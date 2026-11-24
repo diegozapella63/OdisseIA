@@ -1,6 +1,6 @@
 # OdisseIA
 
-Os filmes e as séries da casa: o que cada pessoa está vendo, já viu, quer ver ou abandonou, o episódio em que parou, a nota, os episódios que vão sair e onde assistir no Brasil.
+Os filmes, as séries e os jogos da casa: o que cada pessoa quer ver (ou jogar) e já viu (ou jogou), o episódio em que parou, a categoria, os episódios e os jogos que vão sair, onde assistir no Brasil e em que plataformas jogar.
 
 ## Primeiro passo: a chave do TMDB
 
@@ -12,57 +12,73 @@ Os filmes, as séries, as capas e onde assistir vêm do [TMDB](https://www.themo
 
 A chave fica só no app (em `/data/segredos.json`); a tela mostra só o fim dela. Ela não vai no Exportar nem no Backup.
 
+## Os jogos: a conta do IGDB
+
+Os jogos e as capas deles vêm do [IGDB](https://www.igdb.com/), da Twitch, de graça:
+
+1. Entre no [Twitch Developers](https://dev.twitch.tv/console) com uma conta da Twitch (ela precisa da verificação em duas etapas ligada).
+2. Em **Aplicativos › Registrar seu aplicativo**: um nome qualquer, o endereço `http://localhost`, a categoria **Application Integration** e o tipo de cliente **Confidencial**.
+3. Abra o app criado, copie o **Client ID** e toque em **Novo segredo** para ter o **Client Secret**.
+4. No OdisseIA, em **Mais › Configurações › Integrações › Jogos (IGDB)**, cole os dois e toque em **Salvar e testar**.
+
+Os dois ficam só no app (em `/data/segredos.json`), como a chave do TMDB. Os nomes e as sinopses dos jogos vêm em inglês: o IGDB não tem português.
+
 ## Agora
 
-- **Vendo agora**: o que está sendo visto, com o episódio em que parou e quantos já saíram e faltam. O botão com o episódio (**✓ T2 E6**) marca o seguinte como visto.
+- **Continuar vendo**: as séries em Quero ver com algum episódio visto, com o episódio em que parou e quantos já saíram e faltam. O botão com o episódio (**✓ T2 E6**) marca o seguinte como visto.
 - **Novos episódios**: as séries da lista com episódio saindo nos próximos 30 dias.
-- **Quero ver**: o que a casa quer ver (os mais recentes; **Ver todos** abre o Buscar).
+- **Jogos que vão sair**: os jogos em Quero jogar que ainda não saíram, com a data.
+- **Quero ver** e **Quero jogar**: o que a casa quer ver e jogar (os mais recentes; **Ver todos** abre o Buscar).
 
 ## Adicionar (o + no meio da barra)
 
-Abre nas **listas prontas** do TMDB: **Em alta** (na semana), **Mais populares**, **Mais bem avaliados**, **Coleções** e **Estreias** (os filmes nos cinemas do Brasil; nas séries, as que estão no ar). **Mostrar mais** traz a próxima página. Para procurar um título, escreva o nome: a busca é no TMDB, em português. Tudo, Filmes ou Séries filtra.
+Abre nas **listas prontas**: **Em alta**, **Mais populares**, **Mais bem avaliados**, **Coleções** e **Estreias** (os filmes nos cinemas do Brasil; nas séries, as que estão no ar). Nos jogos, a popularidade do IGDB (**Em alta** e **Mais jogados**), os **Mais bem avaliados**, as **Coleções** e os **Lançamentos** dos últimos 90 dias. **Mostrar mais** traz a próxima página. Para procurar, escreva o nome: os filmes e as séries no TMDB, em português; os jogos no IGDB. **Tudo**, **Filmes**, **Séries** ou **Jogos** filtra (Tudo mistura os que têm a conta posta).
 
 Em cada capa:
-- **Já vi** (o visto): põe na lista como **Visto**. Numa série, marca a série inteira, até o último episódio que saiu. O que ainda não saiu não tem esse botão.
-- **Quero ver** (o marcador): põe na lista como **Quero ver**.
+- **Já vi** (o visto; num jogo, **Já joguei**): põe na lista como **Visto** (**Jogado**). Numa série, marca a série inteira, até o último episódio que saiu. O que ainda não saiu não tem esse botão.
+- **Quero ver** (o marcador; num jogo, **Quero jogar**): põe na lista.
 - Tocar na capa abre o título (fora da lista, ele entra como Quero ver). O Voltar do celular volta para a lista.
 
 O que já está na lista mostra a situação no canto da capa.
 
 ## Categorias
 
-Em **Mais › Categorias** ficam as categorias da casa, uma lista para as séries e outra para os filmes (até 40 em cada). Escreva o nome e toque em **Adicionar** (ou Enter); o nome muda no próprio campo; a lixeira apaga (os títulos ficam sem categoria). O Buscar filtra pela categoria.
+Em **Mais › Categorias** ficam as categorias da casa, uma lista para cada tipo (até 40 em cada), cada uma com uma cor. **Nova categoria** abre o nome e a cor (começa numa cor que nenhuma usa); tocar numa categoria muda o nome e a cor, ou apaga (os títulos ficam sem categoria). No título, a categoria aparece na cor dela; **Nova** cria uma ali mesmo. O Buscar e o Vistos filtram pela categoria.
 
-## Coleções de filmes
+## Coleções
 
-As sagas (os filmes de uma mesma história) aparecem na busca com a etiqueta **Coleção**, na lista pronta **Coleções** (as sagas dos filmes mais populares e mais bem avaliados) e no botão **Coleção** embaixo da capa de um filme que faz parte de uma. Na capa da coleção, o ✓ marca todos os filmes já lançados como Visto, e o marcador, todos como Quero ver, sem abrir. A coleção abre com todos os filmes, na ordem em que saíram: **Quero ver todos** põe os que faltam na lista; **Já vi todos** põe os que já saíram como Visto (e marca como Visto os que já estavam na lista).
+As sagas de filmes e as séries de jogos aparecem na busca com a etiqueta **Coleção**, na lista pronta **Coleções** (as sagas dos filmes mais populares e mais bem avaliados) e no botão **Coleção** embaixo da capa de um filme que faz parte de uma. Na capa da coleção, o ✓ marca todos os já lançados como Visto (Jogado), e o marcador, todos como Quero ver (jogar), sem abrir. A coleção abre com todos, na ordem em que saíram: **Quero ver todos** (**Quero jogar todos**) põe os que faltam na lista; **Já vi todos** (**Já joguei todos**) põe os que já saíram como Visto (e marca como Visto os que já estavam na lista). Numa série de jogos entram os jogos de verdade: as remasterizações, os pacotes e os conteúdos extras ficam de fora.
 
 ## O título
 
-- **Situação**: Quero ver ou Visto. Visto numa série marca até o último episódio que saiu. A série em Quero ver com algum episódio visto aparece em **Continuar vendo**, no Agora.
+- **Situação**: Quero ver ou Visto (num jogo, Quero jogar ou Jogado). Visto numa série marca até o último episódio que saiu. A série em Quero ver com algum episódio visto aparece em **Continuar vendo**, no Agora.
 - **Parou em** (séries): a temporada e o último episódio visto. **Vi o T2 E6** marca o seguinte. No último episódio de uma série que acabou, ela vira **Visto** sozinha.
-- **Categoria**: uma das categorias da casa (as de séries ou as de filmes), ou Nenhuma. Sem nenhuma criada, o botão **Criar categorias** leva a Mais › Categorias.
+- **Categoria**: Sem categoria ou uma das categorias da casa do tipo do título, com a bolinha na cor dela; **Nova** cria uma ali mesmo.
 - **Quem**: quem da casa quer ver ou viu (as pessoas do Home Assistant); **Todos** marca a casa toda. Desliga em **Configurações › Opções › Quem vê**.
-- **Onde assistir**: no Brasil, por assinatura, grátis, para alugar ou comprar. Dados da JustWatch, pelo TMDB.
+- **Onde assistir**: no Brasil, por assinatura, grátis, para alugar ou comprar. Dados da JustWatch, pelo TMDB. Num jogo, **Onde jogar**: as plataformas, pelo IGDB.
 - **Notas**: o que a casa achou, quem indicou.
-- **Atualizar** busca de novo no TMDB (o app já atualiza sozinho: as séries que a casa vê ou quer ver, uma vez por dia; o resto, uma vez por semana).
+- **Atualizar** busca de novo no TMDB ou no IGDB (o app já atualiza sozinho: as séries que a casa vê ou quer ver e os jogos que ainda vão sair, uma vez por dia; o resto, uma vez por semana).
 
-## Buscar e Histórico
+## Buscar e Vistos
 
-**Buscar** filtra a lista pelo nome e, em **Filtros** (que fecha e abre), pelo tipo, pela situação, pela categoria e pela pessoa. **Histórico** mostra o que a casa terminou de ver, mês a mês, numa aba para as séries e outra para os filmes.
+**Buscar** filtra a lista pelo nome e, em **Filtros** (que fecha e abre), pelo tipo, pela situação, pela categoria (também **Sem categoria**) e pela pessoa. **Vistos** mostra o que está salvo como visto (e jogado), o mais recente primeiro, numa aba para cada tipo, com o filtro da categoria em cima.
+
+Nos dois, em cima da lista:
+- **Capas** ou **Lista**: a lista menor, sem as capas, um título por linha. O aparelho lembra.
+- **Selecionar**: toque nos títulos (ou segure o dedo num) e **Alterar** muda de uma vez a **Categoria** e **Quem**; cada campo começa em **Manter**. Depois, o aviso tem o **Desfazer**. Uma seleção é de um tipo só (as categorias são de cada tipo). O Voltar do celular sai do Selecionar.
 
 ## O que controlar
 
-Em **Configurações › Opções › O que controlar**, ligue só as séries, só os filmes ou os dois. O que fica desligado some da tela e do CorrerIA; nada é apagado, e volta ao ligar de novo.
+Em **Configurações › Opções › O que controlar**, ligue as séries, os filmes e os jogos (pelo menos um). O que fica desligado some da tela e do CorrerIA; nada é apagado, e volta ao ligar de novo.
 
 ## Pelo CorrerIA
 
-Com **Configurações › Integrações › CorrerIA** ligado, o CorrerIA (WhatsApp, Claude e Gemini) pode perguntar o que a casa está vendo, adicionar um filme ou uma série pelo nome (também uma série inteira já vista), uma coleção de filmes inteira, marcar o próximo episódio, a nota, a situação e quem vê, dizer onde assistir e mostrar as listas prontas (em alta, mais populares, mais bem avaliados e estreias).
+Com **Configurações › Integrações › CorrerIA** ligado, o CorrerIA (WhatsApp, Claude e Gemini) pode perguntar o que a casa está vendo e jogando, adicionar um filme, uma série ou um jogo pelo nome (também uma série inteira já vista), uma coleção inteira (de filmes ou de jogos), marcar o próximo episódio, a categoria, a situação e quem vê (também de vários de uma vez), dizer onde assistir e em que plataformas jogar e mostrar as listas prontas.
 
 ## Dados
 
-Em **Configurações › Dados**: **Exportar** (a lista e as capas num .zip), **Backup na pasta share** (`share/odisseia/backups`, os 10 últimos), **Importar**, **Versões anteriores** (as 5 últimas: uma por dia e antes de importar, restaurar ou apagar tudo) e **Começar do zero** (apaga a lista; a chave e as configurações ficam).
+Em **Configurações › Dados**: **Exportar** (a lista e as capas num .zip), **Backup na pasta share** (`share/odisseia/backups`, os 10 últimos), **Importar**, **Versões anteriores** (as 5 últimas: uma por dia e antes de importar, restaurar ou apagar tudo) e **Começar do zero** (apaga a lista; as chaves e as configurações ficam).
 
 ## Créditos
 
-Este app usa a API do TMDB, mas não é endossado nem certificado pelo TMDB. Onde assistir: dados da [JustWatch](https://www.justwatch.com/br).
+Este app usa a API do TMDB, mas não é endossado nem certificado pelo TMDB. Onde assistir: dados da [JustWatch](https://www.justwatch.com/br). Os jogos: dados do [IGDB](https://www.igdb.com/).

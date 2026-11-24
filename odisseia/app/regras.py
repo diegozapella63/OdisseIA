@@ -1,5 +1,5 @@
 """As regras dos títulos, as mesmas para a tela e para as ferramentas do CorrerIA: limpar o que chega, achar um título,
-criar com os detalhes do TMDB, mudar a situação, quem, a categoria e o episódio, e o próximo episódio. Só mexem no dicionário
+criar com os detalhes do TMDB (filmes e séries) ou do IGDB (jogos), mudar a situação, quem, a categoria e o episódio, e o próximo episódio. Só mexem no dicionário
 dos dados; quem grava é o server.py."""
 import re
 import secrets
@@ -9,9 +9,21 @@ from datetime import date, datetime
 # 0.3.0 (o dono: "pode tirar a opção de vendo, só vou controlar visto e quero ver"): duas situações; o Vendo e o Abandonado
 # de antes viram Quero ver (a série continua com o episódio em que parou)
 SITUACOES = {"quero": "Quero ver", "visto": "Visto"}
+# 0.4.0 (o dono: "cadê os jogos?"): num jogo, as mesmas duas situações com os nomes de jogo
+SIT_JOGO = {"quero": "Quero jogar", "visto": "Jogado"}
 MAX_CATEGORIAS = 40
 CAT_RE = re.compile(r"^c[0-9a-f]{6}$")
-TIPOS = {"filme": "Filme", "serie": "Série"}
+TIPOS = {"filme": "Filme", "serie": "Série", "jogo": "Jogo"}
+PLURAIS = {"filme": "filmes", "serie": "séries", "jogo": "jogos"}
+# 0.4.0 (o dono: "colocar cor, fazer no mesmo padrão dos outros apps"): cada categoria tem uma cor da paleta da família
+CORES = ["vermelho", "coral", "laranja", "ouro", "verde", "menta", "turquesa", "azul", "indigo", "lilas", "rosa", "grafite"]
+
+
+def cor_livre(lista):
+    """A cor de uma categoria nova: a primeira da paleta (sem o Grafite) que nenhuma da lista usa; todas usadas, a seguinte."""
+    usadas = {c.get("cor") for c in lista}
+    return next((c for c in CORES[:-1] if c not in usadas), CORES[len(lista) % (len(CORES) - 1)])
+CAPA_IGDB_RE = re.compile(r"^[a-z0-9]{2,40}$")
 MAX_TITULOS = 3000
 MAX_NOTAS = 2000
 ID_RE = re.compile(r"^t[0-9a-f]{8}$")
@@ -65,7 +77,7 @@ def limpar_titulo(t):
     nome = _txt(t.get("nome"), 160)
     if not nome:
         return None
-    o = {"id": t["id"], "tipo": t["tipo"], "tmdb": _int(t.get("tmdb"), 0, 10 ** 9) or None, "nome": nome, "original": _txt(t.get("original"), 160),
+    o = {"id": t["id"], "tipo": t["tipo"], "tmdb": _int(t.get("tmdb"), 0, 10 ** 9) or None if t["tipo"] != "jogo" else None, "nome": nome, "original": _txt(t.get("original"), 160),
          "ano": _int(t.get("ano"), 0, 3000) or None, "capa": str(t.get("capa") or "") if re.match(r"^t[0-9a-f]{8}\.(jpg|png)$", str(t.get("capa") or "")) else "",
          "capa_tmdb": str(t.get("capa_tmdb") or "")[:90], "sinopse": _txt(t.get("sinopse"), 1200), "generos": _nomes(t.get("generos"), 6),
          "situacao": "visto" if t.get("situacao") == "visto" else "quero",
@@ -77,7 +89,17 @@ def limpar_titulo(t):
     w = t.get("onde") if isinstance(t.get("onde"), dict) else {}
     o["onde"] = {k: _nomes(w.get(k)) for k in ("assinatura", "gratis", "alugar", "comprar")}
     o["onde"]["link"] = str(w.get("link") or "")[:300] if str(w.get("link") or "").startswith("https://") else ""
-    if o["tipo"] == "filme":
+    if o["tipo"] == "jogo":
+        o["igdb"] = _int(t.get("igdb"), 0, 10 ** 9) or None
+        o["capa_igdb"] = str(t.get("capa_igdb") or "") if CAPA_IGDB_RE.match(str(t.get("capa_igdb") or "")) else ""
+        o["igdb_em"] = str(t.get("igdb_em") or "")[:25]
+        o["data"] = str(t.get("data") or "") if DATA_RE.match(str(t.get("data") or "")) else ""
+        o["plataformas"] = _nomes(t.get("plataformas"))
+        o["link"] = str(t.get("link") or "")[:300] if str(t.get("link") or "").startswith("https://") else ""
+        c = t.get("colecao") if isinstance(t.get("colecao"), dict) else {}
+        o["colecao"] = {"id": _int(c.get("id"), 1, 10 ** 9), "nome": _txt(c.get("nome"), 160), "capa": str(c.get("capa") or "")[:40]} if _int(c.get("id"), 0, 10 ** 9) else None
+        del o["onde"], o["capa_tmdb"], o["tmdb_em"]
+    elif o["tipo"] == "filme":
         o["duracao"] = _int(t.get("duracao"), 0, 2000) or None
         c = t.get("colecao") if isinstance(t.get("colecao"), dict) else {}
         o["colecao"] = {"id": _int(c.get("id"), 1, 10 ** 9), "nome": _txt(c.get("nome"), 160), "capa": str(c.get("capa") or "")[:90]} if _int(c.get("id"), 0, 10 ** 9) else None
@@ -112,7 +134,7 @@ def limpar_dados(d):
         for c in cats.get(k) if isinstance(cats.get(k), list) else []:
             if isinstance(c, dict) and CAT_RE.match(str(c.get("id") or "")) and _txt(c.get("nome"), 40) and c["id"] not in vistos:
                 vistos.add(c["id"])
-                lista.append({"id": c["id"], "nome": _txt(c.get("nome"), 40)})
+                lista.append({"id": c["id"], "nome": _txt(c.get("nome"), 40), "cor": c.get("cor") if c.get("cor") in CORES else cor_livre(lista)})
         categorias[k] = lista[:MAX_CATEGORIAS]
     validas = {c["id"] for k in categorias for c in categorias[k]}
     for t in titulos:
@@ -152,15 +174,35 @@ def achar(d, ref):
     raise ErroRegra("Mais de um título com «" + ref + "»: " + "; ".join(f"{t['nome']}" + (f" ({t['ano']})" if t["ano"] else "") + f" [{t['id']}]" for t in parecidos[:8]) + ". Use o id.")
 
 
-def de_tmdb(d, tipo, tmdb_id):
-    return next((t for t in d["titulos"] if t["tipo"] == tipo and t["tmdb"] == tmdb_id), None)
+def fonte(tipo):
+    """De onde vem o título: o número do IGDB num jogo, o do TMDB num filme ou numa série."""
+    return "igdb" if tipo == "jogo" else "tmdb"
+
+
+def de_fonte(d, tipo, n):
+    """O título da lista com este número do TMDB (filme ou série) ou do IGDB (jogo)."""
+    k = fonte(tipo)
+    return next((t for t in d["titulos"] if t["tipo"] == tipo and t.get(k) == n), None) if n else None
+
+
+de_tmdb = de_fonte
+
+
+def nome_sit(tipo, s):
+    return (SIT_JOGO if tipo == "jogo" else SITUACOES)[s]
 
 
 def aplicar_detalhes(t, det, agora):
-    """O que vem do TMDB por cima do título (o que é da casa, como a situação, quem, a categoria e o episódio, fica)."""
-    for k in ("nome", "original", "ano", "sinopse", "generos", "onde"):
-        if det.get(k) not in (None, "") or k in ("generos", "onde"):
+    """O que vem do TMDB ou do IGDB por cima do título (o que é da casa, como a situação, quem, a categoria e o
+    episódio, fica)."""
+    for k in ("nome", "original", "ano", "sinopse", "generos") + (("plataformas", "data", "link") if t["tipo"] == "jogo" else ("onde",)):
+        if det.get(k) not in (None, "") or k in ("generos", "onde", "plataformas"):
             t[k] = det.get(k) if det.get(k) is not None else t.get(k)
+    if t["tipo"] == "jogo":
+        t["capa_igdb"] = det.get("capa") or t.get("capa_igdb", "")
+        t["colecao"] = det.get("colecao") if "colecao" in det else t.get("colecao")
+        t["igdb_em"] = agora
+        return t
     t["capa_tmdb"] = det.get("capa") or t.get("capa_tmdb", "")
     if t["tipo"] == "filme":
         t["duracao"] = det.get("duracao") or t.get("duracao")
@@ -173,23 +215,26 @@ def aplicar_detalhes(t, det, agora):
 
 
 def criar(d, det, situacao="quero", quem=(), agora=None):
-    """Um título novo com os detalhes do TMDB. Já na lista (o mesmo número do TMDB e o mesmo tipo): devolve o que já
+    """Um título novo com os detalhes do TMDB ou do IGDB. Já na lista (o mesmo número e o mesmo tipo): devolve o que já
     existe e False."""
     agora = agora or datetime.now().isoformat(timespec="seconds")
     if det.get("tipo") not in TIPOS:
-        raise ErroRegra("O tipo precisa ser filme ou serie.")
-    ja = de_tmdb(d, det["tipo"], det.get("tmdb"))
+        raise ErroRegra("O tipo precisa ser filme, serie ou jogo.")
+    ja = de_fonte(d, det["tipo"], det.get(fonte(det["tipo"])))
     if ja:
         return ja, False
     if len(d["titulos"]) >= MAX_TITULOS:
         raise ErroRegra(f"A lista chegou a {MAX_TITULOS} títulos.")
     if situacao not in SITUACOES:
         raise ErroRegra("A situação vale quero ou visto.")
-    t = {"id": novo_id({x["id"] for x in d["titulos"]}), "tipo": det["tipo"], "tmdb": det.get("tmdb"), "nome": det.get("nome") or "Sem nome",
+    t = {"id": novo_id({x["id"] for x in d["titulos"]}), "tipo": det["tipo"], "tmdb": det.get("tmdb") if det["tipo"] != "jogo" else None, "nome": det.get("nome") or "Sem nome",
          "original": det.get("original") or "", "ano": det.get("ano"), "capa": "", "capa_tmdb": "", "sinopse": "", "generos": [],
          "situacao": "quero", "quem": [], "categoria": "", "notas": "", "criado": agora, "atualizado": agora, "visto_em": None, "tmdb_em": "",
          "onde": {"assinatura": [], "gratis": [], "alugar": [], "comprar": [], "link": ""}}
-    if t["tipo"] == "filme":
+    if t["tipo"] == "jogo":
+        t.update(igdb=det.get("igdb"), capa_igdb="", igdb_em="", data="", plataformas=[], link="", colecao=None)
+        del t["onde"], t["capa_tmdb"], t["tmdb_em"]
+    elif t["tipo"] == "filme":
         t.update(duracao=None, colecao=None)
     else:
         t.update(temporadas=[], temp=0, ep=0, proximo=None, ultimo=None, fim=False)
@@ -296,6 +341,24 @@ def mudar(t, campos, pessoas, agora=None, categorias=None):
     return t
 
 
+def lote(d, itens, pessoas, agora=None):
+    """Muda vários títulos de uma vez (o Alterar do Selecionar e o marcar_varios do CorrerIA): [{id, campos}], com as
+    mesmas regras do mudar (a categoria é a do tipo de cada título). Tudo ou nada: um que não vale para tudo."""
+    if not isinstance(itens, list) or not itens or len(itens) > MAX_TITULOS:
+        raise ErroRegra("Mande os títulos e o que mudar.")
+    por_id = {t["id"]: t for t in d["titulos"]}
+    mudados = []
+    for it in itens:
+        t = por_id.get(it.get("id")) if isinstance(it, dict) else None
+        if not t:
+            raise ErroRegra("Um dos títulos não está mais na lista.")
+        campos = it.get("campos") if isinstance(it.get("campos"), dict) else {}
+        campos = {k: v for k, v in campos.items() if k in ("categoria", "quem", "situacao")}
+        mudar(t, campos, pessoas | set(t["quem"]) if pessoas is not None else None, agora, d["categorias"][t["tipo"]])
+        mudados.append(t)
+    return mudados
+
+
 def proximo_ep(t, agora=None):
     """Marca o episódio seguinte como visto. No último que saiu de uma série que acabou, vira Visto."""
     if t["tipo"] != "serie":
@@ -324,7 +387,7 @@ def tipos_ligados(d):
 
 def conferir_tipo(d, tipo):
     if tipo in TIPOS and tipo not in tipos_ligados(d):
-        raise ErroRegra(f"{'Filmes' if tipo == 'filme' else 'Séries'} estão desligados em Opções › O que controlar.")
+        raise ErroRegra(f"{PLURAIS[tipo].capitalize()} estão desligados em Opções › O que controlar.")
 
 
 def em_andamento(t):
@@ -344,19 +407,22 @@ def achar_categoria(d, tipo, nome):
     c = next((c for c in d["categorias"][tipo] if sem_acento(c["nome"]) == alvo), None)
     if not c:
         valem = ", ".join(x["nome"] for x in d["categorias"][tipo])
-        raise ErroRegra(f"«{nome}» não é uma categoria de {'filmes' if tipo == 'filme' else 'séries'}." + (f" Valem: {valem}." if valem else " Crie em Mais › Categorias."))
+        raise ErroRegra(f"«{nome}» não é uma categoria de {PLURAIS[tipo]}." + (f" Valem: {valem}." if valem else " Crie em Mais › Categorias."))
     return c["id"]
 
 
 def mudar_categorias(d, corpo):
-    """Mais › Categorias: {acao: nova, tipo, nome} | {acao: renomear, id, nome} | {acao: apagar, id}. Apagar tira a
-    categoria dos títulos."""
+    """Mais › Categorias: {acao: nova, tipo, nome, cor?} | {acao: editar (ou renomear), id, nome?, cor?} | {acao: apagar,
+    id}. Apagar tira a categoria dos títulos."""
     acao = corpo.get("acao")
     nome = _txt(corpo.get("nome"), 40)
+    cor = corpo.get("cor")
+    if cor is not None and cor not in CORES:
+        raise ErroRegra("Cor desconhecida.")
     if acao == "nova":
         tipo = corpo.get("tipo")
         if tipo not in TIPOS:
-            raise ErroRegra("O tipo vale filme ou serie.")
+            raise ErroRegra("O tipo vale filme, serie ou jogo.")
         if not nome:
             raise ErroRegra("Escreva o nome da categoria.")
         lista = d["categorias"][tipo]
@@ -365,18 +431,21 @@ def mudar_categorias(d, corpo):
         if len(lista) >= MAX_CATEGORIAS:
             raise ErroRegra(f"Até {MAX_CATEGORIAS} categorias por tipo.")
         usados = {c["id"] for k in d["categorias"] for c in d["categorias"][k]}
-        c = {"id": next(i for i in ("c" + secrets.token_hex(3) for _ in range(99)) if i not in usados), "nome": nome}
+        c = {"id": next(i for i in ("c" + secrets.token_hex(3) for _ in range(99)) if i not in usados), "nome": nome, "cor": cor or cor_livre(lista)}
         lista.append(c)
         return c
     tipo, c = next(((k, c) for k in d["categorias"] for c in d["categorias"][k] if c["id"] == corpo.get("id")), (None, None))
     if not c:
         raise ErroRegra("Essa categoria não existe mais.")
-    if acao == "renomear":
-        if not nome:
-            raise ErroRegra("Escreva o nome da categoria.")
-        if any(sem_acento(x["nome"]) == sem_acento(nome) and x is not c for x in d["categorias"][tipo]):
-            raise ErroRegra("Essa categoria já existe.")
-        c["nome"] = nome
+    if acao in ("renomear", "editar"):
+        if "nome" in corpo or acao == "renomear":
+            if not nome:
+                raise ErroRegra("Escreva o nome da categoria.")
+            if any(sem_acento(x["nome"]) == sem_acento(nome) and x is not c for x in d["categorias"][tipo]):
+                raise ErroRegra("Essa categoria já existe.")
+            c["nome"] = nome
+        if cor:
+            c["cor"] = cor
         return c
     if acao == "apagar":
         d["categorias"][tipo] = [x for x in d["categorias"][tipo] if x is not c]

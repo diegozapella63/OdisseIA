@@ -230,7 +230,7 @@ class TestCorrerIA(unittest.TestCase):
         self.assertEqual(oct(os.stat(arq).st_mode & 0o777), "0o600")
         self.assertEqual(self.ferr("GET", chave="errada")[0], 401)
         st, r = self.ferr("GET")
-        self.assertEqual([f["nome"] for f in r["ferramentas"]], ["resumo", "buscar", "ver", "lista_pronta", "adicionar", "adicionar_colecao", "marcar", "proximo_episodio", "apagar"])
+        self.assertEqual([f["nome"] for f in r["ferramentas"]], ["resumo", "buscar", "ver", "lista_pronta", "adicionar", "adicionar_colecao", "marcar", "marcar_varios", "proximo_episodio", "apagar"])
         self.assertEqual(self.usar("resumo")[1]["texto"], "A lista da casa está vazia.")
         self.assertIn("Falta a chave do TMDB", self.usar("adicionar", {"nome": "Mar de Estrelas"})[1]["erro"])
         pedir(self.base, "POST", "/api/tmdb", {"chave": apoio.CHAVE})
@@ -251,7 +251,7 @@ class TestCorrerIA(unittest.TestCase):
         self.assertIn("Ana, Beto", self.usar("marcar", {"titulo": "mar", "quem": ["todos"]})[1]["texto"], "«todos» é a casa toda")
         self.assertIn("todos os episódios que saíram", self.usar("proximo_episodio", {"titulo": "mar"})[1]["erro"])
         r = self.usar("resumo")[1]["texto"]
-        self.assertIn("2 títulos: 2 quero ver, 0 visto.", r)
+        self.assertIn("2 títulos (filmes: 1 quero ver, 0 visto; séries: 1 quero ver, 0 visto).", r)
         self.assertIn("Séries em andamento:\n- ", r)
         self.assertIn("Categorias da casa: séries: Para ver a dois.", r)
         self.assertIn("27/11/2026: Mar de Estrelas T2 E3", r)
@@ -400,14 +400,14 @@ class TestNovidades020(unittest.TestCase):
         r = self.get("/api/lista?nome=populares&tipo=filme&pagina=1")[1]
         self.assertEqual((r["resultados"][0]["situacao"], r["resultados"][1]["ja"]), ("visto", None))
         self.assertFalse(self.get("/api/lista?nome=populares&tipo=filme&pagina=2")[1]["mais"])
-        self.assertEqual(self.get("/api/lista?nome=nada")[0], 502)
+        self.assertEqual(self.get("/api/lista?nome=nada")[0], 400)
         self.assertEqual(len(self.get("/api/lista?nome=alta&pagina=x")[1]["resultados"]), 2, "a página que não é número é a primeira")
 
     def test_colecao(self):
         self.post("/api/titulo", {"acao": "adicionar", "tipo": "filme", "tmdb": 101, "situacao": "quero"})
         st, r = self.get("/api/colecao?id=301")
         c = r["colecao"]
-        self.assertEqual([(f["nome"], f["saiu"], f["situacao"]) for f in c["filmes"]],
+        self.assertEqual([(f["nome"], f["saiu"], f["situacao"]) for f in c["itens"]],
                          [("A Grande Viagem", True, "quero"), ("A Grande Viagem 2", True, None), ("A Grande Viagem 3", False, None)])
         self.assertEqual(self.get("/api/colecao?id=x")[0], 400)
         st, r = self.post("/api/titulo", {"acao": "adicionar_colecao", "colecao": 301, "situacao": "visto"})
@@ -428,12 +428,12 @@ class TestNovidades020(unittest.TestCase):
     def test_o_que_controlar(self):
         self.post("/api/titulo", {"acao": "adicionar", "tipo": "filme", "tmdb": 101})
         self.post("/api/titulo", {"acao": "adicionar", "tipo": "serie", "tmdb": 202})
-        st, r = self.post("/api/ajustes", {"tipos": {"filme": False}})
-        self.assertEqual(r["ajustes"]["tipos"], {"filme": False, "serie": True})
+        st, r = self.post("/api/ajustes", {"tipos": {"filme": False, "jogo": False}})
+        self.assertEqual(r["ajustes"]["tipos"], {"filme": False, "serie": True, "jogo": False})
         self.assertEqual([t["tipo"] for t in self.get("/api/estado")[1]["titulos"]], ["serie"])
         self.assertEqual(len(S.ler()["titulos"]), 2, "desligar não apaga")
         self.assertEqual(self.post("/api/ajustes", {"tipos": {"serie": False}})[1]["erro"], "Deixe pelo menos um ligado.")
-        self.assertEqual(self.post("/api/ajustes", {"tipos": {"jogo": True}})[0], 400)
+        self.assertEqual(self.post("/api/ajustes", {"tipos": {"musica": True}})[0], 400)
         st, r = self.post("/api/titulo", {"acao": "adicionar", "tipo": "filme", "tmdb": 103})
         self.assertEqual((st, r["erro"]), (400, "Filmes estão desligados em Opções › O que controlar."))
         self.assertEqual(self.post("/api/titulo", {"acao": "adicionar_colecao", "colecao": 301})[0], 400)
@@ -519,3 +519,207 @@ class TestNovidades030(unittest.TestCase):
         self.assertIn("Farol Distante (2021) · filme · quero ver · Suspense", r)
         with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "não é uma categoria"):
             S.usar_ferramenta({"nome": "adicionar", "argumentos": {"nome": "grande viagem 2", "categoria": "Terror"}})
+
+
+class TestNovidades040(unittest.TestCase):
+    """0.4.0: os jogos (o IGDB), o Alterar de vários títulos e a cor das categorias."""
+
+    def setUp(self):
+        apoio.limpar()
+        apoio.fixar_hoje(self)
+        self.base = apoio.Servidor.subir()
+        S.guardar_chave(apoio.CHAVE)
+        S.guardar_igdb(apoio.IGDB_ID, apoio.IGDB_SEGREDO)
+
+    def get(self, rota):
+        return pedir(self.base, "GET", rota)
+
+    def post(self, rota, corpo):
+        return pedir(self.base, "POST", rota, corpo)
+
+    def test_conta_do_igdb(self):
+        S.guardar_igdb("", "")
+        self.assertEqual(self.get("/api/estado")[1]["igdb"], {"chave": False, "fim": "", "erro": ""})
+        self.assertEqual(self.post("/api/igdb", {"cliente": "curto", "segredo": "x"})[0], 400)
+        st, r = self.post("/api/igdb", {"cliente": apoio.IGDB_ID, "segredo": "segredoerrado0000"})
+        self.assertEqual((st, "Twitch não aceitou" in r["erro"]), (502, True))
+        self.assertEqual(S.conta_igdb(), ("", ""), "uma conta que não vale não fica guardada")
+        st, r = self.post("/api/igdb", {"cliente": apoio.IGDB_ID, "segredo": apoio.IGDB_SEGREDO})
+        self.assertEqual(r["igdb"], {"chave": True, "fim": "••••abcd", "erro": ""})
+        self.assertNotIn(apoio.IGDB_SEGREDO, json.dumps(self.get("/api/estado")[1]), "o segredo nunca volta para a tela")
+        self.assertEqual(self.post("/api/igdb", {})[1]["igdb"]["chave"], False)
+        st, r = self.get("/api/busca?q=torre&tipo=jogo")
+        self.assertEqual((st, "Falta a conta do IGDB" in r["erro"]), (502, True))
+        self.assertIn("Falta a conta", self.get("/api/estado")[1]["igdb"]["erro"] or "Falta a conta", "sem conta, sem erro guardado")
+
+    def test_busca_e_listas_com_os_jogos(self):
+        st, r = self.get("/api/busca?q=torre&tipo=jogo")
+        self.assertEqual([x["tipo"] for x in r["resultados"]][:2], ["colecao_jogos", "jogo"])
+        st, r = self.get("/api/busca?q=grande")
+        self.assertEqual({x["tipo"] for x in r["resultados"]}, {"colecao", "filme"}, "Tudo: os filmes e as séries do TMDB com os jogos do IGDB")
+        st, r = self.get("/api/busca?q=i")
+        self.assertEqual(r["resultados"], [])
+        st, r = self.get("/api/lista?nome=alta")
+        tipos = [x["tipo"] for x in r["resultados"]]
+        self.assertEqual(tipos[:2], ["filme", "jogo"], "um de cada fonte por vez")
+        self.assertIn("serie", tipos)
+        st, r = self.get("/api/lista?nome=populares&tipo=jogo")
+        self.assertEqual([x["nome"] for x in r["resultados"]], ["Torre do Relógio"])
+        st, r = self.get("/api/lista?nome=colecoes&tipo=jogo")
+        self.assertEqual([(x["tipo"], x["nome"]) for x in r["resultados"]], [("colecao_jogos", "Saga da Torre")])
+        st, r = self.get("/api/lista?nome=colecoes")
+        self.assertEqual([x["tipo"] for x in r["resultados"]], ["colecao", "colecao_jogos"])
+        apoio.TMDB.falha_igdb = 500
+        st, r = self.get("/api/lista?nome=alta")
+        self.assertEqual((st, {x["tipo"] for x in r["resultados"]}), (200, {"filme", "serie"}), "o IGDB fora do ar: fica o TMDB")
+        st, r = self.get("/api/lista?nome=alta&tipo=jogo")
+        self.assertEqual(st, 502)
+        apoio.TMDB.falha_igdb = 0
+        S.guardar_chave("")
+        st, r = self.get("/api/lista?nome=alta")
+        self.assertEqual({x["tipo"] for x in r["resultados"]}, {"jogo"}, "sem a chave do TMDB, Tudo traz só os jogos")
+        S.guardar_igdb("", "")
+        st, r = self.get("/api/lista?nome=alta")
+        self.assertEqual((st, "chave do TMDB" in r["erro"]), (502, True), "sem nenhuma conta, diz o que falta")
+        self.post("/api/ajustes", {"tipos": {"filme": False, "serie": False}})
+        st, r = self.get("/api/lista?nome=alta")
+        self.assertIn("conta do IGDB", r["erro"], "só os jogos ligados: a conta do IGDB")
+        self.assertEqual(self.get("/api/lista?nome=colecoes")[1]["erro"], "Falta a conta do IGDB (Mais › Configurações › Integrações).")
+
+    def test_adicionar_jogos_e_colecao(self):
+        st, r = self.post("/api/titulo", {"acao": "adicionar", "tipo": "jogo", "igdb": 701, "situacao": "visto"})
+        t = r["titulo"]
+        self.assertEqual((t["nome"], t["situacao"], t["plataformas"], t["colecao"]["nome"], t["visto_em"]), ("Torre do Relógio", "visto", ["PC", "PlayStation 5"], "Saga da Torre", "2026-11-24"))
+        self.assertTrue(t["capa"] and os.path.exists(S.caminho_capa(t["capa"])))
+        self.assertNotIn("onde", t)
+        self.assertFalse(self.post("/api/titulo", {"acao": "adicionar", "tipo": "jogo", "igdb": 701})[1]["novo"])
+        self.assertEqual(self.post("/api/titulo", {"acao": "adicionar", "tipo": "jogo", "tmdb": 701})[0], 400)
+        st, r = self.get("/api/colecao?id=501&tipo=jogo")
+        self.assertEqual([(x["nome"], x["situacao"], x["saiu"]) for x in r["colecao"]["itens"]],
+                         [("Torre do Relógio", "visto", True), ("Torre do Relógio 2", None, True), ("Torre do Relógio 3", None, False)])
+        st, r = self.post("/api/titulo", {"acao": "adicionar_colecao", "colecao": 501, "tipo": "jogo", "situacao": "visto"})
+        self.assertEqual((r["novos"], r["ja"], r["fora"], r["tipo"]), (1, 1, 1, "jogo"))
+        st, r = self.post("/api/titulo", {"acao": "adicionar_colecao", "colecao": 501, "tipo": "jogo", "situacao": "quero"})
+        self.assertEqual(r["novos"], 1)
+        self.assertEqual(sorted((x["nome"], x["situacao"]) for x in S.ler()["titulos"]),
+                         [("Torre do Relógio", "visto"), ("Torre do Relógio 2", "visto"), ("Torre do Relógio 3", "quero")])
+        self.assertEqual(self.post("/api/titulo", {"acao": "adicionar_colecao", "colecao": 501, "tipo": "musica"})[0], 400)
+        jogo = next(x for x in S.ler()["titulos"] if x["igdb"] == 701)
+        d = S.ler()
+        next(x for x in d["titulos"] if x["igdb"] == 701)["capa_igdb"] = "co9velha"
+        S.salvar(d)
+        st, r = self.post("/api/titulo", {"acao": "atualizar", "id": jogo["id"]})
+        self.assertEqual((r["titulo"]["capa_igdb"], r["titulo"]["igdb_em"]), ("co1torre", apoio.HOJE))
+        d = S.ler()
+        d["titulos"][0]["igdb"] = None
+        S.salvar(d)
+        self.assertEqual(self.post("/api/titulo", {"acao": "atualizar", "id": d["titulos"][0]["id"]})[1]["erro"], "Esse título não veio do IGDB.")
+        st, dado = self.get("/api/img/t_cover_big/co1torre.jpg")
+        self.assertEqual((st, dado[:3]), (200, b"\xff\xd8\xff"))
+        self.assertEqual(self.get("/api/img/t_cover_big/nada.jpg")[0], 404)
+
+    def test_laco_com_os_jogos(self):
+        from datetime import datetime
+        S.adicionar({"tipo": "jogo", "igdb": 703, "situacao": "quero"})
+        S.adicionar({"tipo": "jogo", "igdb": 702, "situacao": "visto"})
+        S.adicionar({"tipo": "filme", "tmdb": 101, "situacao": "visto"})
+        agora = datetime(2026, 11, 25, 10)
+        ts = {t["nome"]: t for t in S.ler()["titulos"]}
+        self.assertTrue(S.precisa_atualizar(ts["Torre do Relógio 3"], agora), "o jogo que vai sair: de dia em dia")
+        self.assertFalse(S.precisa_atualizar(ts["Torre do Relógio 2"], agora), "o que já saiu: de semana em semana")
+        d = S.ler()
+        for t in d["titulos"]:
+            t["igdb_em" if t["tipo"] == "jogo" else "tmdb_em"] = "2000-01-01T00:00:00"
+        d["titulos"][0]["igdb_em"] = "quebrado"
+        S.salvar(d)
+        self.assertTrue(S.precisa_atualizar(S.ler()["titulos"][0], agora))
+        S.guardar_chave("")
+        with mock.patch.object(S.time, "sleep"):
+            S.uma_volta(agora)
+        ts = {t["nome"]: t for t in S.ler()["titulos"]}
+        self.assertEqual((ts["Torre do Relógio 2"]["igdb_em"], ts["A Grande Viagem"]["tmdb_em"]), (apoio.HOJE, "2000-01-01T00:00:00"), "sem a chave do TMDB, só os jogos")
+        d = S.ler()
+        for t in d["titulos"]:
+            t["igdb_em"] = "2000-01-01T00:00:00"
+        S.salvar(d)
+        apoio.TMDB.falha_igdb = 401
+        with mock.patch.object(S.time, "sleep"), mock.patch.object(S, "atualizar", wraps=S.atualizar) as a:
+            S.uma_volta(agora)
+        self.assertEqual(a.call_count, 1, "o IGDB não aceitou o acesso: para nos jogos")
+
+    def test_alterar_varios(self):
+        for n in (101, 103):
+            S.adicionar({"tipo": "filme", "tmdb": n, "situacao": "visto"}, "person.ana")
+        S.adicionar({"tipo": "serie", "tmdb": 202})
+        d = S.ler()
+        c = S.R.mudar_categorias(d, {"acao": "nova", "tipo": "filme", "nome": "Clássicos"})
+        S.salvar(d)
+        ids = [t["id"] for t in S.ler()["titulos"] if t["tipo"] == "filme"]
+        st, r = self.post("/api/titulo", {"acao": "lote", "itens": [{"id": i, "campos": {"categoria": c["id"], "quem": ["person.beto"], "notas": "não muda"}} for i in ids]})
+        self.assertEqual([(t["categoria"], t["quem"], t["notas"]) for t in r["titulos"]], [(c["id"], ["person.beto"], "")] * 2)
+        self.assertEqual(r["rev"], S.ler()["rev"])
+        serie = next(t for t in S.ler()["titulos"] if t["tipo"] == "serie")
+        st, r = self.post("/api/titulo", {"acao": "lote", "itens": [{"id": ids[0], "campos": {"categoria": ""}}, {"id": serie["id"], "campos": {"categoria": c["id"]}}]})
+        self.assertEqual(st, 400, "a categoria é a do tipo de cada título")
+        self.assertEqual(next(t for t in S.ler()["titulos"] if t["id"] == ids[0])["categoria"], c["id"], "tudo ou nada")
+        for itens in ([], "x", [{"id": "t00000000"}], ["x"]):
+            self.assertEqual(self.post("/api/titulo", {"acao": "lote", "itens": itens})[0], 400, itens)
+        self.assertEqual(self.post("/api/titulo", {"acao": "lote", "itens": [{"id": ids[0], "campos": {"quem": ["person.zeca"]}}]})[0], 400)
+
+    def test_cor_das_categorias(self):
+        st, r = self.post("/api/categorias", {"acao": "nova", "tipo": "jogo", "nome": "Para jogar junto"})
+        self.assertEqual(r["categorias"]["jogo"][0]["cor"], "vermelho", "a primeira cor livre")
+        st, r = self.post("/api/categorias", {"acao": "nova", "tipo": "jogo", "nome": "Difíceis", "cor": "azul"})
+        c = r["categorias"]["jogo"][1]
+        self.assertEqual(c["cor"], "azul")
+        st, r = self.post("/api/categorias", {"acao": "editar", "id": c["id"], "cor": "verde"})
+        self.assertEqual((r["categorias"]["jogo"][1]["nome"], r["categorias"]["jogo"][1]["cor"]), ("Difíceis", "verde"), "editar só a cor")
+        st, r = self.post("/api/categorias", {"acao": "editar", "id": c["id"], "nome": "Muito difíceis"})
+        self.assertEqual(r["categorias"]["jogo"][1]["nome"], "Muito difíceis")
+        self.assertEqual(self.post("/api/categorias", {"acao": "editar", "id": c["id"], "cor": "pink"})[1]["erro"], "Cor desconhecida.")
+        self.assertEqual(self.post("/api/categorias", {"acao": "editar", "id": c["id"], "nome": ""})[0], 400)
+        lista = [{"cor": x} for x in S.R.CORES[:-1]]
+        self.assertEqual(S.R.cor_livre(lista), S.R.CORES[0], "todas usadas: de novo do começo")
+
+    def test_ferramentas_com_os_jogos(self):
+        f = S.usar_ferramenta
+        r = f({"nome": "adicionar", "argumentos": {"nome": "Torre do Relógio", "tipo": "jogo", "situacao": "visto"}})["texto"]
+        self.assertIn("Torre do Relógio (2021) · jogo · jogado", r)
+        self.assertTrue(S.ler()["titulos"][0]["capa"])
+        r = f({"nome": "adicionar", "argumentos": {"nome": "ilha dos ventos"}})["texto"]
+        self.assertIn("Ilha dos Ventos (2025) · jogo · quero jogar", r, "sem tipo, procura nos dois")
+        self.assertIn("Já está na lista", f({"nome": "adicionar", "argumentos": {"nome": "ilha dos ventos", "tipo": "jogo"}})["texto"])
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "no IGDB"):
+            f({"nome": "adicionar", "argumentos": {"nome": "zzzz", "tipo": "jogo"}})
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "no TMDB nem no IGDB"):
+            f({"nome": "adicionar", "argumentos": {"nome": "zzzz"}})
+        r = f({"nome": "ver", "argumentos": {"titulo": "Torre do Relógio"}})["texto"]
+        self.assertIn("Plataformas: PC, PlayStation 5.", r)
+        self.assertIn("Saiu em 15/06/2021.", r)
+        self.assertIn("Coleção: Saga da Torre.", r)
+        self.assertNotIn("Onde assistir", r)
+        r = f({"nome": "lista_pronta", "argumentos": {"lista": "populares", "tipo": "jogo"}})["texto"]
+        self.assertEqual(r, "Mais jogados (IGDB):\n- Torre do Relógio (2021) · jogo · na lista: jogado")
+        r = f({"nome": "lista_pronta", "argumentos": {"lista": "colecoes"}})["texto"]
+        self.assertIn("(TMDB e IGDB)", r)
+        self.assertIn("Saga da Torre · coleção de jogos", r)
+        self.assertEqual(f({"nome": "lista_pronta", "argumentos": {"lista": "estreias", "tipo": "serie"}})["texto"].split("\n")[0], "Estreias (TMDB):")
+        r = f({"nome": "adicionar_colecao", "argumentos": {"nome": "saga da torre", "tipo": "jogo", "situacao": "visto"}})["texto"]
+        self.assertEqual(r, "Saga da Torre: 1 jogo posto na lista como Jogado, 1 já estava na lista, 1 ainda não saiu.")
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "coleção «nada» no IGDB"):
+            f({"nome": "adicionar_colecao", "argumentos": {"nome": "nada", "tipo": "jogo"}})
+        r = f({"nome": "resumo", "argumentos": {}})["texto"]
+        self.assertIn("jogos: 1 quero jogar, 2 jogado", r)
+        d = S.ler()
+        S.R.mudar_categorias(d, {"acao": "nova", "tipo": "jogo", "nome": "Favoritos"})
+        S.salvar(d)
+        r = f({"nome": "marcar_varios", "argumentos": {"titulos": ["Torre do Relógio", "Torre do Relógio 2", "Torre do Relógio"], "categoria": "favoritos", "quem": ["todos"]}})["texto"]
+        self.assertTrue(r.startswith("Feito em 2 títulos:"))
+        self.assertEqual({t["categoria"] for t in S.ler()["titulos"] if t["nome"].startswith("Torre do Relógio") and t["nome"] != "Torre do Relógio 3"}, {S.ler()["categorias"]["jogo"][0]["id"]})
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "Diga o que mudar"):
+            f({"nome": "marcar_varios", "argumentos": {"titulos": ["Ilha dos Ventos"]}})
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "Diga quais"):
+            f({"nome": "marcar_varios", "argumentos": {"titulos": [], "situacao": "visto"}})
+        r = f({"nome": "marcar_varios", "argumentos": {"titulos": ["Ilha dos Ventos"], "situacao": "visto"}})["texto"]
+        self.assertIn("jogado", r)
+        S.R.lote(S.ler(), [{"id": S.ler()["titulos"][0]["id"], "campos": "x"}], None)

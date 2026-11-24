@@ -1,5 +1,17 @@
 # Mudanças
 
+## 0.4.0
+
+- **Jogos**, pelo IGDB (da Twitch, de graça): a conta em **Mais › Configurações › Integrações › Jogos (IGDB)** (o passo a passo está na Documentação). No +, a aba **Jogos** com Em alta, Mais jogados, Mais bem avaliados, Coleções e Lançamentos; **Quero jogar** e **Já joguei** na capa; a série de jogos inteira de uma vez (**Já joguei todos**); no jogo, **Onde jogar** (as plataformas). No Agora, **Quero jogar** e **Jogos que vão sair**. Os jogos ligam e desligam em Opções › O que controlar.
+- **Vistos** no lugar do Histórico: o que está salvo como visto (e jogado), numa aba para cada tipo, com o filtro da categoria em cima.
+- **Capas ou Lista** em cima da lista do Vistos e do Buscar: a Lista é menor, sem as capas.
+- **Selecionar** (ou segurar o dedo num título) e **Alterar**: a categoria e quem de vários títulos de uma vez, com o **Desfazer**.
+- **Categorias com cor**, como no MemorIA: cada uma com a cor dela, que aparece na lista, no título e nos filtros. Tocar numa categoria muda o nome e a cor; no título, **Nova** cria uma ali mesmo.
+- Na lista, quem vê fica na linha do nome, à direita, e a categoria aparece embaixo, na cor dela.
+- No Buscar, o filtro da categoria está sempre (com **Sem categoria**).
+- O cabeçalho das telas e o Voltar como nos outros apps; em Dados, os botões sem cor. **De onde vêm os dados** saiu do Sobre: o crédito do TMDB fica no cartão dele, em Integrações.
+- **Pelo CorrerIA**: os jogos (adicionar, a coleção, as listas e as plataformas) e **marcar vários** (a categoria, quem e a situação de vários títulos de uma vez).
+
 ## 0.3.0
 
 - **Só Quero ver e Visto**: o Vendo e o Abandonado saíram (o que estava neles virou Quero ver). Uma série em Quero ver com algum episódio visto aparece em **Continuar vendo**, no Agora.

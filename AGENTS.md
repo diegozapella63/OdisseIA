@@ -1,8 +1,9 @@
 # Instruções para quem for mexer neste repositório (pessoas ou IAs)
 
-OdisseIA é um app (add-on) do Home Assistant para os filmes e as séries da casa: o que cada pessoa está vendo, já viu,
-quer ver ou abandonou, o episódio em que parou, a nota, os episódios que vão sair e onde assistir no Brasil. Os dados dos
-títulos vêm do TMDB (com a chave grátis de cada casa); onde assistir é da JustWatch, pelo TMDB. Faz parte de uma família de
+OdisseIA é um app (add-on) do Home Assistant para os filmes, as séries e os jogos da casa: o que cada pessoa quer ver (ou
+jogar) e já viu (ou jogou), o episódio em que parou, a categoria, os episódios e os jogos que vão sair e onde assistir no
+Brasil. Os filmes e as séries vêm do TMDB (com a chave grátis de cada casa; onde assistir é da JustWatch, pelo TMDB); os
+jogos, do IGDB (com o Client ID e o Client Secret de um app grátis da casa no Twitch Developers). Faz parte de uma família de
 apps do mesmo dono, que conversam entre si pelo Home Assistant:
 
 | App | Repositório | O que é |
@@ -28,24 +29,27 @@ odisseia/DOCS.md              manual do usuário (aba Documentação no HA)
 odisseia/app/server.py        servidor HTTP (Python, só biblioteca padrão): dados, capas, TMDB, Dados, CorrerIA
 odisseia/app/regras.py        as regras dos títulos (limpar, achar, criar, mudar, próximo episódio): as mesmas da tela e do CorrerIA
 odisseia/app/tmdb.py          o TMDB: busca, detalhes em pt-BR, onde assistir no Brasil (JustWatch), capas; a chave v3 ou o token v4
+odisseia/app/igdb.py          o IGDB: o acesso pela Twitch (na memória), a busca (com as coleções), as listas (a popularidade do
+                              IGDB), as coleções, os detalhes e as capas; consultas em Apicalypse (POST)
 odisseia/app/ferramentas.py   as ferramentas do CorrerIA (resumo, buscar, ver, adicionar, marcar, proximo_episodio, apagar)
 odisseia/app/www/             a tela: index.html, app.js (JavaScript puro, sem build), styles.css, fontes; selectsheet.js,
                               hatema.js e textareas.js são cópias dos outros apps (ainda fora do tools/iguais.py da família)
-tests/                        testes (unittest; a tela com playwright); tests/apoio.py tem o TMDB de mentira (títulos inventados)
+tests/                        testes (unittest; a tela com playwright); tests/apoio.py tem o TMDB e o IGDB de mentira (inventados)
 dev/rodar.py                  o app no computador com o TMDB de mentira
 tools/cobertura.py            a cobertura de linhas do servidor (fica acima de 95%)
 tools/fazer_logo.py           desenha odisseia/icon.png e odisseia/logo.png
 ```
 
-Os dados ficam em `/data/odisseia.json` (`{versao, rev, titulos, ajustes}`; cada gravação soma 1 em `rev`, e a tela confere
-`/api/rev` a cada 20 s), as capas em `/data/capas/<id>.jpg`, a chave do TMDB em `/data/segredos.json` (600; nunca volta
-para a tela, só o fim `••••abcd`), as versões automáticas em `/data/versoes` (as 5 últimas: uma por dia e antes de
+Os dados ficam em `/data/odisseia.json` (`{versao, rev, titulos, categorias, ajustes}`; cada gravação soma 1 em `rev`, e a
+tela confere `/api/rev` a cada 20 s), as capas em `/data/capas/<id>.jpg`, a chave do TMDB e a conta do IGDB em
+`/data/segredos.json` (600; nunca voltam para a tela, só o fim `••••abcd`), as versões automáticas em `/data/versoes` (as 5 últimas: uma por dia e antes de
 importar, restaurar ou apagar tudo) e os backups em `share/odisseia/backups` (os 10 últimos). Um título:
-`{id: t + 8 hex, tipo: filme|serie, tmdb, nome, original, ano, capa, capa_tmdb, sinopse, generos, situacao:
+`{id: t + 8 hex, tipo: filme|serie|jogo, tmdb, nome, original, ano, capa, capa_tmdb, sinopse, generos, situacao:
 quero|visto, quem: [person.*], categoria (c + 6 hex ou ""), notas, visto_em, tmdb_em, onde: {assinatura, gratis, alugar,
 comprar, link}}`, no filme `colecao: {id, nome, capa}` e, na série, `temporadas: [{n, episodios}]` (sem a 0, dos especiais), `temp`/`ep` (o último visto; 0/0
-nenhum), `proximo` e `ultimo` (`{data, temp, ep, nome}`) e `fim`. O laço do servidor atualiza pelo TMDB as séries vistas ou
-queridas uma vez por dia e o resto uma vez por semana (os abandonados, não).
+nenhum), `proximo` e `ultimo` (`{data, temp, ep, nome}`) e `fim`; no jogo, sem `onde`, `capa_tmdb` e `tmdb_em`, com
+`igdb`, `capa_igdb`, `igdb_em`, `data`, `plataformas`, `link` e `colecao`. O laço do servidor (`uma_volta`) atualiza as
+séries em Quero ver e os jogos que vão sair uma vez por dia e o resto uma vez por semana.
 
 ## Rodar no computador
 
@@ -90,7 +94,7 @@ verdade, com a sua chave em Configurações). `ODISSEIA_TMDB` e `ODISSEIA_TMDB_I
 - Tudo em português do Brasil, sem palavras em inglês na tela. **Menos é mais**: textos curtos, sem avisos repetidos.
 - Celular primeiro (390 px; nada passa da largura em 320 px); com 1000 px ou mais, a barra lateral (`#lado`) no lugar da de
   baixo e as janelas no meio. Tema claro e escuro.
-- A barra de baixo: **Agora**, **Buscar**, o **+** (Adicionar, só o ícone), **Histórico** e **Mais**.
+- A barra de baixo: **Agora**, **Buscar**, o **+** (Adicionar, só o ícone), **Vistos** e **Mais**.
 - **Inativos no fim, recolhidos**: os **Abandonados (n)** no fim do Buscar, recolhidos (abrem num toque).
 - **Caixas de seleção no visual do app** (`selectsheet.js`): a temporada e o episódio são `<select class="inp select">`.
 - Dados de exemplo e de testes sempre inventados (Ana, Beto, títulos inventados): nunca a lista real do dono.
@@ -127,6 +131,14 @@ verdade, com a sua chave em Configurações). `ODISSEIA_TMDB` e `ODISSEIA_TMDB_I
 - Quem: **Todos** (`quem-todos`); nas ferramentas, «todos» (`ids_de`).
 - A coleção de cada filme nas listas e na busca (`com_colecao`: os detalhes em `DETALHES`, 12 horas, 8 de cada vez com `ThreadPoolExecutor`); a lista pronta **Coleções** (`lista_colecoes`: as coleções dos filmes populares e mais bem avaliados, até a página 5); na capa: `cz-colecao` (abre) e `cz-col-todos` (Já vi todos / Quero ver todos, pelo `adicionar_colecao`).
 - Buscar no padrão dos outros apps: `.sbar`, `.filtros-h` (`odisseia-filtros` no aparelho) e `.sfiltros` (as caixas `#f-tipo`, `#f-sit`, `#f-cat`, `#f-quem`).
+
+0.4.0 (o dono: "cadê os jogos?"; "colocar cor, fazer no mesmo padrão dos outros apps"; "não precisa ser histórico essa aba, pode ser aqui o que está salvo como visto, e daí permitir visualizar modo lista menor, ter opção de alteração em massa de categorias"; "e também o quem"; "o nome ali, D ou T, deixar no final, na direita, na mesma linha de cima"; "filtro por categoria aqui"; "a seleção de categorias nas opções de adicionar e alterar deve ser igual a outros apps"; "de onde vêm os dados não faz sentido ficar no sobre"):
+- Jogos: `tipo: jogo` (`R.TIPOS`, `R.PLURAIS`), `igdb` (o número), `capa_igdb` (o image_id), `igdb_em`, `data` (o lançamento), `plataformas`, `link` e `colecao: {id, nome, capa}`; sem `onde`, `tmdb`, `capa_tmdb` nem `tmdb_em`. `R.fonte(tipo)` ("igdb" ou "tmdb"), `R.de_fonte` (o `de_tmdb` de antes), `R.nome_sit` (`SIT_JOGO`: Quero jogar e Jogado; o valor gravado é o mesmo, quero e visto). A conta em `segredos.json` (`igdb_id`, `igdb_segredo`; `POST /api/igdb {cliente, segredo}`, testada antes de guardar; `estado.igdb`). `ODISSEIA_IGDB`, `ODISSEIA_TWITCH` e `ODISSEIA_IGDB_IMG` trocam os endereços (os testes). Os tipos dos jogos (`game_type`, o `category` de antes): `NA_BUSCA`, `NAS_LISTAS` e `NA_COLECAO`.
+- Tudo mistura as fontes: `fontes(tipo)` (sem tipo, as dos ligados com a conta posta) e `juntar(chamadas)` (as coleções na frente, depois um de cada fonte; uma que falha fica de fora se outra deu certo), no `buscar` e no `lista_pronta`; `lista_colecoes_jogos`; as capas da busca em `/api/img/t_cover_big/<image_id>.jpg`; `colecao(n, tipo)` e `adicionar_colecao` com `tipo` (as coleções devolvem `itens`, não mais `filmes`); `uma_volta` (o laço) para a fonte que ficou sem a conta ou sem internet.
+- Vistos (`telaVistos`, `#/vistos` no lugar do Histórico, `odisseia-vistos` e `odisseia-vistos-cat` no aparelho): o mais recente primeiro, o filtro `.filtro-cat`. `listaSel` (Vistos e Buscar): `.ssum` com `.modo` (Capas ou Lista, `odisseia-modo`; a Lista é `linhaTit(..., {curta})`) e o Selecionar (`S.sel`, um tipo só, `{sel: 1}` no histórico, o Voltar sai; segurar o dedo, `contextmenu`, começa); o `.selbar` abre `folhaLote` (Categoria e Quem, cada um com Manter) → `POST /api/titulo {acao: lote, itens: [{id, campos}]}` (`R.lote`, tudo ou nada) e o `toast(..., {rotulo: 'Desfazer', fazer})`.
+- Categorias com cor (`cor`, uma das 12 da paleta, `R.CORES`; sem cor, `R.cor_livre`; `{acao: editar, id, nome?, cor?}`): `telaCategorias` (as linhas com o ícone na cor, como no MemorIA) e `folhaCategoria` (o nome e as cores); no título e no Alterar, `pickCat` (`.escolha.cor` com a `.dot`, escolhida no fundo da cor dela) e a **Nova** ali mesmo (`S.novaCat`); na linha, `.t-l1` (o nome e quem) e `tagCat` (`.cat-tag`).
+- O crédito do TMDB foi do Sobre para o cartão dele, em Integrações; o cabeçalho das telas e o `.voltar` como os do GerencIA.
+- Ferramenta `marcar_varios` (`R.lote`); `adicionar`, `lista_pronta` e `adicionar_colecao` com `tipo: jogo`.
 
 ## Conversa com o dono
 

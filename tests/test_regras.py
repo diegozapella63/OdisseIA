@@ -42,10 +42,11 @@ class TestRegras(unittest.TestCase):
         s = d["titulos"][1]
         self.assertEqual(([x["n"] for x in s["temporadas"]], s["temp"], s["ep"], s["situacao"], s["categoria"]), ([1, 2], 0, 0, "quero", ""),
                          "o Vendo e o Abandonado viram Quero ver; a categoria de filme numa série sai")
-        self.assertEqual(d["categorias"], {"filme": [{"id": "c000001", "nome": "Família"}], "serie": []})
-        self.assertEqual(d["ajustes"], {"cor": "lilas", "cor_dia": False, "quem": True, "correria": False, "tipos": {"filme": True, "serie": True}})
-        self.assertEqual(R.limpar_dados({"ajustes": {"tipos": {"filme": False, "serie": False}}})["ajustes"]["tipos"], {"filme": True, "serie": True}, "nunca os dois desligados")
-        self.assertEqual(R.limpar_dados({"ajustes": {"tipos": {"filme": False}}})["ajustes"]["tipos"], {"filme": False, "serie": True})
+        self.assertEqual(d["categorias"], {"filme": [{"id": "c000001", "nome": "Família", "cor": "vermelho"}], "serie": [], "jogo": []}, "sem cor, a primeira livre")
+        self.assertEqual(d["ajustes"], {"cor": "lilas", "cor_dia": False, "quem": True, "correria": False, "tipos": {"filme": True, "serie": True, "jogo": True}})
+        self.assertEqual(R.limpar_dados({"ajustes": {"tipos": {"filme": False, "serie": False, "jogo": False}}})["ajustes"]["tipos"], {"filme": True, "serie": True, "jogo": True}, "nunca todos desligados")
+        self.assertEqual(R.limpar_dados({"ajustes": {"tipos": {"filme": False, "serie": False}}})["ajustes"]["tipos"], {"filme": False, "serie": False, "jogo": True}, "os jogos de uma casa de antes começam ligados")
+        self.assertEqual(R.limpar_dados({"ajustes": {"tipos": {"filme": False}}})["ajustes"]["tipos"], {"filme": False, "serie": True, "jogo": True})
         f = R.limpar_titulo({"id": "t00000009", "tipo": "filme", "nome": "F", "colecao": {"id": 7, "nome": " Saga ", "capa": "/s.jpg"}})
         self.assertEqual(f["colecao"], {"id": 7, "nome": "Saga", "capa": "/s.jpg"})
         self.assertIsNone(R.limpar_titulo({"id": "t00000009", "tipo": "filme", "nome": "F", "colecao": {"id": "x"}})["colecao"])

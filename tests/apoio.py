@@ -1,9 +1,11 @@
-"""Apoio dos testes: um TMDB de mentira (com títulos inventados), o servidor do OdisseIA numa porta livre e pedidos.
+"""Apoio dos testes: um TMDB e um IGDB de mentira (com títulos e jogos inventados), o servidor do OdisseIA numa porta
+livre e pedidos.
 
 Os títulos, os nomes e as capas são inventados: nada aqui é da casa do dono."""
 import base64
 import json
 import os
+import re
 import shutil
 import socket
 import sys
@@ -11,6 +13,7 @@ import tempfile
 import threading
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -65,11 +68,44 @@ COLECOES = {
 }
 
 
+IGDB_ID = "idteste0123456789abcd"
+IGDB_SEGREDO = "segredoteste0123456789"
+
+
+def _quando(iso):
+    return int(datetime.fromisoformat(iso + "T12:00:00").replace(tzinfo=timezone.utc).timestamp())
+
+
+SAGA = [{"id": 501, "name": "Saga da Torre"}]
+JOGOS = {
+    701: {"id": 701, "name": "Torre do Relógio", "first_release_date": _quando("2021-06-15"), "cover": {"id": 1, "image_id": "co1torre"},
+          "game_type": 0, "summary": "A clock tower puzzle adventure.", "genres": [{"id": 1, "name": "Puzzle"}, {"id": 2, "name": "Adventure"}],
+          "platforms": [{"id": 6, "name": "PC (Microsoft Windows)"}, {"id": 167, "name": "PlayStation 5"}, {"id": 6, "name": "PC (Microsoft Windows)"}],
+          "collections": SAGA, "url": "https://www.igdb.com/games/torre-do-relogio", "total_rating": 88, "total_rating_count": 400},
+    702: {"id": 702, "name": "Torre do Relógio 2", "first_release_date": _quando("2024-03-01"), "cover": {"id": 2, "image_id": "co2torre"},
+          "category": 0, "summary": "The tower again.", "platforms": [{"id": 130, "name": "Nintendo Switch"}], "collections": SAGA},
+    703: {"id": 703, "name": "Torre do Relógio 3", "first_release_date": _quando("2027-03-01"), "game_type": 0, "collections": SAGA},
+    704: {"id": 704, "name": "Torre do Relógio Remasterizado", "first_release_date": _quando("2025-01-10"), "game_type": 9, "collections": SAGA,
+          "cover": {"id": 4, "image_id": "co4torre"}},
+    705: {"id": 705, "name": "Ilha dos Ventos", "first_release_date": _quando("2025-10-01"), "cover": {"id": 5, "image_id": "co5ilha"},
+          "game_type": 0, "summary": "Sail between windy islands.", "platforms": [{"id": 130, "name": "Nintendo Switch"}, {"id": 82, "name": "Web browser"}],
+          "total_rating": 91, "total_rating_count": 300, "hypes": 50, "url": "https://outro.site/ilha"},
+    706: {"id": 706, "name": "Torre do Relógio Pacote", "game_type": 3, "collections": SAGA},
+    707: {"id": 707, "name": "Torre do Relógio Trilha Sonora", "game_type": 1},
+    708: {"id": 708, "name": "Torre do Relógio Deluxe", "game_type": 0, "version_parent": 701},
+}
+COLECOES_JOGOS = {501: {"id": 501, "name": "Saga da Torre"}}
+POPULARES = {1: [705, 707, 701, 702, 999], 3: [701]}
+
+
 class TMDBFalso:
     """O TMDB de mentira: a mesma forma das respostas de verdade, só com os títulos daqui. pedidos: o que chegou."""
 
     def __init__(self):
         self.pedidos = []
+        self.tokens = set()
+        self.n_token = 0
+        self.falha_igdb = 0
         dono = self
 
         class H(BaseHTTPRequestHandler):
@@ -80,6 +116,9 @@ class TMDBFalso:
                 u = urlparse(self.path)
                 q = {k: v[0] for k, v in parse_qs(u.query).items()}
                 dono.pedidos.append((u.path, q, self.headers.get("Authorization")))
+                if u.path.startswith("/igdb/image/upload/"):
+                    dado = CAPAS.get({"co1torre": "/viagem.jpg", "co2torre": "/estrelas.jpg", "co5ilha": "/farol.jpg", "co4torre": "/texto.jpg"}.get(u.path.rsplit("/", 1)[-1][:-4], ""))
+                    return self.resp(200, dado, "image/jpeg") if dado else self.resp(404, b"{}")
                 if u.path.startswith("/t/p/"):
                     dado = CAPAS.get("/" + u.path.rsplit("/", 1)[-1])
                     return self.resp(200, dado, "image/jpeg") if dado else self.resp(404, b"{}")
@@ -120,6 +159,49 @@ class TMDBFalso:
                 if len(m) == 4 and m[2] == "tv" and int(m[3]) in SERIES:
                     return self.resp(200, SERIES[int(m[3])])
                 return self.resp(404, {"success": False})
+
+            def do_POST(self):
+                u = urlparse(self.path)
+                corpo = self.rfile.read(int(self.headers.get("Content-Length") or 0)).decode()
+                dono.pedidos.append((u.path, corpo, self.headers.get("Authorization")))
+                if u.path == "/oauth2/token":
+                    f = {k: v[0] for k, v in parse_qs(corpo).items()}
+                    if f.get("client_id") == IGDB_ID and f.get("client_secret") == IGDB_SEGREDO and f.get("grant_type") == "client_credentials":
+                        dono.n_token += 1
+                        dono.tokens.add(f"tok{dono.n_token}")
+                        return self.resp(200, {"access_token": f"tok{dono.n_token}", "expires_in": 5000000, "token_type": "bearer"})
+                    return self.resp(403, {"status": 403, "message": "invalid client secret"})
+                if self.headers.get("Client-ID") != IGDB_ID or (self.headers.get("Authorization") or "")[7:] not in dono.tokens:
+                    return self.resp(401, {"message": "Authorization Failure"})
+                if dono.falha_igdb:
+                    return self.resp(dono.falha_igdb, [])
+                rota = u.path.rsplit("/", 1)[-1]
+                limite = int((re.search(r"limit (\d+);", corpo) or [0, 10])[1])
+                desde = int((re.search(r"offset (\d+);", corpo) or [0, 0])[1])
+                if rota == "popularity_primitives":
+                    tp = int(re.search(r"popularity_type = (\d+)", corpo)[1])
+                    return self.resp(200, [{"game_id": g, "value": 1.0 / (i + 1)} for i, g in enumerate(POPULARES.get(tp, []))][desde:desde + limite])
+                if rota == "collections":
+                    if m := re.search(r'name ~ \*"([^"]*)"\*', corpo):
+                        return self.resp(200, [c for c in COLECOES_JOGOS.values() if m[1].lower() in c["name"].lower()])
+                    n = int(re.search(r"where id = (\d+)", corpo)[1])
+                    return self.resp(200, [COLECOES_JOGOS[n]] if n in COLECOES_JOGOS else [])
+                rs = list(JOGOS.values())
+                if m := re.search(r'search "([^"]*)"', corpo):
+                    rs = [j for j in rs if m[1].lower() in j["name"].lower()]
+                if m := re.search(r"where id = \(([\d,]+)\)", corpo):
+                    ids = {int(x) for x in m[1].split(",")}
+                    rs = [j for j in rs if j["id"] in ids]
+                if m := re.search(r"collections = \(([\d,]+)\)", corpo):
+                    ns = {int(x) for x in m[1].split(",")}
+                    rs = [j for j in rs if any(c["id"] in ns for c in j.get("collections") or [])]
+                if "total_rating_count >" in corpo:
+                    rs = sorted((j for j in rs if j.get("total_rating_count")), key=lambda j: -j["total_rating"])
+                if "hypes > 0" in corpo:
+                    rs = [j for j in rs if j.get("hypes")]
+                if "version_parent = null" in corpo:
+                    rs = [j for j in rs if not j.get("version_parent")]
+                return self.resp(200, rs[desde:desde + limite] + (["x"] if "search" in corpo else []))
 
             def resp(self, st, corpo, tipo="application/json"):
                 b = corpo if isinstance(corpo, bytes) else json.dumps(corpo).encode()
@@ -164,7 +246,8 @@ TMDB = TMDBFalso()
 PASTA = tempfile.mkdtemp(prefix="odisseia-teste-")
 os.environ.update(ODISSEIA_DEV="1", ODISSEIA_DATA=os.path.join(PASTA, "data"), ODISSEIA_SHARE=os.path.join(PASTA, "share", "odisseia"),
                   ODISSEIA_TMDB=f"http://127.0.0.1:{TMDB.porta}/3", ODISSEIA_TMDB_IMG=f"http://127.0.0.1:{TMDB.porta}/t/p",
-                  ODISSEIA_URL_INTERNA="http://odisseia-teste:8099")
+                  ODISSEIA_URL_INTERNA="http://odisseia-teste:8099", ODISSEIA_IGDB=f"http://127.0.0.1:{TMDB.porta}/v4",
+                  ODISSEIA_TWITCH=f"http://127.0.0.1:{TMDB.porta}/oauth2/token", ODISSEIA_IGDB_IMG=f"http://127.0.0.1:{TMDB.porta}/igdb/image/upload")
 os.environ.pop("SUPERVISOR_TOKEN", None)
 import server as S  # noqa: E402
 
@@ -198,6 +281,9 @@ def limpar():
         shutil.rmtree(p, ignore_errors=True)
     os.makedirs(S.DATA_DIR, exist_ok=True)
     S.ESTADO_TMDB.update(erro="", em="")
+    S.ESTADO_IGDB.update(erro="", em="")
+    S.G._TOKENS.clear()
+    TMDB.falha_igdb = 0
     S.IMGS.clear()
     S.DETALHES.clear()
     S.CORRERIA._chave = None

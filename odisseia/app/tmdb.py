@@ -147,7 +147,7 @@ class TMDB:
         filmes = [dict(resumo(p, "filme"), data=str(p.get("release_date") or "")[:10]) for p in x.get("parts") or [] if isinstance(p, dict) and isinstance(p.get("id"), int)]
         filmes.sort(key=lambda f: (not f["data"], f["data"]))
         c = resumo(dict(x, title=x.get("name"), original_title=x.get("original_name")), "filme")
-        return {"tmdb": x.get("id"), "nome": c["nome"], "capa": c["capa"], "sinopse": c["sinopse"], "filmes": filmes[:60]}
+        return {"tmdb": x.get("id"), "nome": c["nome"], "capa": c["capa"], "sinopse": c["sinopse"], "itens": filmes[:60]}
 
     def detalhes(self, tipo, tmdb_id):
         """Os detalhes de um filme ou de uma série, já no formato do app (sem o que é da casa: situação, quem, categoria)."""

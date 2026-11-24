@@ -59,13 +59,14 @@ img { display: block; }
 
 /* ---------- cabeçalho das telas */
 .cab-tela { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-bottom: 18px; }
-.cab-tela h1 { display: flex; align-items: center; gap: 12px; margin: 0; font: 700 clamp(32px, 8.5vw, 42px)/1.05 var(--font-d); }
+.cab-tela h1 { display: flex; align-items: center; gap: 12px; margin: 0; font: 700 clamp(34px, 9vw, 46px)/1.02 var(--font-d); text-wrap: balance; }
 .eyebrow { margin: 0; font: 600 12px/1.3 var(--font); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .brand { font: 600 21px/1 var(--font-d); letter-spacing: 0; text-transform: none; color: var(--text); }
 .brand span, .wm span { color: var(--accent-text); }
-.voltar { display: inline-flex; align-items: center; gap: 2px; margin-left: -6px; padding: 6px 8px 6px 2px; color: var(--accent-text); font: 600 15px var(--font); border-radius: 10px; }
+.voltar { display: inline-flex; align-items: center; gap: 4px; min-height: 40px; margin-left: -6px; padding: 6px 10px 6px 4px; color: var(--text-2); font: 500 16px var(--font); border-radius: 10px; }
 .voltar:active { background: var(--card-2); }
-.tela-ic { width: 44px; height: 44px; }
+.tela-ic { width: 42px; height: 42px; border-radius: 12px; }
+.tela-ic .ic { width: 23px; height: 23px; }
 
 /* ---------- abas (Configurações) */
 .abas { display: flex; gap: 4px; padding: 4px; margin: 0 0 18px; border-radius: 14px; background: var(--card-2); overflow-x: auto; scrollbar-width: none; }
@@ -330,6 +331,10 @@ code { font-size: 14px; background: var(--card-2); padding: 1px 6px; border-radi
 #nav .add span.pill svg { width: 24px; height: 24px; color: var(--on-accent); }
 #toast { position: fixed; left: 50%; bottom: calc(var(--nav-h) + 20px + env(safe-area-inset-bottom, 0px)); z-index: 60; transform: translate(-50%, 20px); opacity: 0; transition: .2s; pointer-events: none; background: var(--text); color: var(--bg); padding: 11px 16px; border-radius: 12px; font-size: 15px; font-weight: 500; max-width: calc(100vw - 32px); text-align: center; }
 #toast.on { opacity: 1; transform: translate(-50%, 0); }
+/* o Desfazer no aviso, como no GerencIA (no escuro o aviso é claro: a cor mais escura) */
+#toast.com-acao { pointer-events: auto; display: flex; align-items: center; gap: 14px; text-align: left; }
+#toast .toast-a { display: inline-flex; align-items: center; gap: 6px; flex: none; background: none; border: 0; color: color-mix(in srgb, var(--accent) 58%, #000); font: inherit; font-weight: 700; padding: 6px 2px; min-height: 36px; }
+:root[data-theme="light"] #toast .toast-a { color: var(--accent); }
 
 /* ---------- computador (1000 px ou mais): a barra lateral da família no lugar da barra de baixo */
 :root { --side-w: 272px; }
@@ -353,3 +358,46 @@ code { font-size: 14px; background: var(--card-2); padding: 1px 6px; border-radi
   #app { max-width: 760px; padding-bottom: 60px; }
   #toast { bottom: 28px; left: calc(50% + var(--side-w) / 2); }
 }
+
+/* ---------- 0.4.0: as linhas dos títulos (o nome e quem na linha de cima, a categoria na cor dela), Capas ou Lista, o
+   Selecionar e as categorias com cor (como no MemorIA e no ResolvIA) */
+.t-l1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.t-l1 > b { flex: 1; min-width: 0; }
+.t-l1 .pessoas-mini { flex: none; }
+.t-l1 .ano { flex: none; color: var(--muted); font-size: 13px; }
+.cat-tag { display: inline-flex; align-items: center; max-width: 100%; margin-left: 8px; padding: 1px 8px; border-radius: 999px; vertical-align: 1px;
+  background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--c); font: 600 12.5px/1.5 var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root[data-theme="light"] .cat-tag { color: var(--ci); }
+.t-l1 .cat-tag { flex: none; max-width: 40%; margin-left: 0; }
+.titulos.curtas .tit { padding: 11px 0; min-height: 48px; }
+.titulos.curtas .tit b { font-size: 17px; -webkit-line-clamp: 1; }
+.titulos.curtas .mais1 { min-height: 34px; }
+.ssum { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: -2px 0 6px; }
+.ssum.sel .sel-n { flex: 1; min-width: 0; font-weight: 600; }
+@media (max-width: 380px) { .modo button > span { display: none; } .modo button { padding: 0 10px; } }
+.ssum.sel .fechar { width: 36px; height: 36px; margin-left: -8px; }
+.modo { display: inline-flex; gap: 2px; padding: 3px; border-radius: 11px; background: var(--card-2); }
+.modo button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 11px; border-radius: 9px; color: var(--muted); font: 500 14px/1 var(--font); }
+.modo button.on { background: var(--card); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+:root[data-theme="dark"] .modo button.on { background: color-mix(in srgb, var(--card) 84%, var(--text)); }
+.btn.fino { min-height: 36px; padding: 6px 10px; border-color: transparent; background: transparent; color: var(--accent-text); font-size: 14px; font-weight: 600; }
+.marca { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line-2); display: grid; place-items: center; }
+.marca .ic-s { width: 15px; height: 15px; stroke-width: 3; opacity: 0; }
+.marca.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.marca.on .ic-s { opacity: 1; }
+.linha-tit.fora { opacity: .38; }
+.selbar { position: sticky; z-index: 5; bottom: calc(var(--nav-h) + 14px + env(safe-area-inset-bottom, 0px)); margin-top: 12px; }
+.selbar .btn { width: 100%; box-shadow: 0 10px 28px -10px rgba(0, 0, 0, .55); }
+.chips.filtro-cat { margin: 0 0 14px; padding: 0; }
+.dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+.chip.cor.on, .escolha.cor.on { background: color-mix(in srgb, var(--c) 18%, transparent); border-color: var(--c); color: var(--text); }
+.chip.cor.on { font-weight: 600; }
+.cat-tile { background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--c); }
+:root[data-theme="light"] .cat-tile { color: var(--ci); }
+.cat-linha .rot-ic { width: 40px; height: 40px; border-radius: 12px; }
+.cat-linha.nova b { color: var(--accent-text); }
+.nova-cat { display: flex; gap: 8px; margin-top: 8px; }
+.nova-cat .inp { flex: 1; }
+.nova-cat .btn { flex: none; }
+.seg.n4 button { padding: 8px 4px; }
+@media (min-width: 1000px) { .selbar { bottom: 20px; } }

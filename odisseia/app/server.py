@@ -1,9 +1,9 @@
-"""OdisseIA: os filmes e as séries da casa, um app do Home Assistant (ingress). Só biblioteca padrão do Python.
+"""OdisseIA: os filmes, as séries e os jogos da casa, um app do Home Assistant (ingress). Só biblioteca padrão do Python.
 
 Os dados ficam em /data/odisseia.json (com rev: cada gravação soma 1 e a tela vê pelo /api/rev), as capas em /data/capas,
-a chave do TMDB em /data/segredos.json (600; nunca volta para a tela, só o fim) e as versões automáticas em /data/versoes.
-Os detalhes vêm do TMDB (tmdb.py), as regras dos títulos são as do regras.py e as ferramentas do CorrerIA, as do
-ferramentas.py."""
+a chave do TMDB e a conta do IGDB em /data/segredos.json (600; nunca voltam para a tela, só o fim) e as versões
+automáticas em /data/versoes. Os filmes e as séries vêm do TMDB (tmdb.py), os jogos do IGDB (igdb.py), as regras dos
+títulos são as do regras.py e as ferramentas do CorrerIA, as do ferramentas.py."""
 import base64
 import hmac
 import io
@@ -19,6 +19,7 @@ import urllib.error
 import urllib.request
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
+from itertools import zip_longest
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -26,6 +27,7 @@ from urllib.parse import parse_qs, urlparse
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, AQUI)
 import ferramentas  # noqa: E402
+import igdb as G  # noqa: E402
 import regras as R  # noqa: E402
 import tmdb as T  # noqa: E402
 
@@ -54,6 +56,9 @@ TOKEN = os.environ.get("SUPERVISOR_TOKEN")
 HA_API = os.environ.get("ODISSEIA_HA_API", "http://supervisor/core/api")
 TMDB_API = os.environ.get("ODISSEIA_TMDB", T.API)
 TMDB_IMG = os.environ.get("ODISSEIA_TMDB_IMG", T.IMG)
+IGDB_API = os.environ.get("ODISSEIA_IGDB", G.API)
+IGDB_TOKEN = os.environ.get("ODISSEIA_TWITCH", G.TOKEN)
+IGDB_IMG = os.environ.get("ODISSEIA_IGDB_IMG", G.IMG)
 DADOS_ARQ = os.path.join(DATA_DIR, "odisseia.json")
 SEGREDOS_ARQ = os.path.join(DATA_DIR, "segredos.json")
 CAPAS = os.path.join(DATA_DIR, "capas")
@@ -137,7 +142,7 @@ def guardar_versao(motivo):
             pass
 
 
-# ---------------------------------------------------------------- a chave do TMDB (só em /data, nunca na tela)
+# ---------------------------------------------------------------- a chave do TMDB e a conta do IGDB (só em /data, nunca na tela)
 
 def segredos():
     try:
@@ -182,6 +187,47 @@ def tmdb_fez(fn, *args):
 def estado_tmdb():
     c = chave_tmdb()
     return {"chave": bool(c), "fim": ("••••" + c[-4:]) if c else "", "erro": ESTADO_TMDB["erro"] if c else ""}
+
+
+def conta_igdb():
+    """(Client ID, Client Secret) do app da casa no Twitch Developers, ou ("", "")."""
+    s = segredos()
+    return str(s.get("igdb_id") or ""), str(s.get("igdb_segredo") or "")
+
+
+def guardar_igdb(cid, segredo):
+    s = segredos()
+    if cid and segredo:
+        s.update(igdb_id=cid, igdb_segredo=segredo)
+    else:
+        s.pop("igdb_id", None)
+        s.pop("igdb_segredo", None)
+    _gravar(SEGREDOS_ARQ, json.dumps(s), 0o600)
+
+
+def cliente_igdb():
+    return G.IGDB(*conta_igdb(), IGDB_API, IGDB_TOKEN, IGDB_IMG)
+
+
+ESTADO_IGDB = {"erro": "", "em": ""}
+
+
+def igdb_fez(fn, *args):
+    try:
+        r = fn(*args)
+        ESTADO_IGDB.update(erro="", em=agora_iso())
+        return r
+    except G.ErroIGDB as e:
+        ESTADO_IGDB.update(erro=str(e), em=agora_iso())
+        raise
+
+
+def estado_igdb():
+    c = conta_igdb()[0]
+    return {"chave": bool(c), "fim": ("••••" + c[-4:]) if c else "", "erro": ESTADO_IGDB["erro"] if c else ""}
+
+
+ERROS = (T.ErroTMDB, G.ErroIGDB)
 
 
 # ---------------------------------------------------------------- as pessoas da casa
@@ -243,10 +289,17 @@ def apagar_capa(nome):
 IMGS = {}  # as capas da busca (o Adicionar), na memória: {tamanho+caminho: bytes}, até 300
 
 
+def baixar_capa(tipo, capa):
+    """Os bytes da capa de um título (a do TMDB num filme ou numa série, a do IGDB num jogo), ou None."""
+    if not capa:
+        return None
+    return cliente_igdb().imagem(capa, "t_cover_big") if tipo == "jogo" else cliente().imagem(capa, "w342")
+
+
 def capa_da_busca(tamanho, caminho):
     k = tamanho + caminho
     if k not in IMGS:
-        dado = cliente().imagem(caminho, tamanho)
+        dado = cliente_igdb().imagem(caminho, tamanho) if tamanho.startswith("t_") else cliente().imagem(caminho, tamanho)
         if not dado:
             return None
         if len(IMGS) >= 300:
@@ -258,19 +311,20 @@ def capa_da_busca(tamanho, caminho):
 # ---------------------------------------------------------------- os títulos
 
 def adicionar(corpo, quem_usa=""):
-    tipo, n = corpo.get("tipo"), corpo.get("tmdb")
+    tipo = corpo.get("tipo")
+    n = corpo.get(R.fonte(tipo))
     if tipo not in R.TIPOS or not isinstance(n, int) or isinstance(n, bool):
-        raise ValueError("Escolha um filme ou uma série da busca.")
+        raise ValueError("Escolha um filme, uma série ou um jogo da busca.")
     situacao = corpo.get("situacao") or "quero"
     if situacao not in R.SITUACOES:
         raise ValueError("A situação vale quero ou visto.")
     R.conferir_tipo(ler(), tipo)
     with TRAVA:
-        ja = R.de_tmdb(ler(), tipo, n)
+        ja = R.de_fonte(ler(), tipo, n)
     if ja:
         return {"titulo": ja, "novo": False}
     det = detalhes(tipo, n)
-    capa = cliente().imagem(det.get("capa"), "w342") if det.get("capa") else None
+    capa = baixar_capa(tipo, det.get("capa"))
     quem = [quem_usa] if quem_usa and ler()["ajustes"]["quem"] else []
     with TRAVA:
         d = ler()
@@ -282,10 +336,10 @@ def adicionar(corpo, quem_usa=""):
 
 
 def marcar_ja(rs, d=None):
-    """Cada resultado do TMDB com ja (o id na lista) e a situação dele (None fora da lista)."""
+    """Cada resultado do TMDB ou do IGDB com ja (o id na lista) e a situação dele (None fora da lista)."""
     d = d or ler()
     for r in rs:
-        ja = R.de_tmdb(d, r["tipo"], r["tmdb"]) if r["tipo"] in R.TIPOS else None
+        ja = R.de_fonte(d, r["tipo"], r.get(R.fonte(r["tipo"]))) if r["tipo"] in R.TIPOS else None
         r.update(ja=ja["id"] if ja else None, situacao=ja["situacao"] if ja else None)
     return rs
 
@@ -298,17 +352,58 @@ def tipo_de_busca(tipo):
 
 def so_ligados(rs):
     ligados = R.tipos_ligados(ler())
-    return [r for r in rs if r["tipo"] in ligados or (r["tipo"] == "colecao" and "filme" in ligados)]
+    return [r for r in rs if r["tipo"] in ligados or (r["tipo"] == "colecao" and "filme" in ligados) or (r["tipo"] == "colecao_jogos" and "jogo" in ligados)]
 
 
-DETALHES = {}  # (tipo, tmdb) → (quando, detalhes): os detalhes lidos do TMDB valem 12 horas (a coleção de cada filme da lista)
+def fontes(tipo):
+    """De onde vêm uma busca e uma lista: (TMDB, IGDB). Com um tipo, a dele; sem tipo, as dos tipos ligados que têm a
+    conta posta (sem nenhuma, a dos filmes e das séries, que diz o que falta)."""
+    if tipo == "jogo":
+        return False, True
+    if tipo in ("filme", "serie"):
+        return True, False
+    lig = set(R.tipos_ligados(ler()))
+    tv = bool(lig & {"filme", "serie"})
+    tm, ig = tv and bool(chave_tmdb()), "jogo" in lig and bool(conta_igdb()[0])
+    return (tm, ig) if tm or ig else (tv, not tv)
+
+
+def juntar(chamadas):
+    """Chama cada fonte e junta: as coleções na frente, depois um resultado de cada fonte por vez. Uma que falha fica de
+    fora se outra deu certo. (resultados, tem_mais)"""
+    partes, erro = [], None
+    for fn in chamadas:
+        try:
+            partes.append(fn())
+        except ERROS as e:
+            erro = erro or e
+    if not partes:
+        raise erro
+    cols = [[r for r in p[0] if r["tipo"].startswith("colecao")] for p in partes]
+    outros = [[r for r in p[0] if not r["tipo"].startswith("colecao")] for p in partes]
+    um_de_cada = lambda ls: [x for grupo in zip_longest(*ls) for x in grupo if x]  # noqa: E731
+    return um_de_cada(cols) + um_de_cada(outros), any(p[1] for p in partes)
+
+
+def buscar(q, tipo):
+    tipo = tipo_de_busca(tipo)
+    tm, ig = fontes(tipo)
+    chamadas = []
+    if tm:
+        chamadas.append(lambda: (com_colecao(so_ligados(tmdb_fez(cliente().buscar, q, tipo))), False))
+    if ig:
+        chamadas.append(lambda: (so_ligados(igdb_fez(cliente_igdb().buscar, q)), False))
+    return marcar_ja(juntar(chamadas)[0])
+
+
+DETALHES = {}  # (tipo, número) → (quando, detalhes): os detalhes lidos valem 12 horas (a coleção de cada filme da lista)
 
 
 def detalhes(tipo, n):
     v = DETALHES.get((tipo, n))
     if v and time.time() - v[0] < 12 * 3600:
         return v[1]
-    det = tmdb_fez(cliente().detalhes, tipo, n)
+    det = igdb_fez(cliente_igdb().detalhes, n) if tipo == "jogo" else tmdb_fez(cliente().detalhes, tipo, n)
     if len(DETALHES) > 3000:
         DETALHES.clear()
     DETALHES[(tipo, n)] = (time.time(), det)
@@ -330,12 +425,16 @@ def com_colecao(rs):
     return rs
 
 
+def _pagina(pagina, maximo=5):
+    try:
+        return max(1, min(maximo, int(pagina)))
+    except (TypeError, ValueError):
+        return 1
+
+
 def lista_colecoes(pagina):
     """As coleções dos filmes mais populares e mais bem avaliados (o TMDB não tem uma lista de coleções), sem repetir."""
-    try:
-        pagina = max(1, min(5, int(pagina)))
-    except (TypeError, ValueError):
-        pagina = 1
+    pagina = _pagina(pagina)
     filmes = []
     for nome in ("populares", "avaliados"):
         filmes += tmdb_fez(cliente().lista, nome, "filme", pagina)[0]
@@ -348,58 +447,101 @@ def lista_colecoes(pagina):
     return out, pagina < 5
 
 
+def lista_colecoes_jogos(pagina):
+    """As coleções (as séries de jogos) dos jogos em alta e dos mais bem avaliados, sem repetir."""
+    pagina = _pagina(pagina)
+    jogos = []
+    for nome in ("alta", "avaliados"):
+        jogos += igdb_fez(cliente_igdb().lista, nome, pagina)[0]
+    out, vistos = [], set()
+    for j in jogos:
+        c = j.get("colecao")
+        if c and c["id"] not in vistos:
+            vistos.add(c["id"])
+            out.append(G.como_colecao(c))
+    return out, pagina < 5
+
+
 def lista_pronta(nome, tipo="", pagina=1):
+    """Uma lista pronta: a do TMDB (filmes e séries), a do IGDB (jogos) ou as duas juntas (Tudo)."""
+    if nome not in T.LISTAS:
+        raise ValueError("Lista desconhecida.")
+    tipo = tipo_de_busca(tipo)
+    lig = R.tipos_ligados(ler())
+    tm, ig = fontes(tipo)
+    chamadas = []
     if nome == "colecoes":
-        if "filme" not in R.tipos_ligados(ler()):
+        if tm and "filme" in lig and tipo != "serie":
+            chamadas.append(lambda: lista_colecoes(pagina))
+        if ig:
+            chamadas.append(lambda: lista_colecoes_jogos(pagina))
+        if not chamadas:
             return {"resultados": [], "mais": False}
-        rs, mais = lista_colecoes(pagina)
-        return {"resultados": rs, "mais": mais}
-    rs, mais = tmdb_fez(cliente().lista, nome, tipo_de_busca(tipo), pagina)
-    return {"resultados": marcar_ja(com_colecao(so_ligados(rs))), "mais": mais}
+    else:
+        if tm:
+            def do_tmdb():
+                rs, mais = tmdb_fez(cliente().lista, nome, tipo, pagina)
+                return com_colecao(so_ligados(rs)), mais
+            chamadas.append(do_tmdb)
+        if ig:
+            chamadas.append(lambda: igdb_fez(cliente_igdb().lista, nome, pagina))
+    rs, mais = juntar(chamadas)
+    return {"resultados": marcar_ja(rs), "mais": mais}
 
 
-def colecao(n):
-    """Uma coleção de filmes (uma saga) com o que já está na lista: cada filme com ja (o id), situacao e saiu."""
-    col = tmdb_fez(cliente().colecao, n)
-    d, hoje = ler(), agora_iso()[:10]
-    for f in col["filmes"]:
-        ja = R.de_tmdb(d, "filme", f["tmdb"])
+def colecao_de(tipo, n):
+    return igdb_fez(cliente_igdb().colecao, n) if tipo == "jogo" else tmdb_fez(cliente().colecao, n)
+
+
+def colecao(n, tipo="filme"):
+    """Uma coleção (uma saga de filmes ou uma série de jogos) com o que já está na lista: cada item com ja (o id),
+    situacao e saiu."""
+    col = colecao_de(tipo, n)
+    d, hoje, k = ler(), agora_iso()[:10], R.fonte(tipo)
+    for f in col["itens"]:
+        ja = R.de_fonte(d, tipo, f[k])
         f.update(ja=ja["id"] if ja else None, situacao=ja["situacao"] if ja else None, saiu=bool(f["data"]) and f["data"] <= hoje)
     return col
 
 
 def adicionar_colecao(corpo, quem_usa=""):
-    """Põe todos os filmes de uma coleção na lista, como Quero ver ou como Visto. Visto: só os que já saíram, e os que já
-    estavam na lista viram Visto; Quero ver não mexe nos que já estavam. {nome, novos, marcados, ja, fora}"""
-    n, situacao = corpo.get("colecao"), corpo.get("situacao") or "quero"
+    """Põe tudo de uma coleção na lista (os filmes de uma saga, os jogos de uma série), como Quero ver (jogar) ou como
+    Visto (Jogado). Visto: só os que já saíram, e os que já estavam na lista viram Visto; Quero ver não mexe nos que já
+    estavam. {nome, tipo, novos, marcados, ja, fora}"""
+    n, situacao, tipo = corpo.get("colecao"), corpo.get("situacao") or "quero", corpo.get("tipo") or "filme"
     if not isinstance(n, int) or isinstance(n, bool):
         raise ValueError("Escolha uma coleção da busca.")
+    if tipo not in ("filme", "jogo"):
+        raise ValueError("Uma coleção é de filmes ou de jogos.")
     if situacao not in ("quero", "visto"):
         raise ValueError("Numa coleção, a situação vale quero ou visto.")
-    R.conferir_tipo(ler(), "filme")
-    col = tmdb_fez(cliente().colecao, n)
-    hoje = agora_iso()[:10]
+    R.conferir_tipo(ler(), tipo)
+    col = colecao_de(tipo, n)
+    hoje, k = agora_iso()[:10], R.fonte(tipo)
     with TRAVA:
         d = ler()
-    entram = [f for f in col["filmes"] if situacao == "quero" or (f["data"] and f["data"] <= hoje)]
-    novos = []
-    for f in entram:
-        if not R.de_tmdb(d, "filme", f["tmdb"]):
-            det = detalhes("filme", f["tmdb"])
-            novos.append((det, cliente().imagem(det["capa"], "w342") if det.get("capa") else None))
-    res = {"nome": col["nome"], "novos": 0, "marcados": 0, "ja": 0, "fora": len(col["filmes"]) - len(entram)}
+    entram = [f for f in col["itens"] if situacao == "quero" or (f["data"] and f["data"] <= hoje)]
+    faltam = [f[k] for f in entram if not R.de_fonte(d, tipo, f[k])]
+    if tipo == "jogo":
+        dets = igdb_fez(cliente_igdb().varios, faltam) if faltam else {}
+        dets = [dets[i] for i in faltam if i in dets]
+    else:
+        dets = [detalhes("filme", i) for i in faltam]
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        capas = list(ex.map(lambda det: baixar_capa(tipo, det.get("capa")), dets))
+    res = {"nome": col["nome"], "tipo": tipo, "novos": 0, "marcados": 0, "ja": 0, "fora": len(col["itens"]) - len(entram)}
     with TRAVA:
         d = ler()
         quem = [quem_usa] if quem_usa and d["ajustes"]["quem"] else []
         criados = set()
-        for det, capa in reversed(novos):  # o primeiro filme da coleção fica em cima
+        for det, capa in reversed(list(zip(dets, capas))):  # o primeiro da coleção fica em cima
             t, criou = R.criar(d, det, situacao, quem, agora_iso())
             if criou:
                 gravar_capa(t, capa)
                 criados.add(t["id"])
                 res["novos"] += 1
         for f in entram:
-            t = R.de_tmdb(d, "filme", f["tmdb"])
+            t = R.de_fonte(d, tipo, f[k])
             if not t or t["id"] in criados:
                 continue
             if situacao == "visto" and t["situacao"] != "visto":
@@ -414,15 +556,17 @@ def adicionar_colecao(corpo, quem_usa=""):
 
 
 def atualizar(tid):
-    """Os detalhes de novo pelo TMDB (o próximo episódio, onde assistir, a capa)."""
+    """Os detalhes de novo pelo TMDB ou pelo IGDB (o próximo episódio, onde assistir, as plataformas, a capa)."""
     with TRAVA:
         t = R.achar(ler(), tid)
-    if not t.get("tmdb"):
-        raise ValueError("Esse título não veio do TMDB.")
-    det = tmdb_fez(cliente().detalhes, t["tipo"], t["tmdb"])
+    tipo, n = t["tipo"], t.get(R.fonte(t["tipo"]))
+    if not n:
+        raise ValueError("Esse título não veio do " + ("IGDB." if tipo == "jogo" else "TMDB."))
+    det = igdb_fez(cliente_igdb().detalhes, n) if tipo == "jogo" else tmdb_fez(cliente().detalhes, tipo, n)
+    antes = t.get("capa_igdb" if tipo == "jogo" else "capa_tmdb")
     capa = None
-    if det.get("capa") and (det["capa"] != t.get("capa_tmdb") or not t.get("capa") or not os.path.exists(caminho_capa(t["capa"]))):
-        capa = cliente().imagem(det["capa"], "w342")
+    if det.get("capa") and (det["capa"] != antes or not t.get("capa") or not os.path.exists(caminho_capa(t["capa"]))):
+        capa = baixar_capa(tipo, det["capa"])
     with TRAVA:
         d = ler()
         t = next((x for x in d["titulos"] if x["id"] == tid), None)
@@ -435,8 +579,19 @@ def atualizar(tid):
     return t
 
 
+def mudar_varios(corpo):
+    """O Alterar do Selecionar: {itens: [{id, campos: {categoria?, quem?}}]} → {titulos, rev}."""
+    with TRAVA:
+        d = ler()
+        ts = R.lote(d, corpo.get("itens"), {p["id"] for p in pessoas()}, agora_iso())
+        salvar(d)
+    return {"titulos": ts, "rev": d["rev"]}
+
+
 def mudar_titulo(corpo):
     acao, tid = corpo.get("acao"), str(corpo.get("id") or "")
+    if acao == "lote":
+        return mudar_varios(corpo)
     with TRAVA:
         d = ler()
         t = next((x for x in d["titulos"] if x["id"] == tid), None)
@@ -456,33 +611,42 @@ def mudar_titulo(corpo):
 
 
 def precisa_atualizar(t, agora):
-    """No laço: as séries que a casa vê ou quer ver, de dia em dia (o próximo episódio); o resto, de semana em semana."""
-    if not t.get("tmdb"):
+    """No laço: as séries que a casa vê ou quer ver e os jogos que ainda vão sair, de dia em dia (o próximo episódio, a
+    data); o resto, de semana em semana."""
+    if not t.get(R.fonte(t["tipo"])):
         return False
     try:
-        idade = agora - datetime.fromisoformat(t.get("tmdb_em") or "2000-01-01T00:00:00")
+        idade = agora - datetime.fromisoformat(t.get("igdb_em" if t["tipo"] == "jogo" else "tmdb_em") or "2000-01-01T00:00:00")
     except ValueError:
         return True
-    if t["tipo"] == "serie" and t["situacao"] == "quero":
+    if t["tipo"] == "serie" and t["situacao"] == "quero" or t["tipo"] == "jogo" and t["situacao"] == "quero" and (t.get("data") or "9") > agora.date().isoformat():
         return idade > timedelta(hours=20)
     return idade > timedelta(days=7)
+
+
+def uma_volta(agora=None):
+    """Uma passada do laço: até 30 títulos com os detalhes velhos. Uma fonte sem a conta (ou sem internet) para ali."""
+    agora = agora or datetime.now()
+    tem = {"tmdb": bool(chave_tmdb()), "igdb": bool(conta_igdb()[0])}
+    parou = set()
+    fila = [(t["id"], R.fonte(t["tipo"])) for t in ler()["titulos"] if tem[R.fonte(t["tipo"])] and precisa_atualizar(t, agora)][:30]
+    for tid, f in fila:
+        if f in parou:
+            continue
+        try:
+            atualizar(tid)
+        except (ValueError, *ERROS) as e:
+            log("Atualizar", tid, e)
+            if any(p in str(e) for p in ("chave", "internet", "Client", "acesso")):
+                parou.add(f)
+        time.sleep(0.5)
 
 
 def laco():
     time.sleep(60)
     while True:
         try:
-            if chave_tmdb():
-                agora = datetime.now()
-                fila = [t["id"] for t in ler()["titulos"] if precisa_atualizar(t, agora)][:30]
-                for tid in fila:
-                    try:
-                        atualizar(tid)
-                    except (ValueError, T.ErroTMDB) as e:
-                        log("Atualizar", tid, e)
-                        if "chave" in str(e) or "internet" in str(e):
-                            break
-                    time.sleep(0.5)
+            uma_volta()
         except Exception as e:  # noqa: BLE001 (o laço nunca para)
             log("Laço:", e)
         time.sleep(30 * 60)
@@ -650,7 +814,7 @@ class Conexao:
                 return
             url, ip = self.endereco()
             corpo = {"app": "odisseia", "nome": "OdisseIA",
-                     "assunto": "filmes e séries da casa: o que cada um quer ver ou já viu, episódios, categorias e onde assistir",
+                     "assunto": "filmes, séries e jogos da casa: o que cada um quer ver (ou jogar) ou já viu (ou jogou), episódios, categorias e onde assistir",
                      "versao": VERSAO, "url": url, "ip_url": f"http://{ip}:{PORTA}" if ip else None, "chave": self.chave(),
                      "ferramentas": "/api/integracao/ferramentas", "gravado_em": datetime.now().isoformat(timespec="seconds")}
             _gravar(self.arq_share, json.dumps(corpo, ensure_ascii=False, indent=1), 0o600)
@@ -687,18 +851,23 @@ def usar_ferramenta(corpo):
         a = ferramentas.conferir(nome, args)
         try:
             r = lista_pronta(a["lista"], a.get("tipo") or "")
-        except T.ErroTMDB as e:
+        except (*ERROS, R.ErroRegra) as e:
             raise ferramentas.ErroFerramenta(str(e)) from e
         CORRERIA.ultimo = {"app": str(corpo.get("cliente") or "CorrerIA")[:40], "em": agora_iso(), "nome": nome}
-        return {"texto": ferramentas.texto_lista(a["lista"], r["resultados"])}
+        return {"texto": ferramentas.texto_lista(a["lista"], r["resultados"], tipo_de_busca(a.get("tipo") or ""))}
     if nome == "adicionar_colecao":
         a = ferramentas.conferir(nome, args)
+        tipo = a.get("tipo") or "filme"
         try:
-            col = ferramentas.melhor(tmdb_fez(cliente().colecoes, a["nome"]), a["nome"])
+            R.conferir_tipo(ler(), tipo)
+            if tipo == "jogo":
+                col = ferramentas.melhor([r for r in igdb_fez(cliente_igdb().buscar, a["nome"]) if r["tipo"] == "colecao_jogos"], a["nome"])
+            else:
+                col = ferramentas.melhor(tmdb_fez(cliente().colecoes, a["nome"]), a["nome"])
             if not col:
-                raise ferramentas.ErroFerramenta(f"Não achei a coleção «{a['nome']}» no TMDB.")
-            res = adicionar_colecao({"colecao": col["tmdb"], "situacao": a.get("situacao") or "quero"}, pid)
-        except (T.ErroTMDB, ValueError) as e:
+                raise ferramentas.ErroFerramenta(f"Não achei a coleção «{a['nome']}» no {'IGDB' if tipo == 'jogo' else 'TMDB'}.")
+            res = adicionar_colecao({"colecao": col[R.fonte(tipo)], "tipo": tipo, "situacao": a.get("situacao") or "quero"}, pid)
+        except (*ERROS, ValueError) as e:
             raise ferramentas.ErroFerramenta(str(e)) from e
         texto = ferramentas.texto_colecao(res, a.get("situacao") or "quero")
         CORRERIA.ultimo = {"app": str(corpo.get("cliente") or "CorrerIA")[:40], "em": agora_iso(), "nome": nome}
@@ -713,16 +882,18 @@ def usar_ferramenta(corpo):
         except R.ErroRegra as e:
             raise ferramentas.ErroFerramenta(str(e)) from e
         try:
-            achou = ferramentas.melhor(tmdb_fez(cliente().buscar, args["nome"], tipo or ""), args["nome"], tipo, args.get("ano"))
+            # sem tipo, procura nos dois (os filmes e as séries no TMDB, os jogos no IGDB): o nome igual decide
+            achou = ferramentas.melhor([r for r in buscar(args["nome"], tipo or "") if r["tipo"] in R.TIPOS], args["nome"], tipo, args.get("ano"))
             if achou:
+                k = R.fonte(achou["tipo"])
                 with TRAVA:
-                    ja = R.de_tmdb(ler(), achou["tipo"], achou["tmdb"])
+                    ja = R.de_fonte(ler(), achou["tipo"], achou[k])
                 if not ja:
-                    det = tmdb_fez(cliente().detalhes, achou["tipo"], achou["tmdb"])
-                    capa = cliente().imagem(det.get("capa"), "w342") if det.get("capa") else None
+                    det = detalhes(achou["tipo"], achou[k])
+                    capa = baixar_capa(achou["tipo"], det.get("capa"))
                 else:
-                    det = {"tipo": ja["tipo"], "tmdb": ja["tmdb"]}
-        except T.ErroTMDB as e:
+                    det = {"tipo": ja["tipo"], k: ja[k]}
+        except ERROS as e:
             raise ferramentas.ErroFerramenta(str(e)) from e
     with TRAVA:
         d = ler()
@@ -752,7 +923,7 @@ def estado(usuario=""):
     d = ler()
     ligados = R.tipos_ligados(d)
     return {"versao": VERSAO, "rev": d["rev"], "titulos": [t for t in d["titulos"] if t["tipo"] in ligados], "categorias": d["categorias"], "ajustes": d["ajustes"], "hoje": agora_iso()[:10],
-            "pessoas": [{"id": p["id"], "nome": p["nome"]} for p in pessoas()], "eu": eu(usuario), "tmdb": estado_tmdb(),
+            "pessoas": [{"id": p["id"], "nome": p["nome"]} for p in pessoas()], "eu": eu(usuario), "tmdb": estado_tmdb(), "igdb": estado_igdb(),
             "correria": {"ligado": d["ajustes"]["correria"], "ultimo": CORRERIA.ultimo}}
 
 
@@ -772,7 +943,7 @@ def mudar_ajustes(corpo):
         if "tipos" in corpo:
             t = corpo["tipos"]
             if not isinstance(t, dict) or any(k not in R.TIPOS or not isinstance(v, bool) for k, v in t.items()):
-                raise ValueError("tipos: filme e serie, ligado ou desligado.")
+                raise ValueError("tipos: filme, serie e jogo, ligado ou desligado.")
             novos = dict(a["tipos"], **t)
             if not any(novos.values()):
                 raise ValueError("Deixe pelo menos um ligado.")
@@ -795,6 +966,21 @@ def salvar_chave(corpo):
     guardar_chave(chave)
     ESTADO_TMDB.update(erro="", em=agora_iso())
     return estado_tmdb()
+
+
+def salvar_igdb(corpo):
+    """A conta do IGDB: o Client ID e o Client Secret do app da casa no Twitch Developers (testados antes de guardar)."""
+    cid, seg = (" ".join(str(corpo.get(k) or "").split()) for k in ("cliente", "segredo"))
+    if not cid and not seg:
+        guardar_igdb("", "")
+        ESTADO_IGDB.update(erro="", em="")
+        return estado_igdb()
+    if not re.match(r"^[A-Za-z0-9]{10,60}$", cid) or not re.match(r"^[A-Za-z0-9]{10,60}$", seg):
+        raise ValueError("Copie o Client ID e o Client Secret do app no Twitch Developers.")
+    G.IGDB(cid, seg, IGDB_API, IGDB_TOKEN, IGDB_IMG).testar()
+    guardar_igdb(cid, seg)
+    ESTADO_IGDB.update(erro="", em=agora_iso())
+    return estado_igdb()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -866,9 +1052,7 @@ class Handler(BaseHTTPRequestHandler):
             if c == "/api/rev":
                 return self.enviar(200, {"rev": ler()["rev"]})
             if c == "/api/busca":
-                tipo = (q.get("tipo") or [""])[0]
-                rs = tmdb_fez(cliente().buscar, (q.get("q") or [""])[0], tipo_de_busca(tipo))
-                return self.enviar(200, {"resultados": marcar_ja(com_colecao(so_ligados(rs)))})
+                return self.enviar(200, {"resultados": buscar((q.get("q") or [""])[0], (q.get("tipo") or [""])[0])})
             if c == "/api/lista":
                 return self.enviar(200, lista_pronta((q.get("nome") or [""])[0], (q.get("tipo") or [""])[0], (q.get("pagina") or ["1"])[0]))
             m = re.match(r"^/api/capa/(t[0-9a-f]{8}\.(?:jpg|png))$", c)
@@ -880,7 +1064,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.enviar(404, {"erro": "Sem capa."})
                 return self.enviar(200, dado, MIME[os.path.splitext(m.group(1))[1]] if m.group(1).endswith(".png") else "image/jpeg",
                                    {"Cache-Control": "private, max-age=604800"})
-            m = re.match(r"^/api/img/(w92|w185|w342)(/[A-Za-z0-9_-]{1,80}\.(?:jpg|png))$", c)
+            m = re.match(r"^/api/img/(w92|w185|w342)(/[A-Za-z0-9_-]{1,80}\.(?:jpg|png))$", c) or re.match(r"^/api/img/(t_cover_big)/([a-z0-9]{2,40})\.jpg$", c)
             if m:
                 dado = capa_da_busca(m.group(1), m.group(2))
                 if not dado:
@@ -891,7 +1075,7 @@ class Handler(BaseHTTPRequestHandler):
                     n = int((q.get("id") or [""])[0])
                 except ValueError:
                     raise ValueError("Escolha uma coleção da busca.")
-                return self.enviar(200, {"colecao": colecao(n)})
+                return self.enviar(200, {"colecao": colecao(n, "jogo" if (q.get("tipo") or [""])[0] == "jogo" else "filme")})
             if c == "/api/dados":
                 return self.enviar(200, {"backups": backups(), "versoes": versoes()})
             if c == "/api/dados/exportar":
@@ -901,7 +1085,7 @@ class Handler(BaseHTTPRequestHandler):
             if c.startswith("/api/"):
                 return self.enviar(404, {"erro": "Rota desconhecida."})
             return self.arquivo(c)
-        except T.ErroTMDB as e:
+        except ERROS as e:
             return self.enviar(502, {"erro": str(e)})
         except (ValueError, R.ErroRegra) as e:
             return self.enviar(400, {"erro": str(e)})
@@ -957,6 +1141,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.enviar(200, {"ajustes": mudar_ajustes(corpo)})
             if c == "/api/tmdb":
                 return self.enviar(200, {"tmdb": salvar_chave(corpo)})
+            if c == "/api/igdb":
+                return self.enviar(200, {"igdb": salvar_igdb(corpo)})
             if c == "/api/dados/backup":
                 return self.enviar(200, {"nome": fazer_backup(), "backups": backups()})
             if c == "/api/dados/restaurar":
@@ -966,7 +1152,7 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("Confirme para apagar.")
                 return self.enviar(200, {"rev": zerar()["rev"]})
             return self.enviar(404, {"erro": "Rota desconhecida."})
-        except T.ErroTMDB as e:
+        except ERROS as e:
             return self.enviar(502, {"erro": str(e)})
         except (ValueError, R.ErroRegra) as e:
             return self.enviar(400, {"erro": str(e)})
