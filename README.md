@@ -11,11 +11,17 @@ Um app (add-on) do Home Assistant para os filmes e as séries da casa, da famíl
 - **Pelo CorrerIA**: no WhatsApp, no Claude e no Gemini.
 - Exportar, backup, importar e versões anteriores; tema claro e escuro e a cor da casa.
 
-## Instalar
+## Instalação
 
-No Home Assistant: **Configurações › Aplicativos › Loja de aplicativos › ⋮ › Repositórios**, adicione
-`https://github.com/diegozapella63/OdisseIA` e instale o **OdisseIA**. Depois, ponha a chave grátis do TMDB em
-**Mais › Configurações › Integrações** (veja a aba Documentação).
+1. No Home Assistant: **Configurações → Aplicativos → Loja de aplicativos**.
+2. No menu **⋮ → Repositórios**, adicione:
+   ```
+   https://github.com/diegozapella63/OdisseIA
+   ```
+3. Procure **OdisseIA** na loja, toque em **Instalar** e depois em **Iniciar**.
+4. Ative **Mostrar na barra lateral** e ponha a chave grátis do TMDB em **Mais › Configurações › Integrações** (o passo a passo está na aba **Documentação**).
+
+[![Adicionar o repositório ao Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fdiegozapella63%2FOdisseIA)
 
 ## Desenvolvimento
 
