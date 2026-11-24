@@ -516,6 +516,12 @@ def adicionar_colecao(corpo, quem_usa=""):
     if situacao not in ("quero", "visto"):
         raise ValueError("Numa coleção, a situação vale quero ou visto.")
     R.conferir_tipo(ler(), tipo)
+    # 0.5.0 (o dono: "antes do já vi todos, as opções de categorias para selecionar a categoria de todos"): a categoria vale
+    # para tudo o que entra (os novos e os que já estavam)
+    cat = corpo.get("categoria")
+    cats = {c["id"]: c["nome"] for c in ler()["categorias"][tipo]}
+    if cat is not None and (not isinstance(cat, str) or (cat and cat not in cats)):
+        raise ValueError("Categoria desconhecida.")
     col = colecao_de(tipo, n)
     hoje, k = agora_iso()[:10], R.fonte(tipo)
     with TRAVA:
@@ -549,7 +555,14 @@ def adicionar_colecao(corpo, quem_usa=""):
                 res["marcados"] += 1
             else:
                 res["ja"] += 1
-        if res["novos"] or res["marcados"]:
+        mudou = False
+        if cat is not None:
+            res["categoria"] = cats.get(cat, "")
+            for f in entram:
+                t = R.de_fonte(d, tipo, f[k])
+                if t and t["categoria"] != cat:
+                    t["categoria"], mudou = cat, True
+        if res["novos"] or res["marcados"] or mudou:
             salvar(d)
     res["rev"] = d["rev"]
     return res
@@ -866,8 +879,9 @@ def usar_ferramenta(corpo):
                 col = ferramentas.melhor(tmdb_fez(cliente().colecoes, a["nome"]), a["nome"])
             if not col:
                 raise ferramentas.ErroFerramenta(f"Não achei a coleção «{a['nome']}» no {'IGDB' if tipo == 'jogo' else 'TMDB'}.")
-            res = adicionar_colecao({"colecao": col[R.fonte(tipo)], "tipo": tipo, "situacao": a.get("situacao") or "quero"}, pid)
-        except (*ERROS, ValueError) as e:
+            extra = {"categoria": R.achar_categoria(ler(), tipo, a["categoria"])} if "categoria" in a else {}
+            res = adicionar_colecao(dict({"colecao": col[R.fonte(tipo)], "tipo": tipo, "situacao": a.get("situacao") or "quero"}, **extra), pid)
+        except (*ERROS, ValueError) as e:  # R.ErroRegra também é um ValueError
             raise ferramentas.ErroFerramenta(str(e)) from e
         texto = ferramentas.texto_colecao(res, a.get("situacao") or "quero")
         CORRERIA.ultimo = {"app": str(corpo.get("cliente") or "CorrerIA")[:40], "em": agora_iso(), "nome": nome}

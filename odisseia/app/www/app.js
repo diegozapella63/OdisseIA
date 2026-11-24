@@ -138,6 +138,8 @@
   // fundo na cor dela
   const pickCat = (a, c, on, extra = '') => `<button class="escolha cor${on ? ' on' : ''}" style="${estiloCor(c.cor)}" data-a="${a}" data-v="${c.id}" aria-pressed="${on}"${extra}><span class="dot"></span>${esc(c.nome)}</button>`;
   const tagCat = c => `<span class="cat-tag" style="${estiloCor(c.cor)}">${esc(c.nome)}</span>`;
+  // a mesma etiqueta, para tocar (dentro do botão da linha, o toque nela vai para ela); sem categoria, Sem categoria
+  const tagCatToque = (c, id) => `<span class="cat-tag toque${c ? '' : ' vazia'}" role="button" data-a="cat-rapida" data-id="${id}"${c ? ` style="${estiloCor(c.cor)}"` : ''}>${c ? esc(c.nome) : `${ic('plus', 'ic-s')}Categoria`}</span>`;
   function corAtual() {
     const a = (S.e && S.e.ajustes) || lerJSON('odisseia-cor', {});
     return a.cor_dia !== false ? corDoDia() : (PALETA.some(c => c.id === a.cor) ? a.cor : 'lilas');
@@ -215,7 +217,7 @@
   const cab = (icone, titulo, chave, extra = '') => `<div class="rot" role="button" tabindex="0" data-dobra="${esc(chave || titulo)}" aria-expanded="${!fechadas().has(chave || titulo)}"><span class="rot-ic">${ic(icone)}</span><h2>${titulo}</h2>${extra}<span class="dobra-ic" aria-hidden="true">${ic('chev', 'ic-s')}</span></div>`;
   const card = (id, icone, titulo, corpo, chave) => `<section class="card${fechadas().has(chave || titulo) ? ' fechada' : ''}" id="${id}">${cab(icone, titulo, chave)}${corpo}</section>`;
   const lbl = (icone, titulo, para) => para ? `<label for="${para}">${ic(icone, 'ic-s')}${titulo}</label>` : `<span class="lbl">${ic(icone, 'ic-s')}${titulo}</span>`;
-  const ICONE_TELA = { Agora: 'clock', Buscar: 'search', Vistos: 'visto', Mais: 'mais', Categorias: 'tag', 'Configurações': 'gear', Sobre: 'info' };
+  const ICONE_TELA = { Agora: 'clock', Buscar: 'search', 'Concluídos': 'visto', Mais: 'mais', Categorias: 'tag', 'Configurações': 'gear', Sobre: 'info' };
   const topo = (titulo, volta, extra = '') => `<header class="cab-tela">${volta ? `<button class="voltar" data-a="voltar">${ic('back', 'ic-s')}${volta}</button>` : extra}<h1><span class="rot-ic tela-ic" aria-hidden="true">${ic(ICONE_TELA[titulo])}</span>${titulo}</h1></header>`;
   const capa = (t, g) => t.capa ? `<img class="capa${g ? ' g' : ''}" src="api/capa/${esc(t.capa)}" alt="" loading="lazy">` : `<span class="capa${g ? ' g' : ''}">${ic(TIPO[t.tipo][1])}</span>`;
   const avs = ids => ids && ids.length && S.e.ajustes.quem ? `<span class="pessoas-mini">${ids.map(i => `<span class="av" title="${esc((pessoa(i) || {}).nome || i)}">${esc(inicial(i))}</span>`).join('')}</span>` : '';
@@ -247,19 +249,32 @@
   // sel: o Selecionar (um toque marca); lado: o tipo do que já foi marcado (os outros ficam de fora)
   function linhaTit(t, opts = {}) {
     const sel = opts.sel, marcado = sel && sel.has(t.id), fora = sel && opts.lado && t.tipo !== opts.lado, c = catDe(t);
+    const tag = opts.catToque && !sel ? tagCatToque(c, t.id) : c ? tagCat(c) : '';
     const s = !sel && opts.mais1 && podeProximo(t);
     const marca = sel ? `<span class="marca${marcado ? ' on' : ''}">${ic('check', 'ic-s')}</span>` : '';
     const acao = `data-a="${sel ? 'sel-marcar' : 'abrir'}" data-id="${t.id}"${fora ? ' disabled' : ''}${sel ? ` aria-pressed="${!!marcado}"` : ''}`;
     const mais = s ? `<button class="mais1" data-a="proximo" data-id="${t.id}" aria-label="Vi o ${ep(s[0], s[1])}">${ic('check', 'ic-s')}${ep(s[0], s[1])}</button>` : '';
     if (opts.curta) {
-      return `<li class="linha-tit curta${fora ? ' fora' : ''}"><button class="tit" ${acao}>${marca}<span class="t-txt"><span class="t-l1"><b>${esc(t.nome)}</b>${c ? tagCat(c) : ''}${t.ano ? `<small class="ano">${t.ano}</small>` : ''}${avs(t.quem)}</span></span></button>${mais}</li>`;
+      return `<li class="linha-tit curta${fora ? ' fora' : ''}"><button class="tit" ${acao}>${marca}<span class="t-txt"><span class="t-l1"><b>${esc(t.nome)}</b>${tag}${t.ano ? `<small class="ano">${t.ano}</small>` : ''}${avs(t.quem)}</span></span></button>${mais}</li>`;
     }
     return `<li class="linha-tit${fora ? ' fora' : ''}"><button class="tit" ${acao}>${marca}${capa(t)}<span class="t-txt"><span class="t-l1"><b>${esc(t.nome)}</b>${avs(t.quem)}</span>
-      <small class="${opts.dest ? 'dest' : ''}">${opts.sub != null ? opts.sub : esc(meta(t))}${c && opts.sub == null ? tagCat(c) : ''}</small></span></button>${mais}</li>`;
+      <small class="${opts.dest ? 'dest' : ''}">${opts.sub != null ? opts.sub : esc(meta(t))}${opts.sub == null ? tag : ''}</small></span></button>${mais}</li>`;
   }
   // 0.4.0 (o dono: "permitir visualizar modo lista menor, ter opção de alteração em massa de categorias"; "e também o
   // quem, igual a alteração em massa de outros apps"): em cima da lista, Capas ou Lista (o aparelho lembra) e o
   // Selecionar, como no InventarIA (marcar vários e Alterar, com o Desfazer). Uma seleção é de um tipo só.
+  // 0.5.0 (o dono: "ter opção de agrupar por categoria do filme, e pelo gênero"): os grupos na ordem das categorias (Sem
+  // categoria no fim) ou dos gêneros (o primeiro de cada título, em ordem alfabética; Sem gênero no fim)
+  function grupos(ts, ag) {
+    const m = new Map();
+    for (const t of ts) {
+      const c = ag === 'categoria' ? catDe(t) : null, k = ag === 'categoria' ? (c ? c.id : '') : ((t.generos || [])[0] || '');
+      if (!m.has(k)) m.set(k, { k, c, nome: k ? (c ? c.nome : k) : ag === 'categoria' ? 'Sem categoria' : 'Sem gênero', ts: [] });
+      m.get(k).ts.push(t);
+    }
+    const ordem = ag === 'categoria' ? Object.values(S.e.categorias).flat().map(c => c.id) : [];
+    return [...m.values()].sort((a, b) => (!a.k) - (!b.k) || (ag === 'categoria' ? ordem.indexOf(a.k) - ordem.indexOf(b.k) : a.nome.localeCompare(b.nome, 'pt-BR')));
+  }
   function listaSel(ts, opts = {}) {
     const modo = guardada('odisseia-modo') === 'lista' ? 'lista' : 'capas', sel = S.sel;
     if (sel) { const vis = new Set(ts.map(t => t.id)); for (const id of [...sel]) if (!vis.has(id)) sel.delete(id); }
@@ -271,8 +286,13 @@
         <button class="btn fino" data-a="sel-todos">${ic('list-checks', 'ic-s')}${todos ? 'Nenhum' : 'Todos'}</button></div>`
       : `<div class="ssum"><div class="modo" role="group" aria-label="Ver como">${[['capas', 'Capas', 'image'], ['lista', 'Lista', 'list']].map(([k, nome, i]) => `<button class="${modo === k ? 'on' : ''}" data-a="modo" data-v="${k}" aria-pressed="${modo === k}" aria-label="${nome}">${ic(i, 'ic-s')}<span>${nome}</span></button>`).join('')}</div>
         <button class="btn fino" data-a="sel-comecar">${ic('list-checks', 'ic-s')}Selecionar</button></div>`;
-    const o = { mais1: opts.mais1, sel, lado, curta: modo === 'lista' };
-    return barra + `<ul class="titulos${modo === 'lista' ? ' curtas' : ''}">${ts.map(t => linhaTit(t, o)).join('')}</ul>`
+    const o = { mais1: opts.mais1, sel, lado, curta: modo === 'lista', catToque: true };
+    const ag = guardada('odisseia-agrupar') || '', ul = l => `<ul class="titulos${modo === 'lista' ? ' curtas' : ''}">${l.map(t => linhaTit(t, o)).join('')}</ul>`;
+    const agrupar = `<div class="agrupar"><span class="lbl">${ic('layers', 'ic-s')}Agrupar por</span><div class="modo" role="group" aria-label="Agrupar por">${[['', 'Nada'], ['categoria', 'Categoria'], ['genero', 'Gênero']].map(([k, n]) => `<button class="${ag === k ? 'on' : ''}" data-a="agrupar" data-v="${k}" aria-pressed="${ag === k}">${n}</button>`).join('')}</div></div>`;
+    return barra + (sel ? '' : agrupar) + (ag ? grupos(ts, ag).map(g => {
+      const k = ag + ':' + g.k, F = new Set(lerJSON('odisseia-grupos', [])), fechado = F.has(k);
+      return `<div class="grupo${fechado ? ' fechado' : ''}"><button class="grupo-h" data-a="grupo" data-v="${esc(k)}" aria-expanded="${!fechado}">${g.c ? `<span class="dot" style="${estiloCor(g.c.cor)}"></span>` : ic(ag === 'genero' ? 'texto' : 'tag', 'ic-s')}<b>${esc(g.nome)}</b><span class="cont">${g.ts.length}</span>${ic('chev', 'ic-s seta')}</button>${fechado ? '' : ul(g.ts)}</div>`;
+    }).join('') : ul(ts))
       + (sel ? `<div class="selbar"><button class="btn pri" data-a="sel-alterar"${n ? '' : ' disabled'}>${ic('nota', 'ic-s')}${n ? 'Alterar ' + plural(n, 'título', 'títulos') : 'Alterar'}</button></div>` : '');
   }
   const lista = (ts, opts) => `<ul class="titulos">${ts.map(t => linhaTit(t, opts)).join('')}</ul>`;
@@ -320,10 +340,15 @@
 
   /* ---------- Buscar */
   function filtrados() {
-    const b = S.busca, alvo = semAcento(b.texto.trim());
+    const b = S.busca, alvo = semAcento(b.texto.trim()), cat = catDaBusca();
     return ordem(S.e.titulos.filter(t => (!alvo || semAcento(t.nome).includes(alvo) || semAcento(t.original).includes(alvo))
       && (!b.tipo || t.tipo === b.tipo || !ligados().includes(b.tipo)) && (!b.quem || t.quem.includes(b.quem))
-      && (!b.situacao || t.situacao === b.situacao) && (!b.categoria || (b.categoria === 'sem' ? !catDe(t) : t.categoria === b.categoria))));
+      && (!b.situacao || t.situacao === b.situacao) && (!cat || (cat === 'sem' ? !catDe(t) : t.categoria === cat))));
+  }
+  // a categoria só vale com um tipo escolhido (ou um tipo só ligado)
+  function catDaBusca() {
+    const l = ligados();
+    return l.length === 1 || l.includes(S.busca.tipo) ? S.busca.categoria : '';
   }
   // 0.3.0 (o dono: "a parte de filtros deixa no mesmo padrão dos outros apps"): a busca, o Filtros que fecha e abre (o
   // aparelho lembra) e as caixas de seleção lado a lado, como no InventarIA e no ResolvIA
@@ -331,7 +356,10 @@
     const b = S.busca, e = S.e, tipos = ligados(), aberto = guardada('odisseia-filtros') !== 'fechado';
     const caixa = (id, ic_, rot, opcoes, atual) => `<select class="inp select" id="${id}" data-ic="${ic_}" aria-label="${rot}">${opcoes}</select>`;
     const opt = (v, n, atual) => `<option value="${esc(v)}"${v === atual ? ' selected' : ''}>${esc(n)}</option>`;
-    const cats = tipos.filter(k => !b.tipo || k === b.tipo).filter(k => (e.categorias[k] || []).length);
+    // 0.5.0 (o dono: "só deve habilitar o filtro de categorias se eu selecionar só filmes, séries ou jogos"): as categorias
+    // são de cada tipo; com todos os tipos, a caixa fica inativa
+    const tipoUm = tipos.length === 1 ? tipos[0] : tipos.includes(b.tipo) ? b.tipo : '';
+    const cats = tipoUm ? e.categorias[tipoUm] || [] : [];
     const sel = [];
     const todos = tipos.map((k, i) => i ? NOMES[k].toLowerCase() : NOMES[k]), tipo = tipos.includes(b.tipo) ? b.tipo : '';
     if (tipos.length > 1) sel.push(caixa('f-tipo', 'film', 'Tipo', opt('', todos.slice(0, -1).join(', ') + ' e ' + todos[todos.length - 1], b.tipo) + tipos.map(k => opt(k, NOMES[k], b.tipo)).join('')));
@@ -339,9 +367,9 @@
     sel.push(caixa('f-sit', 'layers', 'Situação', opt('', 'Todas as situações', b.situacao) + opt('quero', soJogo ? 'Quero jogar' : comJogo ? 'Quero ver ou jogar' : 'Quero ver', b.situacao)
       + opt('visto', soJogo ? 'Jogados' : comJogo ? 'Vistos e jogados' : 'Vistos', b.situacao)));
     // 0.4.0 (o dono: "filtro por categoria aqui"): a caixa está sempre; sem nenhuma categoria, leva a criar
-    sel.push(caixa('f-cat', 'tag', 'Categoria', opt('', 'Todas as categorias', b.categoria) + cats.map(k => cats.length > 1
-      ? `<optgroup label="${NOMES[k]}">${e.categorias[k].map(c => opt(c.id, c.nome, b.categoria)).join('')}</optgroup>`
-      : e.categorias[k].map(c => opt(c.id, c.nome, b.categoria)).join('')).join('') + opt('sem', 'Sem categoria', b.categoria) + (cats.length ? '' : opt('__criar', 'Criar categorias…', ''))));
+    sel.push(tipoUm ? caixa('f-cat', 'tag', 'Categoria', opt('', 'Todas as categorias', b.categoria) + cats.map(c => opt(c.id, c.nome, b.categoria)).join('')
+      + opt('sem', 'Sem categoria', b.categoria) + (cats.length ? '' : opt('__criar', 'Criar categorias…', '')))
+      : `<select class="inp select" id="f-cat" data-ic="tag" aria-label="Categoria: escolha o tipo antes" disabled><option>Categoria</option></select>`);
     if (e.ajustes.quem && e.pessoas.length > 1) sel.push(caixa('f-quem', 'users', 'Quem', opt('', 'Todas as pessoas', b.quem) + e.pessoas.map(p => opt(p.id, p.nome.split(' ')[0], b.quem)).join('')));
     const ts = filtrados();
     let h = topo('Buscar') + `<section class="sbar"><label class="busca">${ic('search')}<input id="b-texto" type="search" placeholder="${oQue()}" value="${esc(b.texto)}" enterkeyhint="search" autocomplete="off">${b.texto ? `<button class="limpar" data-a="b-limpar" aria-label="Limpar">${ic('x', 'ic-s')}</button>` : ''}</label>
@@ -362,7 +390,7 @@
     const f = fc === 'sem' ? (semCat ? 'sem' : '') : cats.some(c => c.id === fc) ? fc : '';
     const ts = todos.filter(t => !f || (f === 'sem' ? !catDe(t) : t.categoria === f))
       .sort((a, b) => String(b.visto_em || '').localeCompare(String(a.visto_em || '')) || a.nome.localeCompare(b.nome, 'pt-BR'));
-    let h = topo('Vistos') + (abas.length < 2 ? '' : `<div class="abas" role="tablist">${abas.map(([k, n, i]) => `<button role="tab" aria-selected="${aba === k}" class="${aba === k ? 'on' : ''}" data-a="hist" data-v="${k}">${ic(i, 'ic-s')}${n}</button>`).join('')}</div>`);
+    let h = topo('Concluídos') + (abas.length < 2 ? '' : `<div class="abas" role="tablist">${abas.map(([k, n, i]) => `<button role="tab" aria-selected="${aba === k}" class="${aba === k ? 'on' : ''}" data-a="hist" data-v="${k}">${ic(i, 'ic-s')}${n}</button>`).join('')}</div>`);
     if (!todos.length) return h + card('nada-visto', icone, vazio, `<p class="lead">O que a casa ${aba === 'jogo' ? 'jogou' : 'viu'} aparece aqui.</p>`, 'nada-visto');
     const chip = (v, nome, icone_) => `<button class="chip${f === v ? ' on' : ''}" data-a="v-cat" data-v="${v}" aria-pressed="${f === v}">${icone_}${esc(nome)}</button>`;
     const chipCat = c => `<button class="chip cor${f === c.id ? ' on' : ''}" style="${estiloCor(c.cor)}" data-a="v-cat" data-v="${c.id}" aria-pressed="${f === c.id}"><span class="dot"></span>${esc(c.nome)}</button>`;
@@ -550,7 +578,8 @@
       : `<span class="cz-acoes">${r.ja ? '' : `<button class="cz-bt" data-a="cz-quero" data-o="${o}" data-i="${i}" aria-label="${quer} ${esc(r.nome)}">${ic('bookmark', 'ic-s')}</button>`}
         ${r.situacao === 'visto' || !saiu ? '' : `<button class="cz-bt vi" data-a="cz-visto" data-o="${o}" data-i="${i}" aria-label="${vi} ${esc(r.nome)}">${ic('check', 'ic-s')}</button>`}</span>`}</div>
       <b class="cz-nome">${esc(r.nome)}</b><small>${esc(meta)}</small>
-      ${(r.tipo === 'filme' || r.tipo === 'jogo') && r.colecao && o !== 'col' ? `<button class="cz-col" data-a="cz-colecao" data-id="${r.colecao.id}"${jg ? ' data-j="1"' : ''}>${ic('layers', 'ic-s')}Coleção</button>` : ''}</li>`;
+      ${(r.tipo === 'filme' || r.tipo === 'jogo') && r.colecao && o !== 'col' ? `<button class="cz-col" data-a="cz-colecao" data-id="${r.colecao.id}"${jg ? ' data-j="1"' : ''}>${ic('layers', 'ic-s')}Coleção</button>` : ''}
+      ${o === 'col' && r.ja && S.e.titulos.some(t => t.id === r.ja) ? tagCatToque(catDe(S.e.titulos.find(t => t.id === r.ja)), r.ja) : ''}</li>`;
   }
   const grade = (rs, o) => `<ul class="cartazes">${rs.map((r, i) => cartaz(r, i, o)).join('')}</ul>`;
   function folhaAdicionar() {
@@ -578,6 +607,19 @@
     return { titulo: 'Adicionar', icone: 'plus', alta: true, corpo: `<label class="busca" style="margin-bottom:12px">${ic('search')}<input id="add-q" type="search" placeholder="${oQue(a.tipo)}" value="${esc(a.q)}" enterkeyhint="search" autocomplete="off"${semChave ? ' disabled' : ''}>${a.q ? `<button class="limpar" data-a="add-limpar" aria-label="Limpar">${ic('x', 'ic-s')}</button>` : ''}</label>
       ${seg}${res}` };
   }
+  // Sem categoria, as da casa e a Nova (o nome aparece embaixo; a categoria nasce com uma cor livre), como no MemorIA
+  function campoCategoria(t) {
+    const cats = S.e.categorias[t.tipo] || [], semC = !(t.categoria && cats.some(c => c.id === t.categoria));
+    return `<div class="campo">${lbl('tag', 'Categoria')}<div class="escolhas"><button class="escolha${semC && S.novaCat == null ? ' on' : ''}" data-a="cat" data-v="">${ic('x', 'ic-s')}Sem categoria</button>
+      ${cats.map(c => pickCat('cat', c, t.categoria === c.id && S.novaCat == null)).join('')}<button class="escolha${S.novaCat != null ? ' on' : ''}" data-a="cat-nova-t">${ic('plus', 'ic-s')}Nova</button></div>
+      ${S.novaCat != null ? `<div class="nova-cat"><textarea class="inp umalinha" rows="1" id="cat-nova-t" maxlength="40" placeholder="Nome da nova categoria" aria-label="Nome da nova categoria" enterkeyhint="done">${esc(S.novaCat)}</textarea>
+        <button class="btn pri" data-a="cat-nova-criar">${ic('check', 'ic-s')}Criar</button></div>` : ''}</div>`;
+  }
+  // 0.5.0 (o dono: "colocar a categoria em cada linha ali"): o toque na categoria de uma linha (ou no Sem categoria) abre só a
+  // escolha dela; escolhida, a janela fecha
+  function folhaCatTitulo(t) {
+    return { titulo: t.nome, icone: 'tag', corpo: campoCategoria(t) };
+  }
   function folhaTitulo(t) {
     const e = S.e, pode = podeProximo(t);
     const jg = t.tipo === 'jogo';
@@ -602,13 +644,7 @@
     if ((t.tipo === 'filme' || jg) && t.colecao) {
       h += `<div class="campo">${lbl('layers', 'Coleção')}<div class="acoes"><button class="btn out" data-a="abrir-colecao" data-id="${t.colecao.id}"${jg ? ' data-j="1"' : ''}>${ic('layers', 'ic-s')}${esc(t.colecao.nome)}</button></div></div>`;
     }
-    const cats = S.e.categorias[t.tipo] || [];
-    // Sem categoria, as da casa e a Nova (o nome aparece embaixo; a categoria nasce com uma cor livre), como no MemorIA
-    const semC = !(t.categoria && cats.some(c => c.id === t.categoria));
-    h += `<div class="campo">${lbl('tag', 'Categoria')}<div class="escolhas">${`<button class="escolha${semC && S.novaCat == null ? ' on' : ''}" data-a="cat" data-v="">${ic('x', 'ic-s')}Sem categoria</button>`}
-      ${cats.map(c => pickCat('cat', c, t.categoria === c.id && S.novaCat == null)).join('')}<button class="escolha${S.novaCat != null ? ' on' : ''}" data-a="cat-nova-t">${ic('plus', 'ic-s')}Nova</button></div>
-      ${S.novaCat != null ? `<div class="nova-cat"><textarea class="inp umalinha" rows="1" id="cat-nova-t" maxlength="40" placeholder="Nome da nova categoria" aria-label="Nome da nova categoria" enterkeyhint="done">${esc(S.novaCat)}</textarea>
-        <button class="btn pri" data-a="cat-nova-criar">${ic('check', 'ic-s')}Criar</button></div>` : ''}</div>`;
+    h += campoCategoria(t);
     if (e.ajustes.quem && e.pessoas.length) {
       const todos = e.pessoas.every(p => t.quem.includes(p.id));
       h += `<div class="campo">${lbl('users', 'Quem')}<div class="escolhas">${e.pessoas.length > 1 ? `<button class="escolha${todos ? ' on' : ''}" data-a="quem-todos">${ic(todos ? 'check' : 'users', 'ic-s')}Todos</button>` : ''}${e.pessoas.map(p => `<button class="escolha${t.quem.includes(p.id) ? ' on' : ''}" data-a="quem" data-v="${esc(p.id)}">${ic(t.quem.includes(p.id) ? 'check' : 'user', 'ic-s')}${esc(p.nome.split(' ')[0])}</button>`).join('')}</div></div>`;
@@ -638,18 +674,23 @@
     }
     if (c.erro) return { titulo: nome, icone: 'layers', corpo: `<p class="status erro">${esc(c.erro)}</p>` };
     if (!c.dados) return { titulo: nome, icone: 'layers', corpo: '<p class="vazio">Abrindo…</p>' };
-    const d = c.dados, saiu = d.itens.filter(x => x.saiu);
+    const d = c.dados, saiu = d.itens.filter(x => x.saiu), cats = S.e.categorias[jg ? 'jogo' : 'filme'] || [];
+    // 0.5.0 (o dono: "antes do já vi todos, as opções de categorias para selecionar a categoria de todos ou individual"): a
+    // categoria de todos vale no Quero ver todos e no Já vi todos; a de cada um, na etiqueta embaixo da capa
+    const cc = S.colCat || MANTER;
+    const campoCat = cats.length ? `<div class="campo">${lbl('tag', jg ? 'Categoria de todos os jogos' : 'Categoria de todos os filmes')}<div class="escolhas">
+      <button class="escolha${cc === MANTER ? ' on' : ''}" data-a="col-cat" data-v="${MANTER}">${ic(cc === MANTER ? 'check' : 'igual', 'ic-s')}Manter</button>${cats.map(x => pickCat('col-cat', x, cc === x.id)).join('')}</div></div>` : '';
     const pe = `<button class="btn out" data-a="col-todos" data-v="quero"${d.itens.every(x => x.ja) ? ' disabled' : ''}>${ic('bookmark', 'ic-s')}${jg ? 'Quero jogar todos' : 'Quero ver todos'}</button>
       <button class="btn pri" data-a="col-todos" data-v="visto"${saiu.every(x => x.situacao === 'visto') ? ' disabled' : ''}>${ic('visto', 'ic-s')}${jg ? 'Já joguei todos' : 'Já vi todos'}</button>`;
     return { titulo: d.nome, icone: 'layers', alta: true, pe, corpo: `${d.sinopse ? `<p class="sinopse">${esc(d.sinopse)}</p>` : ''}
-      <div class="campo" style="margin-top:14px">${lbl(jg ? 'gamepad' : 'film', jg ? plural(d.itens.length, 'jogo', 'jogos') : plural(d.itens.length, 'filme', 'filmes'))}${grade(d.itens, 'col')}</div>` };
+      <div class="campo" style="margin-top:14px">${lbl(jg ? 'gamepad' : 'film', jg ? plural(d.itens.length, 'jogo', 'jogos') : plural(d.itens.length, 'filme', 'filmes'))}${grade(d.itens, 'col')}</div>${campoCat}` };
   }
   function pintarJanela() {
     const el = $('#janela');
     const f = S.folha;
-    const t = f && f.tipo === 'titulo' ? S.e.titulos.find(x => x.id === f.id) : null;
-    const j = !f || (f.tipo === 'titulo' && !t) ? null : f.tipo === 'adicionar' ? folhaAdicionar() : f.tipo === 'colecao' ? folhaColecao(f)
-      : f.tipo === 'categoria' ? folhaCategoria(f) : f.tipo === 'lote' ? folhaLote() : folhaTitulo(t);
+    const t = f && (f.tipo === 'titulo' || f.tipo === 'cat-titulo') ? S.e.titulos.find(x => x.id === f.id) : null;
+    const j = !f || ((f.tipo === 'titulo' || f.tipo === 'cat-titulo') && !t) ? null : f.tipo === 'adicionar' ? folhaAdicionar() : f.tipo === 'colecao' ? folhaColecao(f)
+      : f.tipo === 'categoria' ? folhaCategoria(f) : f.tipo === 'lote' ? folhaLote() : f.tipo === 'cat-titulo' ? folhaCatTitulo(t) : folhaTitulo(t);
     if (!j) {
       if (el.innerHTML) el.innerHTML = '';
       document.body.classList.remove('com-folha');
@@ -665,12 +706,26 @@
       <div class="folha-corpo" data-k="${f.tipo + (f.id || '')}">${j.corpo}</div>${j.pe ? `<div class="folha-pe">${j.pe}</div>` : ''}</div>`;
     document.body.classList.add('com-folha');
     const corpo = el.querySelector('.folha-corpo');
+    // 0.5.0 (o dono: "falta de opções de retrair, igual os outros apps"): cada campo da janela fecha e abre pelo título, com a
+    // seta no canto; o aparelho lembra (pelo título)
+    const F = new Set(lerJSON('odisseia-campos', []));
+    corpo.querySelectorAll(':scope > .campo').forEach(c => {
+      const r = c.querySelector(':scope > .lbl, :scope > label');
+      if (!r || !c.children[1]) return;
+      const k = r.textContent.trim().replace(/^\d+ /, '');
+      r.classList.add('dobra-campo');
+      r.dataset.campo = k;
+      r.setAttribute('role', 'button');
+      r.setAttribute('aria-expanded', String(!F.has(k)));
+      r.insertAdjacentHTML('beforeend', ic('chev', 'ic-s seta'));
+      c.classList.toggle('fechado', F.has(k));
+    });
     if (rolou) corpo.scrollTop = rolou;
     if (foco && $('#' + foco)) { const x = $('#' + foco); x.focus({ preventScroll: true }); try { if (sel != null) x.setSelectionRange(sel, sel); } catch (e) { /* sem seleção */ } }
   }
 
   /* ---------- a barra de baixo e a lateral (o padrão da família) */
-  const NAV = [['agora', 'Agora', 'clock'], ['buscar', 'Buscar', 'search'], ['+', 'Adicionar', 'plus'], ['vistos', 'Vistos', 'visto'], ['mais', 'Mais', 'mais']];
+  const NAV = [['agora', 'Agora', 'clock'], ['buscar', 'Buscar', 'search'], ['+', 'Adicionar', 'plus'], ['vistos', 'Concluídos', 'visto'], ['mais', 'Mais', 'mais']];
   const aba = () => (['config', 'sobre', 'categorias'].includes(S.tela) ? 'mais' : S.tela);
   function pintarNav() {
     $('#nav').innerHTML = `<div class="in">${NAV.map(([k, n, i]) => k === '+' ? `<button class="add" data-a="adicionar" aria-label="Adicionar"><span class="pill">${ic(i)}</span></button>`
@@ -809,7 +864,7 @@
     if (r.marcados) p.push(`${r.marcados} ${r.marcados === 1 ? 'marcado' : 'marcados'} como ${sitN(r.tipo, 'visto')}`);
     if (r.ja) p.push(`${r.ja} já ${r.ja === 1 ? 'estava' : 'estavam'} na lista`);
     if (r.fora) p.push(`${r.fora} ainda não ${r.fora === 1 ? 'saiu' : 'saíram'}`);
-    return `${r.nome}: ${p.length ? p.join(', ') : 'nada a mudar'}.`;
+    return `${r.nome}: ${p.length ? p.join(', ') : 'nada a mudar'}.` + ('categoria' in r ? ` Categoria de todos: ${r.categoria || 'nenhuma'}.` : '');
   }
   const salvarBusca = () => guardar('odisseia-busca', JSON.stringify({ tipo: S.busca.tipo, situacao: S.busca.situacao, quem: S.busca.quem, categoria: S.busca.categoria }));
 
@@ -826,7 +881,7 @@
     'add-limpar': () => { S.add.q = ''; S.add.res = null; render(); },
     'cz-abrir': async el => {
       const r = itemDe(el);
-      if (r.tipo === 'colecao' || r.tipo === 'colecao_jogos') { S.col = null; abrirFolha({ tipo: 'colecao', id: ref(r), jogo: r.tipo === 'colecao_jogos' }, true); return; }
+      if (r.tipo === 'colecao' || r.tipo === 'colecao_jogos') { S.col = null; S.colCat = null; abrirFolha({ tipo: 'colecao', id: ref(r), jogo: r.tipo === 'colecao_jogos' }, true); return; }
       if (r.ja) { abrirFolha({ tipo: 'titulo', id: r.ja }, true); return; }
       el.disabled = true;
       try { const x = await adicionarUm(r, 'quero'); abrirFolha({ tipo: 'titulo', id: x.titulo.id }, true); } catch (err) { el.disabled = false; toast(err.message); }
@@ -850,8 +905,8 @@
         render();
       } catch (err) { el.disabled = false; toast(err.message); }
     },
-    'abrir-colecao': el => { S.col = null; abrirFolha({ tipo: 'colecao', id: +el.dataset.id, jogo: !!el.dataset.j }, true); },
-    'cz-colecao': el => { S.col = null; abrirFolha({ tipo: 'colecao', id: +el.dataset.id, jogo: !!el.dataset.j }, true); },
+    'abrir-colecao': el => { S.col = null; S.colCat = null; abrirFolha({ tipo: 'colecao', id: +el.dataset.id, jogo: !!el.dataset.j }, true); },
+    'cz-colecao': el => { S.col = null; S.colCat = null; abrirFolha({ tipo: 'colecao', id: +el.dataset.id, jogo: !!el.dataset.j }, true); },
     // a coleção inteira de uma vez, sem abrir: Já vi todos (os que já saíram) ou Quero ver todos
     'cz-col-todos': async el => {
       const r = itemDe(el), sit = el.dataset.v;
@@ -866,14 +921,19 @@
     'col-todos': async el => {
       el.disabled = true;
       try {
-        const r = await api.post('titulo', { acao: 'adicionar_colecao', colecao: S.col.id, tipo: S.col.jogo ? 'jogo' : 'filme', situacao: el.dataset.v });
+        const r = await api.post('titulo', Object.assign({ acao: 'adicionar_colecao', colecao: S.col.id, tipo: S.col.jogo ? 'jogo' : 'filme', situacao: el.dataset.v },
+          S.colCat && S.colCat !== MANTER ? { categoria: S.colCat } : {}));
         toast(textoColecao(r, el.dataset.v));
         S.col = null;
         await carregar();
       } catch (err) { el.disabled = false; toast(err.message); }
     },
     sit: el => mudar(S.folha.id, { situacao: el.dataset.v }),
-    cat: el => { S.novaCat = null; mudar(S.folha.id, { categoria: el.dataset.v }); },
+    cat: async el => { S.novaCat = null; await mudar(S.folha.id, { categoria: el.dataset.v }); if (S.folha && S.folha.tipo === 'cat-titulo') fecharFolha(); },
+    'cat-rapida': el => abrirFolha({ tipo: 'cat-titulo', id: el.dataset.id }, true),
+    'col-cat': el => { S.colCat = el.dataset.v; render(); },
+    agrupar: el => { guardar('odisseia-agrupar', el.dataset.v); render(); },
+    grupo: el => { const F = new Set(lerJSON('odisseia-grupos', [])), k = el.dataset.v; if (F.has(k)) F.delete(k); else F.add(k); guardar('odisseia-grupos', JSON.stringify([...F])); render(); },
     'cat-nova-t': () => { S.novaCat = S.novaCat == null ? '' : null; render(); if (S.novaCat != null) { const c = $('#cat-nova-t'); if (c) c.focus(); } },
     'cat-nova-criar': async el => {
       const t = S.e.titulos.find(x => x.id === S.folha.id), nome = (S.novaCat || '').trim();
@@ -885,6 +945,7 @@
         const c = r.categorias[t.tipo].find(x => x.nome === nome) || r.categorias[t.tipo][r.categorias[t.tipo].length - 1];
         S.novaCat = null;
         await mudar(t.id, { categoria: c.id });
+        if (S.folha && S.folha.tipo === 'cat-titulo') fecharFolha();
       } catch (err) { el.disabled = false; toast(err.message); }
     },
     'quem-todos': () => { const t = S.e.titulos.find(x => x.id === S.folha.id), todos = S.e.pessoas.every(p => t.quem.includes(p.id)); mudar(t.id, { quem: todos ? [] : S.e.pessoas.map(p => p.id) }); },
@@ -1018,6 +1079,15 @@
   document.addEventListener('click', ev => {
     const el = ev.target.closest('[data-a]');
     if (el && ACOES[el.dataset.a] && !el.disabled) { ev.preventDefault(); ACOES[el.dataset.a](el); return; }
+    const campo = ev.target.closest('[data-campo]');
+    if (campo) {
+      ev.preventDefault();
+      const F = new Set(lerJSON('odisseia-campos', [])), k = campo.dataset.campo;
+      if (F.has(k)) F.delete(k); else F.add(k);
+      guardar('odisseia-campos', JSON.stringify([...F]));
+      render();
+      return;
+    }
     const dobra = ev.target.closest('[data-dobra]');
     if (dobra) {
       const F = fechadas(), k = dobra.dataset.dobra;
@@ -1069,7 +1139,7 @@
     if (id === 'f-cat' && ev.target.value === '__criar') { ev.target.value = S.busca.categoria; ir('categorias'); return; }
     if (filtro) {
       S.busca[filtro] = ev.target.value;
-      if (filtro === 'tipo' && S.busca.categoria && S.busca.categoria !== 'sem' && !(S.e.categorias[S.busca.tipo] || []).some(c => c.id === S.busca.categoria) && S.busca.tipo) S.busca.categoria = '';
+      if (filtro === 'tipo') S.busca.categoria = ''; // as categorias são de cada tipo
       salvarBusca();
       render();
     }

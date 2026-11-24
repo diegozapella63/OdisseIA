@@ -94,7 +94,7 @@ verdade, com a sua chave em Configurações). `ODISSEIA_TMDB` e `ODISSEIA_TMDB_I
 - Tudo em português do Brasil, sem palavras em inglês na tela. **Menos é mais**: textos curtos, sem avisos repetidos.
 - Celular primeiro (390 px; nada passa da largura em 320 px); com 1000 px ou mais, a barra lateral (`#lado`) no lugar da de
   baixo e as janelas no meio. Tema claro e escuro.
-- A barra de baixo: **Agora**, **Buscar**, o **+** (Adicionar, só o ícone), **Vistos** e **Mais**.
+- A barra de baixo: **Agora**, **Buscar**, o **+** (Adicionar, só o ícone), **Concluídos** e **Mais**.
 - **Inativos no fim, recolhidos**: os **Abandonados (n)** no fim do Buscar, recolhidos (abrem num toque).
 - **Caixas de seleção no visual do app** (`selectsheet.js`): a temporada e o episódio são `<select class="inp select">`.
 - Dados de exemplo e de testes sempre inventados (Ana, Beto, títulos inventados): nunca a lista real do dono.
@@ -139,6 +139,13 @@ verdade, com a sua chave em Configurações). `ODISSEIA_TMDB` e `ODISSEIA_TMDB_I
 - Categorias com cor (`cor`, uma das 12 da paleta, `R.CORES`; sem cor, `R.cor_livre`; `{acao: editar, id, nome?, cor?}`): `telaCategorias` (as linhas com o ícone na cor, como no MemorIA) e `folhaCategoria` (o nome e as cores); no título e no Alterar, `pickCat` (`.escolha.cor` com a `.dot`, escolhida no fundo da cor dela) e a **Nova** ali mesmo (`S.novaCat`); na linha, `.t-l1` (o nome e quem) e `tagCat` (`.cat-tag`).
 - O crédito do TMDB foi do Sobre para o cartão dele, em Integrações; o cabeçalho das telas e o `.voltar` como os do GerencIA.
 - Ferramenta `marcar_varios` (`R.lote`); `adicionar`, `lista_pronta` e `adicionar_colecao` com `tipo: jogo`.
+
+0.5.0 (o dono: "vistos fica estranho para jogos"; "colocar a categoria em cada linha ali"; "ter opção de agrupar por categoria do filme, e pelo gênero"; "antes do já vi todos, as opções de categorias para selecionar a categoria de todos ou individual"; "e falta de opções de retrair, igual os outros apps"; "só deve habilitar o filtro de categorias se eu selecionar só filmes, séries ou jogos"):
+- A aba **Concluídos** (a rota continua `vistos`). `tagCatToque` (`.cat-tag.toque`, `.vazia`: + Categoria; um `span` com `data-a="cat-rapida"` dentro do botão da linha) abre `folhaCatTitulo` (o `campoCategoria`, o mesmo do título; escolhida, fecha); as linhas do `listaSel` têm `catToque`.
+- **Agrupar por** (`.agrupar`, `odisseia-agrupar`: '', categoria, genero; `grupos(ts, ag)`; `.grupo`/`.grupo-h`, os fechados em `odisseia-grupos`).
+- Buscar: a categoria só com um tipo (`catDaBusca`; com todos os tipos, a caixa `#f-cat` fica `disabled`; mudar o tipo limpa a categoria).
+- Coleção: `S.colCat` (Manter ou uma categoria, `col-cat`) → `adicionar_colecao {categoria}` (vale para tudo o que entra; `res.categoria` é o nome); a etiqueta de cada capa que já está na lista. A ferramenta `adicionar_colecao` aceita `categoria`.
+- Os campos das janelas fecham pelo título (`pintarJanela`: `.dobra-campo`, `data-campo` com o título, `odisseia-campos`; `.campo.fechado`).
 
 ## Conversa com o dono
 

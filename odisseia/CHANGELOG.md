@@ -1,5 +1,15 @@
 # Mudanças
 
+## 0.5.0
+
+- **Concluídos** no lugar de Vistos (o nome serve também para os jogos): o que está salvo como visto ou jogado.
+- **A categoria em cada linha** do Concluídos e do Buscar, na cor dela, ou **+ Categoria**: o toque abre só a escolha da categoria daquele título.
+- **Agrupar por**: Nada, **Categoria** ou **Gênero**, no Concluídos e no Buscar. Cada grupo fecha num toque, e o aparelho lembra.
+- **Buscar**: o filtro da categoria só fica ativo depois de escolher Filmes, Séries ou Jogos (as categorias são de cada tipo).
+- **Na coleção**, antes do Já vi todos: a **Categoria de todos** os filmes (ou jogos), para os novos e os que já estavam na lista. Cada capa que já está na lista mostra a categoria dela, para mudar uma a uma.
+- **Os campos das janelas fecham** pelo título, com a seta no canto, como nos outros apps; o aparelho lembra os fechados.
+- **Pelo CorrerIA**: a categoria de todos ao adicionar uma coleção.
+
 ## 0.4.0
 
 - **Jogos**, pelo IGDB (da Twitch, de graça): a conta em **Mais › Configurações › Integrações › Jogos (IGDB)** (o passo a passo está na Documentação). No +, a aba **Jogos** com Em alta, Mais jogados, Mais bem avaliados, Coleções e Lançamentos; **Quero jogar** e **Já joguei** na capa; a série de jogos inteira de uma vez (**Já joguei todos**); no jogo, **Onde jogar** (as plataformas). No Agora, **Quero jogar** e **Jogos que vão sair**. Os jogos ligam e desligam em Opções › O que controlar.

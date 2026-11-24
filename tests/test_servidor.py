@@ -723,3 +723,32 @@ class TestNovidades040(unittest.TestCase):
         r = f({"nome": "marcar_varios", "argumentos": {"titulos": ["Ilha dos Ventos"], "situacao": "visto"}})["texto"]
         self.assertIn("jogado", r)
         S.R.lote(S.ler(), [{"id": S.ler()["titulos"][0]["id"], "campos": "x"}], None)
+
+
+class TestNovidades050(unittest.TestCase):
+    """0.5.0: a categoria de todos numa coleção."""
+
+    def setUp(self):
+        apoio.limpar()
+        apoio.fixar_hoje(self)
+        self.base = apoio.Servidor.subir()
+        S.guardar_chave(apoio.CHAVE)
+
+    def test_categoria_de_todos_na_colecao(self):
+        S.adicionar({"tipo": "filme", "tmdb": 101, "situacao": "visto"})
+        d = S.ler()
+        c = S.R.mudar_categorias(d, {"acao": "nova", "tipo": "filme", "nome": "Sagas"})
+        S.salvar(d)
+        st, r = pedir(self.base, "POST", "/api/titulo", {"acao": "adicionar_colecao", "colecao": 301, "situacao": "visto", "categoria": c["id"]})
+        self.assertEqual((st, r["categoria"], r["novos"], r["ja"]), (200, "Sagas", 1, 1))
+        self.assertEqual({t["categoria"] for t in S.ler()["titulos"]}, {c["id"]})
+        rev = S.ler()["rev"]
+        st, r = pedir(self.base, "POST", "/api/titulo", {"acao": "adicionar_colecao", "colecao": 301, "situacao": "visto", "categoria": c["id"]})
+        self.assertEqual(S.ler()["rev"], rev, "nada a mudar, nada gravado")
+        for cat in ("c999999", 3):
+            self.assertEqual(pedir(self.base, "POST", "/api/titulo", {"acao": "adicionar_colecao", "colecao": 301, "categoria": cat})[1]["erro"], "Categoria desconhecida.")
+        r = S.usar_ferramenta({"nome": "adicionar_colecao", "argumentos": {"nome": "grande viagem", "categoria": ""}})["texto"]
+        self.assertTrue(r.endswith("Categoria de todos: nenhuma."), r)
+        self.assertEqual({t["categoria"] for t in S.ler()["titulos"]}, {""})
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "não é uma categoria"):
+            S.usar_ferramenta({"nome": "adicionar_colecao", "argumentos": {"nome": "grande viagem", "categoria": "Nada"}})

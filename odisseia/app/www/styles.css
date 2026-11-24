@@ -401,3 +401,25 @@ code { font-size: 14px; background: var(--card-2); padding: 1px 6px; border-radi
 .nova-cat .btn { flex: none; }
 .seg.n4 button { padding: 8px 4px; }
 @media (min-width: 1000px) { .selbar { bottom: 20px; } }
+
+/* ---------- 0.5.0: a categoria tocável na linha, Agrupar por, os grupos que fecham e os campos das janelas que fecham */
+.cat-tag.toque { cursor: pointer; }
+.cat-tag.vazia { display: inline-flex; align-items: center; gap: 3px; background: transparent; color: var(--muted); border: 1px dashed var(--line-2); padding: 0 8px; }
+.cat-tag.vazia .ic-s { width: 12px; height: 12px; }
+.cz > .cat-tag { margin: 4px 0 0; justify-self: start; }
+.agrupar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; margin: 0 0 6px; }
+.agrupar .lbl { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; white-space: nowrap; }
+.agrupar .modo button { padding: 0 10px; }
+.grupo + .grupo { margin-top: 2px; }
+.grupo-h { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 8px 0; border-top: 1px solid var(--line); color: var(--text); text-align: left; }
+.grupo-h b { font: 600 17px/1.2 var(--font-d); }
+.grupo-h .cont { color: var(--muted); font: 600 14px var(--font-d); }
+.grupo-h .seta { margin-left: auto; color: var(--muted); transition: transform .15s; transform: rotate(90deg); }
+.grupo.fechado .grupo-h .seta { transform: none; }
+.grupo > .titulos { margin-bottom: 4px; }
+.dobra-campo { cursor: pointer; display: flex !important; align-items: center; }
+.dobra-campo .seta { margin-left: auto; color: var(--muted); transform: rotate(90deg); transition: transform .15s; }
+.campo.fechado > .dobra-campo .seta { transform: none; }
+.campo.fechado > :not(.dobra-campo) { display: none !important; }
+@media (prefers-reduced-motion: reduce) { .grupo-h .seta, .dobra-campo .seta { transition: none; } }
+@media (max-width: 380px) { .agrupar .lbl { font-size: 13px; } .agrupar .modo button { padding: 0 8px; } }

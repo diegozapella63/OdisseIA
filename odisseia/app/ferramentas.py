@@ -53,7 +53,7 @@ FERRAMENTAS = [
        "de jogos no IGDB) e põe tudo dela na lista. Com situacao visto, só os que já saíram, e os que já estavam na lista "
        "viram Visto (num jogo, Jogado).",
        {"nome": {"type": "string"}, "tipo": {"type": "string", "enum": ["filme", "jogo"], "description": "filme (de início) ou jogo."},
-        "situacao": _SIT}, ["nome"], grava=True),
+        "situacao": _SIT, "categoria": {"type": "string", "description": "O nome de uma categoria da casa (as do tipo): vale para todos; vazio tira."}}, ["nome"], grava=True),
     _f("marcar", "Marcar", "Muda a situação (quero ou visto), a categoria, o episódio (temporada e episodio, numa série), "
        "quem vê e as notas de um título.",
        {"titulo": _TIT, "situacao": _SIT, "categoria": _CAT,
@@ -300,7 +300,8 @@ def texto_colecao(res, situacao):
         partes.append(f"{res['ja']} já {'estava' if res['ja'] == 1 else 'estavam'} na lista")
     if res["fora"]:
         partes.append(f"{res['fora']} ainda não {'saiu' if res['fora'] == 1 else 'saíram'}")
-    return f"{res['nome']}: " + (", ".join(partes) if partes else "nada a mudar") + "."
+    cat = f" Categoria de todos: {res['categoria'] or 'nenhuma'}." if "categoria" in res else ""
+    return f"{res['nome']}: " + (", ".join(partes) if partes else "nada a mudar") + "." + cat
 
 
 COLECOES = {"colecao": "coleção de filmes", "colecao_jogos": "coleção de jogos"}
