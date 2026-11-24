@@ -16,7 +16,8 @@ jobs:
         with:
           python-version: "3.12"
       # os testes da tela (tests/test_tela.py) abrem a tela num Chromium
-      - run: pip install playwright && python -m playwright install --with-deps chromium
+      # o pyyaml só para o tests/test_versao.py ler o config.yaml como o Home Assistant lê
+      - run: pip install playwright pyyaml && python -m playwright install --with-deps chromium
       - name: Testes (falha também se algum for pulado)
         env:
           TZ: America/Sao_Paulo

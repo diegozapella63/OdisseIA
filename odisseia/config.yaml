@@ -1,7 +1,7 @@
 name: OdisseIA
-version: "0.1.0"
+version: "0.1.1"
 slug: odisseia
-description: Os filmes e as séries da casa: o que cada um está vendo, o que já viu, o próximo episódio e onde assistir.
+description: Os filmes e as séries da casa, com o que cada um está vendo, o próximo episódio e onde assistir no Brasil.
 url: https://github.com/diegozapella63/OdisseIA
 arch:
   - amd64

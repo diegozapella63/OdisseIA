@@ -1,5 +1,9 @@
 # Mudanças
 
+## 0.1.1
+
+- O app aparece na loja de aplicativos do Home Assistant depois de adicionar o repositório (a descrição do app impedia a leitura).
+
 ## 0.1.0
 
 - **Primeira versão.** Os filmes e as séries da casa, no padrão dos outros apps:
