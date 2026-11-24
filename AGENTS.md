@@ -42,8 +42,8 @@ Os dados ficam em `/data/odisseia.json` (`{versao, rev, titulos, ajustes}`; cada
 para a tela, só o fim `••••abcd`), as versões automáticas em `/data/versoes` (as 5 últimas: uma por dia e antes de
 importar, restaurar ou apagar tudo) e os backups em `share/odisseia/backups` (os 10 últimos). Um título:
 `{id: t + 8 hex, tipo: filme|serie, tmdb, nome, original, ano, capa, capa_tmdb, sinopse, generos, situacao:
-quero|vendo|visto|abandonado, quem: [person.*], nota: 0..5, notas, visto_em, tmdb_em, onde: {assinatura, gratis, alugar,
-comprar, link}}` e, na série, `temporadas: [{n, episodios}]` (sem a 0, dos especiais), `temp`/`ep` (o último visto; 0/0
+quero|visto, quem: [person.*], categoria (c + 6 hex ou ""), notas, visto_em, tmdb_em, onde: {assinatura, gratis, alugar,
+comprar, link}}`, no filme `colecao: {id, nome, capa}` e, na série, `temporadas: [{n, episodios}]` (sem a 0, dos especiais), `temp`/`ep` (o último visto; 0/0
 nenhum), `proximo` e `ultimo` (`{data, temp, ep, nome}`) e `fim`. O laço do servidor atualiza pelo TMDB as séries vistas ou
 queridas uma vez por dia e o resto uma vez por semana (os abandonados, não).
 
@@ -120,6 +120,13 @@ verdade, com a sua chave em Configurações). `ODISSEIA_TMDB` e `ODISSEIA_TMDB_I
 - **Histórico** (`telaHistorico`, `odisseia-historico`): uma aba por tipo ligado.
 - **O que controlar** (`ajustes.tipos`, `R.tipos_ligados`, `R.conferir_tipo`): o tipo desligado sai do `/api/estado`, da busca e das listas (`tipo_de_busca`, `so_ligados`) e do que as ferramentas veem (e volta inteiro ao gravar); pelo menos um fica ligado.
 - Ferramentas novas: `lista_pronta` e `adicionar_colecao` (`texto_lista`, `texto_colecao`).
+
+0.3.0 (o dono: "pode tirar a opção de vendo, só vou controlar visto e quero ver"; "tirar a opção de nota e colocar um campo de categoria... configurável"; "Quem ter opção para todos"; "uma opção direta nessa tela para eu clicar e abrir a coleção"; "o + também deve aparecer coleções"; "a parte de filtros deixa no mesmo padrão dos outros apps"):
+- `R.SITUACOES` só `quero` e `visto` (o `limpar_titulo` passa o resto para quero); `R.em_andamento` (série em quero com episódio) é o **Continuar vendo** do Agora e as séries em andamento do `resumo`.
+- Categorias: `d["categorias"] = {filme: [{id, nome}], serie: [...]}` (até 40; `R.mudar_categorias`, `POST /api/categorias {acao: nova|renomear|apagar}`), `t.categoria`, `R.achar_categoria` (pelo nome, nas ferramentas), `R.nome_categoria`; a tela em **Mais › Categorias** (`telaCategorias`, `textarea.umalinha`: o Enter salva). A nota saiu (e o argumento `nota` das ferramentas).
+- Quem: **Todos** (`quem-todos`); nas ferramentas, «todos» (`ids_de`).
+- A coleção de cada filme nas listas e na busca (`com_colecao`: os detalhes em `DETALHES`, 12 horas, 8 de cada vez com `ThreadPoolExecutor`); a lista pronta **Coleções** (`lista_colecoes`: as coleções dos filmes populares e mais bem avaliados, até a página 5); na capa: `cz-colecao` (abre) e `cz-col-todos` (Já vi todos / Quero ver todos, pelo `adicionar_colecao`).
+- Buscar no padrão dos outros apps: `.sbar`, `.filtros-h` (`odisseia-filtros` no aparelho) e `.sfiltros` (as caixas `#f-tipo`, `#f-sit`, `#f-cat`, `#f-quem`).
 
 ## Conversa com o dono
 

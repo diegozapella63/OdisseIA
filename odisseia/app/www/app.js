@@ -55,6 +55,7 @@
     nota: '<path d="M12 20h9"/><path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
     texto: '<path d="M4 6h16M4 12h16M4 18h10"/>',
     list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+    tag: '<path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>',
     globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
   };
   const ic = (n, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n] || ''}</svg>`;
@@ -62,12 +63,13 @@
   const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* sem armazenamento: só nesta vez */ } };
   const lerJSON = (k, padrao) => { try { return JSON.parse(guardada(k) || '') || padrao; } catch (e) { return padrao; } };
 
-  const SIT = { quero: ['Quero ver', 'bookmark'], vendo: ['Vendo', 'play'], visto: ['Visto', 'visto'], abandonado: ['Abandonado', 'ban'] };
+  // 0.3.0 (o dono: "pode tirar a opção de vendo, só vou controlar visto e quero ver")
+  const SIT = { quero: ['Quero ver', 'bookmark'], visto: ['Visto', 'visto'] };
   const TIPO = { filme: ['Filme', 'film'], serie: ['Série', 'tv'], colecao: ['Coleção de filmes', 'layers'] };
   const ABAS = [['integracoes', 'Integrações', 'layers'], ['dados', 'Dados', 'database'], ['aparencia', 'Aparência', 'palette'], ['opcoes', 'Opções', 'toggle']];
   const S = {
     e: null, tela: 'agora', aba: guardada('odisseia-aba') || 'integracoes', tema: guardada('odisseia-tema') || 'auto',
-    folha: null, folhas: [], col: null, hist: guardada('odisseia-historico') || 'serie', busca: Object.assign({ texto: '', tipo: '', situacao: '', quem: '' }, lerJSON('odisseia-busca', {})),
+    folha: null, folhas: [], col: null, hist: guardada('odisseia-historico') || 'serie', busca: Object.assign({ texto: '', tipo: '', situacao: '', quem: '', categoria: '' }, lerJSON('odisseia-busca', {})),
     add: { q: '', tipo: '', res: null, erro: '', buscando: false, lista: 'alta', listas: {} }, aband: false, tempEsc: {}, conf: '', dados: null, trocarChave: false,
   };
   const api = {
@@ -178,27 +180,28 @@
   const cab = (icone, titulo, chave, extra = '') => `<div class="rot" role="button" tabindex="0" data-dobra="${esc(chave || titulo)}" aria-expanded="${!fechadas().has(chave || titulo)}"><span class="rot-ic">${ic(icone)}</span><h2>${titulo}</h2>${extra}<span class="dobra-ic" aria-hidden="true">${ic('chev', 'ic-s')}</span></div>`;
   const card = (id, icone, titulo, corpo, chave) => `<section class="card${fechadas().has(chave || titulo) ? ' fechada' : ''}" id="${id}">${cab(icone, titulo, chave)}${corpo}</section>`;
   const lbl = (icone, titulo, para) => para ? `<label for="${para}">${ic(icone, 'ic-s')}${titulo}</label>` : `<span class="lbl">${ic(icone, 'ic-s')}${titulo}</span>`;
-  const ICONE_TELA = { Agora: 'clock', Buscar: 'search', 'Histórico': 'visto', Mais: 'mais', 'Configurações': 'gear', Sobre: 'info' };
+  const ICONE_TELA = { Agora: 'clock', Buscar: 'search', 'Histórico': 'visto', Mais: 'mais', Categorias: 'tag', 'Configurações': 'gear', Sobre: 'info' };
   const topo = (titulo, volta, extra = '') => `<header class="cab-tela">${volta ? `<button class="voltar" data-a="voltar">${ic('back', 'ic-s')}${volta}</button>` : extra}<h1><span class="rot-ic tela-ic" aria-hidden="true">${ic(ICONE_TELA[titulo])}</span>${titulo}</h1></header>`;
   const capa = (t, g) => t.capa ? `<img class="capa${g ? ' g' : ''}" src="api/capa/${esc(t.capa)}" alt="" loading="lazy">` : `<span class="capa${g ? ' g' : ''}">${ic(TIPO[t.tipo][1])}</span>`;
   const avs = ids => ids && ids.length && S.e.ajustes.quem ? `<span class="pessoas-mini">${ids.map(i => `<span class="av" title="${esc((pessoa(i) || {}).nome || i)}">${esc(inicial(i))}</span>`).join('')}</span>` : '';
 
+  const emAndamento = t => t.tipo === 'serie' && t.situacao === 'quero' && !!t.temp;
+  const nomeCat = t => ((S.e.categorias[t.tipo] || []).find(c => c.id === t.categoria) || {}).nome || '';
   function meta(t) {
     const p = [];
-    if (t.tipo === 'serie') {
-      if (t.situacao === 'vendo' || (t.temp && t.situacao !== 'visto')) {
-        p.push(t.temp ? `parou em ${ep(t.temp, t.ep)}` : 'nenhum episódio ainda');
-        const f = faltam(t);
-        if (f) p.push(`faltam ${f}`);
-      } else {
-        p.push('Série' + (t.temporadas && t.temporadas.length ? ' · ' + plural(t.temporadas.length, 'temporada', 'temporadas') : ''));
-      }
+    if (emAndamento(t)) {
+      p.push(`parou em ${ep(t.temp, t.ep)}`);
+      const f = faltam(t);
+      if (f) p.push(`faltam ${f}`);
+    } else if (t.tipo === 'serie') {
+      p.push('Série' + (t.temporadas && t.temporadas.length ? ' · ' + plural(t.temporadas.length, 'temporada', 'temporadas') : ''));
+      if (t.ano) p.push(t.ano);
     } else {
       p.push('Filme');
       if (t.duracao) p.push(duracao(t.duracao));
+      if (t.ano) p.push(t.ano);
     }
-    if (t.ano && !(t.tipo === 'serie' && t.temp && t.situacao !== 'visto')) p.push(t.ano);
-    if (t.nota) p.push('★'.repeat(t.nota));
+    if (nomeCat(t)) p.push(nomeCat(t));
     return p.join(' · ');
   }
   function linhaTit(t, opts = {}) {
@@ -220,19 +223,19 @@
         <div class="acoes"><button class="btn pri" data-a="ir-config" data-v="integracoes">${ic('key', 'ic-s')}Pôr a chave</button></div>`);
     }
     if (!ts.length) {
-      return h + card('vazia', 'film', 'A lista está vazia', `<p class="lead">Ponha o que a casa está vendo e o que quer ver.</p>
+      return h + card('vazia', 'film', 'A lista está vazia', `<p class="lead">Ponha o que a casa quer ver e o que já viu.</p>
         <div class="acoes"><button class="btn pri" data-a="adicionar">${ic('plus', 'ic-s')}Adicionar</button></div>`);
     }
-    const vendo = ordem(ts.filter(t => t.situacao === 'vendo'));
-    h += card('vendo', 'play', `Vendo agora${vendo.length ? ` <span class="cont">${vendo.length}</span>` : ''}`, vendo.length ? lista(vendo, { mais1: true }) : '<p class="vazio">Nada sendo visto agora.</p>', 'Vendo agora');
+    const vendo = ordem(ts.filter(emAndamento));
+    if (vendo.length) h += card('vendo', 'play', `Continuar vendo <span class="cont">${vendo.length}</span>`, lista(vendo, { mais1: true }), 'Continuar vendo');
     const ate = new Date(hojeISO() + 'T12:00:00'); ate.setDate(ate.getDate() + 30);
     const ateISO = ate.toISOString().slice(0, 10);
-    const novos = ts.filter(t => t.tipo === 'serie' && t.proximo && t.situacao !== 'abandonado' && t.proximo.data >= hojeISO() && t.proximo.data <= ateISO)
+    const novos = ts.filter(t => t.tipo === 'serie' && t.proximo && t.proximo.data >= hojeISO() && t.proximo.data <= ateISO)
       .sort((a, b) => a.proximo.data.localeCompare(b.proximo.data));
     if (novos.length) {
       h += card('episodios', 'calendar', 'Novos episódios', `<ul class="titulos">${novos.map(t => linhaTit(t, { dest: true, sub: `${ep(t.proximo.temp, t.proximo.ep)} · ${esc(dia(t.proximo.data))}` })).join('')}</ul>`);
     }
-    const quero = ordem(ts.filter(t => t.situacao === 'quero'));
+    const quero = ordem(ts.filter(t => t.situacao === 'quero' && !emAndamento(t)));
     if (quero.length) {
       h += card('quero', 'bookmark', `Quero ver <span class="cont">${quero.length}</span>`, lista(quero.slice(0, 6)) +
         (quero.length > 6 ? `<div class="acoes ver-todos"><button class="btn out" data-a="ver-quero">${ic('list', 'ic-s')}Ver todos</button></div>` : ''), 'Quero ver');
@@ -244,23 +247,31 @@
   function filtrados() {
     const b = S.busca, alvo = semAcento(b.texto.trim());
     return ordem(S.e.titulos.filter(t => (!alvo || semAcento(t.nome).includes(alvo) || semAcento(t.original).includes(alvo))
-      && (!b.tipo || t.tipo === b.tipo || !ligados().includes(b.tipo)) && (!b.quem || t.quem.includes(b.quem))));
+      && (!b.tipo || t.tipo === b.tipo || !ligados().includes(b.tipo)) && (!b.quem || t.quem.includes(b.quem))
+      && (!b.situacao || t.situacao === b.situacao) && (!b.categoria || t.categoria === b.categoria)));
   }
+  // 0.3.0 (o dono: "a parte de filtros deixa no mesmo padrão dos outros apps"): a busca, o Filtros que fecha e abre (o
+  // aparelho lembra) e as caixas de seleção lado a lado, como no InventarIA e no ResolvIA
   function telaBuscar() {
-    const b = S.busca, e = S.e;
-    const todos = filtrados(), aband = todos.filter(t => t.situacao === 'abandonado');
-    const ativos = todos.filter(t => t.situacao !== 'abandonado' && (!b.situacao || t.situacao === b.situacao));
-    const segTipo = ligados().length > 1 ? `<div class="campo">${lbl('film', 'Tipo')}<div class="seg">${[['', 'Tudo'], ['filme', 'Filmes'], ['serie', 'Séries']].map(([v, n]) => `<button class="${b.tipo === v ? 'on' : ''}" data-a="f-tipo" data-v="${v}">${n}</button>`).join('')}</div></div>` : '';
-    const escSit = [['', 'Todos', 'layers'], ['quero', 'Quero ver', 'bookmark'], ['vendo', 'Vendo', 'play'], ['visto', 'Vistos', 'visto']]
-      .map(([v, n, i]) => `<button class="escolha${b.situacao === v ? ' on' : ''}" data-a="f-sit" data-v="${v}">${ic(i, 'ic-s')}${n}</button>`).join('');
-    const quem = e.ajustes.quem && e.pessoas.length > 1 ? `<div class="campo">${lbl('users', 'Quem')}<div class="seg">${[['', 'Todos'], ...e.pessoas.map(p => [p.id, p.nome.split(' ')[0]])]
-      .map(([v, n]) => `<button class="${b.quem === v ? 'on' : ''}" data-a="f-quem" data-v="${esc(v)}">${esc(n)}</button>`).join('')}</div></div>` : '';
-    let h = topo('Buscar') + `<label class="busca">${ic('search')}<input id="b-texto" type="search" placeholder="Nome do filme ou da série" value="${esc(b.texto)}" enterkeyhint="search" autocomplete="off">${b.texto ? `<button class="limpar" data-a="b-limpar" aria-label="Limpar">${ic('x', 'ic-s')}</button>` : ''}</label>`;
-    h += card('filtros', 'sliders', 'Filtros', `<div class="filtros">${segTipo}
-      <div class="campo">${lbl('layers', 'Situação')}<div class="escolhas">${escSit}</div></div>${quem}</div>`);
-    const corpo = (ativos.length ? lista(ativos, { mais1: true }) : `<p class="vazio">${e.titulos.length ? 'Nenhum título com esses filtros.' : 'A lista está vazia.'}</p>`)
-      + (aband.length && (!b.situacao || b.texto) ? `<button class="recolhido" data-a="aband" aria-expanded="${S.aband}">${ic('chev', 'ic-s')}Abandonados (${aband.length})</button>${S.aband ? lista(aband) : ''}` : '');
-    return h + card('resultado', 'list', `Títulos <span class="cont">${ativos.length}</span>`, corpo, 'Títulos');
+    const b = S.busca, e = S.e, tipos = ligados(), aberto = guardada('odisseia-filtros') !== 'fechado';
+    const caixa = (id, ic_, rot, opcoes, atual) => `<select class="inp select" id="${id}" data-ic="${ic_}" aria-label="${rot}">${opcoes}</select>`;
+    const opt = (v, n, atual) => `<option value="${esc(v)}"${v === atual ? ' selected' : ''}>${esc(n)}</option>`;
+    const cats = tipos.filter(k => !b.tipo || k === b.tipo).filter(k => (e.categorias[k] || []).length);
+    const sel = [];
+    if (tipos.length > 1) sel.push(caixa('f-tipo', 'film', 'Tipo', opt('', 'Filmes e séries', b.tipo) + opt('filme', 'Filmes', b.tipo) + opt('serie', 'Séries', b.tipo)));
+    sel.push(caixa('f-sit', 'layers', 'Situação', opt('', 'Todas as situações', b.situacao) + opt('quero', 'Quero ver', b.situacao) + opt('visto', 'Vistos', b.situacao)));
+    if (cats.length) {
+      sel.push(caixa('f-cat', 'tag', 'Categoria', opt('', 'Todas as categorias', b.categoria) + cats.map(k => cats.length > 1
+        ? `<optgroup label="${k === 'filme' ? 'Filmes' : 'Séries'}">${e.categorias[k].map(c => opt(c.id, c.nome, b.categoria)).join('')}</optgroup>`
+        : e.categorias[k].map(c => opt(c.id, c.nome, b.categoria)).join('')).join('')));
+    }
+    if (e.ajustes.quem && e.pessoas.length > 1) sel.push(caixa('f-quem', 'users', 'Quem', opt('', 'Todas as pessoas', b.quem) + e.pessoas.map(p => opt(p.id, p.nome.split(' ')[0], b.quem)).join('')));
+    const ts = filtrados();
+    let h = topo('Buscar') + `<section class="sbar"><label class="busca">${ic('search')}<input id="b-texto" type="search" placeholder="Nome do filme ou da série" value="${esc(b.texto)}" enterkeyhint="search" autocomplete="off">${b.texto ? `<button class="limpar" data-a="b-limpar" aria-label="Limpar">${ic('x', 'ic-s')}</button>` : ''}</label>
+      <button class="filtros-h" data-a="filtros" aria-expanded="${aberto}">${ic('sliders', 'ic-s')}<span>Filtros</span>${ic('chev', 'ic-s seta')}</button>
+      <div class="sfiltros n${sel.length}"${aberto ? '' : ' hidden'}>${sel.join('')}</div></section>`;
+    const corpo = ts.length ? lista(ts, { mais1: true }) : `<p class="vazio">${e.titulos.length ? 'Nenhum título com esses filtros.' : 'A lista está vazia.'}</p>`;
+    return h + card('resultado', 'list', `Títulos <span class="cont">${ts.length}</span>`, corpo, 'Títulos');
   }
 
   /* ---------- Histórico: o que a casa já viu, por mês, numa aba para cada tipo (0.2.0, o dono: "e se for jogos?") */
@@ -287,7 +298,25 @@
   /* ---------- Mais, Configurações e Sobre */
   function telaMais() {
     const linha = (a, icone, titulo, txt) => `<button class="linha" data-a="${a}"><span class="rot-ic">${ic(icone)}</span><span class="linha-t"><b>${titulo}</b><small>${txt}</small></span>${ic('chev', 'ic-s chev')}</button>`;
-    return topo('Mais') + `<section class="card linha-card">${linha('ir-config', 'gear', 'Configurações', 'Integrações, dados, aparência e opções.')}${linha('sobre', 'info', 'Sobre', 'CorrerIA Code, os apps e o GitHub.')}</section>`;
+    return topo('Mais') + `<section class="card linha-card">${linha('ir-categorias', 'tag', 'Categorias', 'As categorias dos filmes e das séries.')}${linha('ir-config', 'gear', 'Configurações', 'Integrações, dados, aparência e opções.')}${linha('sobre', 'info', 'Sobre', 'CorrerIA Code, os apps e o GitHub.')}</section>`;
+  }
+  // 0.3.0 (o dono: "tirar a opção de nota e colocar um campo de categoria... vou poder definir categorias para filme, outra
+  // para séries e outra para jogos"): uma lista por tipo ligado; o nome muda no próprio campo (o Enter salva)
+  const EXEMPLO_CAT = { filme: 'Ex.: Para ver em família', serie: 'Ex.: Para ver a dois' };
+  function telaCategorias() {
+    let h = topo('Categorias', 'Mais');
+    for (const [k, nome, icone] of [['serie', 'Séries', 'tv'], ['filme', 'Filmes', 'film']].filter(([k]) => ligados().includes(k))) {
+      const cs = S.e.categorias[k] || [];
+      const linhas = cs.map(c => `<li class="cat-l">${S.conf === 'cat:' + c.id ? confirma(`Apagar «${c.nome}»? Os títulos ficam sem categoria.`, 'cat-apagar', 'trash', 'Apagar', `data-id="${c.id}"`)
+        : `<textarea class="inp umalinha" rows="1" data-cat="${c.id}" maxlength="40" aria-label="Nome da categoria">${esc(c.nome)}</textarea><button class="fechar" data-a="conf" data-v="cat:${c.id}" aria-label="Apagar ${esc(c.nome)}">${ic('trash', 'ic-s')}</button>`}</li>`).join('');
+      h += card('cat-' + k, icone, `${nome} <span class="cont">${cs.length}</span>`, `${cs.length ? `<ul class="cats">${linhas}</ul>` : '<p class="vazio">Nenhuma categoria ainda.</p>'}
+        <div class="campo" style="margin-top:16px">${lbl('plus', 'Nova categoria', 'nova-' + k)}<textarea class="inp umalinha" rows="1" id="nova-${k}" maxlength="40" placeholder="${EXEMPLO_CAT[k]}" enterkeyhint="done"></textarea></div>
+        <div class="acoes"><button class="btn pri" data-a="cat-nova" data-k="${k}">${ic('plus', 'ic-s')}Adicionar</button></div>`, 'Categorias de ' + nome);
+    }
+    return h;
+  }
+  async function categorias(corpo) {
+    try { const r = await api.post('categorias', corpo); S.e.categorias = r.categorias; S.e.rev = r.rev; S.conf = ''; render(); return true; } catch (err) { toast(err.message); return false; }
   }
   function cardTMDB() {
     const t = S.e.tmdb, mostrar = !t.chave || S.trocarChave;
@@ -380,7 +409,9 @@
   // TMDB (Em alta, Mais populares, Mais bem avaliados, Estreias) e mostra as capas em grade; em cada capa, Quero ver (o
   // marcador) e Já vi (o visto, que numa série marca até o último episódio que saiu), sem sair da janela. Tocar na capa
   // abre o título (e, fora da lista, põe como Quero ver); uma coleção abre os filmes dela.
-  const LISTAS = [['alta', 'Em alta', 'zap'], ['populares', 'Mais populares', 'users'], ['avaliados', 'Mais bem avaliados', 'star'], ['estreias', 'Estreias', 'calendar']];
+  const LISTAS = [['alta', 'Em alta', 'zap'], ['populares', 'Mais populares', 'users'], ['avaliados', 'Mais bem avaliados', 'star'], ['colecoes', 'Coleções', 'layers'], ['estreias', 'Estreias', 'calendar']];
+  // as Coleções só com os filmes ligados e fora de Séries
+  const listas = () => LISTAS.filter(([k]) => k !== 'colecoes' || (ligados().includes('filme') && S.add.tipo !== 'serie'));
   function cartaz(r, i, o) {
     // o que ainda não saiu (um filme da coleção, uma estreia futura) não tem o Já vi
     const col = r.tipo === 'colecao', sit = r.situacao && SIT[r.situacao], saiu = r.saiu !== false && !(r.data && r.data > hojeISO());
@@ -388,9 +419,12 @@
     const meta = [r.ano, col ? 'Coleção' : TIPO[r.tipo][0], saiu ? '' : (r.data ? 'sai em ' + new Date(r.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'sem data')].filter(Boolean).join(' · ');
     return `<li class="cz${r.situacao === 'visto' ? ' feito' : ''}"><div class="cz-quadro"><button class="cz-capa" data-a="cz-abrir" data-o="${o}" data-i="${i}" aria-label="${esc(r.nome)}">${img}
         ${sit ? `<span class="cz-sit">${ic(sit[1], 'ic-s')}${sit[0]}</span>` : col ? `<span class="cz-sit">${ic('layers', 'ic-s')}Coleção</span>` : ''}</button>
-      ${col ? '' : `<span class="cz-acoes">${r.ja ? '' : `<button class="cz-bt" data-a="cz-quero" data-o="${o}" data-i="${i}" aria-label="Quero ver ${esc(r.nome)}">${ic('bookmark', 'ic-s')}</button>`}
+      ${col ? `<span class="cz-acoes">${r.situacao ? '' : `<button class="cz-bt" data-a="cz-col-todos" data-v="quero" data-o="${o}" data-i="${i}" aria-label="Quero ver todos de ${esc(r.nome)}">${ic('bookmark', 'ic-s')}</button>`}
+        ${r.situacao === 'visto' ? '' : `<button class="cz-bt vi" data-a="cz-col-todos" data-v="visto" data-o="${o}" data-i="${i}" aria-label="Já vi todos de ${esc(r.nome)}">${ic('check', 'ic-s')}</button>`}</span>`
+      : `<span class="cz-acoes">${r.ja ? '' : `<button class="cz-bt" data-a="cz-quero" data-o="${o}" data-i="${i}" aria-label="Quero ver ${esc(r.nome)}">${ic('bookmark', 'ic-s')}</button>`}
         ${r.situacao === 'visto' || !saiu ? '' : `<button class="cz-bt vi" data-a="cz-visto" data-o="${o}" data-i="${i}" aria-label="Já vi ${esc(r.nome)}">${ic('check', 'ic-s')}</button>`}</span>`}</div>
-      <b class="cz-nome">${esc(r.nome)}</b><small>${esc(meta)}</small></li>`;
+      <b class="cz-nome">${esc(r.nome)}</b><small>${esc(meta)}</small>
+      ${r.tipo === 'filme' && r.colecao && o !== 'col' ? `<button class="cz-col" data-a="cz-colecao" data-id="${r.colecao.id}">${ic('layers', 'ic-s')}Coleção</button>` : ''}</li>`;
   }
   const grade = (rs, o) => `<ul class="cartazes">${rs.map((r, i) => cartaz(r, i, o)).join('')}</ul>`;
   function folhaAdicionar() {
@@ -405,7 +439,8 @@
       else res = grade(a.res, 'busca');
     } else {
       const L = a.listas[a.lista + ':' + a.tipo];
-      res = `<div class="chips" role="tablist" aria-label="Listas prontas">${LISTAS.map(([k, n, i]) => `<button class="chip${a.lista === k ? ' on' : ''}" role="tab" aria-selected="${a.lista === k}" data-a="add-lista" data-v="${k}">${ic(i, 'ic-s')}${n}</button>`).join('')}</div>`;
+      if (!listas().some(([k]) => k === a.lista)) a.lista = 'alta';
+      res = `<div class="chips" role="tablist" aria-label="Listas prontas">${listas().map(([k, n, i]) => `<button class="chip${a.lista === k ? ' on' : ''}" role="tab" aria-selected="${a.lista === k}" data-a="add-lista" data-v="${k}">${ic(i, 'ic-s')}${n}</button>`).join('')}</div>`;
       if (!L || (!L.itens.length && L.carregando)) res += '<p class="vazio" style="margin-top:14px">Abrindo…</p>';
       else if (L.erro && !L.itens.length) res += `<p class="status erro" style="margin-top:14px">${esc(L.erro)}</p>`;
       else res += grade(L.itens, 'lista') + (L.mais ? `<div class="acoes" style="margin-top:16px"><button class="btn out" data-a="add-mais"${L.carregando ? ' disabled' : ''}>${ic('plus', 'ic-s')}Mostrar mais</button></div>` : '');
@@ -436,9 +471,12 @@
     if (t.tipo === 'filme' && t.colecao) {
       h += `<div class="campo">${lbl('layers', 'Coleção')}<div class="acoes"><button class="btn out" data-a="abrir-colecao" data-id="${t.colecao.id}">${ic('layers', 'ic-s')}${esc(t.colecao.nome)}</button></div></div>`;
     }
-    h += `<div class="campo">${lbl('star', 'Nota')}<div class="estrelas" role="radiogroup" aria-label="Nota">${[1, 2, 3, 4, 5].map(n => `<button class="${t.nota >= n ? 'on' : ''}" data-a="nota" data-v="${n}" role="radio" aria-checked="${t.nota === n}" aria-label="${plural(n, 'estrela', 'estrelas')}">${ic('star')}</button>`).join('')}</div></div>`;
+    const cats = S.e.categorias[t.tipo] || [];
+    h += `<div class="campo">${lbl('tag', 'Categoria')}${cats.length ? `<div class="escolhas">${[{ id: '', nome: 'Nenhuma' }, ...cats].map(c => `<button class="escolha${(t.categoria || '') === c.id ? ' on' : ''}" data-a="cat" data-v="${c.id}">${ic(c.id ? ((t.categoria || '') === c.id ? 'check' : 'tag') : 'x', 'ic-s')}${esc(c.nome)}</button>`).join('')}</div>`
+      : `<div class="acoes"><button class="btn out" data-a="ir-categorias">${ic('tag', 'ic-s')}Criar categorias</button></div>`}</div>`;
     if (e.ajustes.quem && e.pessoas.length) {
-      h += `<div class="campo">${lbl('users', 'Quem')}<div class="escolhas">${e.pessoas.map(p => `<button class="escolha${t.quem.includes(p.id) ? ' on' : ''}" data-a="quem" data-v="${esc(p.id)}">${ic(t.quem.includes(p.id) ? 'check' : 'user', 'ic-s')}${esc(p.nome.split(' ')[0])}</button>`).join('')}</div></div>`;
+      const todos = e.pessoas.every(p => t.quem.includes(p.id));
+      h += `<div class="campo">${lbl('users', 'Quem')}<div class="escolhas">${e.pessoas.length > 1 ? `<button class="escolha${todos ? ' on' : ''}" data-a="quem-todos">${ic(todos ? 'check' : 'users', 'ic-s')}Todos</button>` : ''}${e.pessoas.map(p => `<button class="escolha${t.quem.includes(p.id) ? ' on' : ''}" data-a="quem" data-v="${esc(p.id)}">${ic(t.quem.includes(p.id) ? 'check' : 'user', 'ic-s')}${esc(p.nome.split(' ')[0])}</button>`).join('')}</div></div>`;
     }
     const o = t.onde || {}, partes = [['assinatura', 'Assinatura'], ['gratis', 'Grátis'], ['alugar', 'Alugar'], ['comprar', 'Comprar']].filter(([k]) => (o[k] || []).length);
     h += `<div class="campo">${lbl('tv', 'Onde assistir')}${partes.length ? `<dl class="onde">${partes.map(([k, n]) => `<div><dt>${n}</dt><dd>${esc(o[k].join(', '))}</dd></div>`).join('')}</dl>` : '<p class="vazio">Nada no Brasil, pelo que a JustWatch sabe.</p>'}
@@ -491,7 +529,7 @@
 
   /* ---------- a barra de baixo e a lateral (o padrão da família) */
   const NAV = [['agora', 'Agora', 'clock'], ['buscar', 'Buscar', 'search'], ['+', 'Adicionar', 'plus'], ['historico', 'Histórico', 'visto'], ['mais', 'Mais', 'mais']];
-  const aba = () => (['config', 'sobre'].includes(S.tela) ? 'mais' : S.tela);
+  const aba = () => (['config', 'sobre', 'categorias'].includes(S.tela) ? 'mais' : S.tela);
   function pintarNav() {
     $('#nav').innerHTML = `<div class="in">${NAV.map(([k, n, i]) => k === '+' ? `<button class="add" data-a="adicionar" aria-label="Adicionar"><span class="pill">${ic(i)}</span></button>`
       : `<button class="${aba() === k ? 'on' : ''}" data-a="ir" data-v="${k}"${aba() === k ? ' aria-current="page"' : ''}>${ic(i)}<span>${n}</span></button>`).join('')}</div>`;
@@ -505,7 +543,7 @@
   function render() {
     if (!S.e) return;
     document.body.dataset.tela = S.tela;
-    const h = S.tela === 'buscar' ? telaBuscar() : S.tela === 'historico' ? telaHistorico() : S.tela === 'mais' ? telaMais() : S.tela === 'config' ? telaConfig() : S.tela === 'sobre' ? telaSobre() : telaAgora();
+    const h = S.tela === 'buscar' ? telaBuscar() : S.tela === 'historico' ? telaHistorico() : S.tela === 'mais' ? telaMais() : S.tela === 'categorias' ? telaCategorias() : S.tela === 'config' ? telaConfig() : S.tela === 'sobre' ? telaSobre() : telaAgora();
     const app = $('#app');
     const foco = document.activeElement && app.contains(document.activeElement) ? document.activeElement.id : '';
     const sel = foco && document.activeElement.selectionStart;
@@ -624,7 +662,7 @@
     if (r.fora) p.push(`${r.fora} ainda não ${r.fora === 1 ? 'saiu' : 'saíram'}`);
     return `${r.nome}: ${p.length ? p.join(', ') : 'nada a mudar'}.` + (r.novos && situacao === 'visto' ? '' : '');
   }
-  const salvarBusca = () => guardar('odisseia-busca', JSON.stringify({ tipo: S.busca.tipo, situacao: S.busca.situacao, quem: S.busca.quem }));
+  const salvarBusca = () => guardar('odisseia-busca', JSON.stringify({ tipo: S.busca.tipo, situacao: S.busca.situacao, quem: S.busca.quem, categoria: S.busca.categoria }));
 
   const ACOES = {
     ir: el => ir(el.dataset.v),
@@ -664,6 +702,18 @@
       } catch (err) { el.disabled = false; toast(err.message); }
     },
     'abrir-colecao': el => { S.col = null; abrirFolha({ tipo: 'colecao', id: +el.dataset.id }, true); },
+    'cz-colecao': el => { S.col = null; abrirFolha({ tipo: 'colecao', id: +el.dataset.id }, true); },
+    // a coleção inteira de uma vez, sem abrir: Já vi todos (os que já saíram) ou Quero ver todos
+    'cz-col-todos': async el => {
+      const r = itemDe(el), sit = el.dataset.v;
+      el.disabled = true;
+      try {
+        const x = await api.post('titulo', { acao: 'adicionar_colecao', colecao: r.tmdb, situacao: sit });
+        r.situacao = sit;
+        toast(textoColecao(x, sit));
+        await carregar();
+      } catch (err) { el.disabled = false; toast(err.message); }
+    },
     'col-todos': async el => {
       el.disabled = true;
       try {
@@ -674,7 +724,9 @@
       } catch (err) { el.disabled = false; toast(err.message); }
     },
     sit: el => mudar(S.folha.id, { situacao: el.dataset.v }),
-    nota: el => { const t = S.e.titulos.find(x => x.id === S.folha.id), n = +el.dataset.v; mudar(t.id, { nota: t.nota === n ? 0 : n }); },
+    cat: el => mudar(S.folha.id, { categoria: el.dataset.v }),
+    'quem-todos': () => { const t = S.e.titulos.find(x => x.id === S.folha.id), todos = S.e.pessoas.every(p => t.quem.includes(p.id)); mudar(t.id, { quem: todos ? [] : S.e.pessoas.map(p => p.id) }); },
+    'ir-categorias': () => { if (S.folha) { S.folha = null; S.folhas = []; history.replaceState({ t: S.tela }, ''); } ir('categorias'); },
     quem: el => { const t = S.e.titulos.find(x => x.id === S.folha.id), p = el.dataset.v; mudar(t.id, { quem: t.quem.includes(p) ? t.quem.filter(x => x !== p) : [...t.quem, p] }); },
     proximo: async el => {
       try {
@@ -701,13 +753,10 @@
         fecharFolha();
       } catch (err) { toast(err.message); }
     },
-    'f-tipo': el => { S.busca.tipo = el.dataset.v; salvarBusca(); render(); },
-    'f-sit': el => { S.busca.situacao = el.dataset.v; salvarBusca(); render(); },
-    'f-quem': el => { S.busca.quem = el.dataset.v; salvarBusca(); render(); },
+    filtros: () => { guardar('odisseia-filtros', guardada('odisseia-filtros') === 'fechado' ? 'aberto' : 'fechado'); render(); },
     'b-limpar': () => { S.busca.texto = ''; render(); },
-    aband: () => { S.aband = !S.aband; render(); },
     'ver-quero': () => { S.busca.situacao = 'quero'; S.busca.texto = ''; salvarBusca(); ir('buscar'); },
-    'lado-sit': el => { S.busca.texto = ''; if (el.dataset.v === 'abandonado') { S.busca.situacao = ''; S.aband = true; } else S.busca.situacao = el.dataset.v; salvarBusca(); S.tela === 'buscar' ? render() : ir('buscar'); },
+    'lado-sit': el => { S.busca.texto = ''; S.busca.situacao = el.dataset.v; salvarBusca(); S.tela === 'buscar' ? render() : ir('buscar'); },
     'ir-config': el => { if (el.dataset.v) { S.aba = el.dataset.v; guardar('odisseia-aba', S.aba); } if (S.folha) { S.folha = null; S.folhas = []; history.replaceState({ t: S.tela }, ''); } ir('config'); },
     sobre: () => ir('sobre'),
     hist: el => { S.hist = el.dataset.v; guardar('odisseia-historico', S.hist); render(); },
@@ -726,6 +775,12 @@
     'aj-tipo': async el => {
       try { S.e.ajustes = (await api.post('ajustes', { tipos: { [el.dataset.k]: !S.e.ajustes.tipos[el.dataset.k] } })).ajustes; S.add.listas = {}; await carregar(); } catch (err) { toast(err.message); }
     },
+    'cat-nova': async el => {
+      const k = el.dataset.k, campo = $('#nova-' + k), nome = (campo.value || '').trim();
+      if (!nome) { toast('Escreva o nome da categoria.'); campo.focus(); return; }
+      if (await categorias({ acao: 'nova', tipo: k, nome })) { const c = $('#nova-' + k); if (c) c.focus({ preventScroll: true }); }
+    },
+    'cat-apagar': el => categorias({ acao: 'apagar', id: el.dataset.id }),
     'chave-salvar': async el => {
       const v = ($('#f-chave') || {}).value || '';
       if (!v.trim()) { toast('Cole a chave do TMDB.'); return; }
@@ -760,6 +815,12 @@
     if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('[data-dobra]')) { ev.preventDefault(); ev.target.click(); }
     if (ev.key === 'Escape' && S.folha && !(window.__selectSheet && window.__selectSheet.isOpen())) fecharFolha();
     if (ev.key === 'Enter' && ev.target.id === 'f-chave') { ev.preventDefault(); ACOES['chave-salvar']($('[data-a="chave-salvar"]')); }
+    // as categorias: um campo de uma linha só, o Enter salva
+    if (ev.key === 'Enter' && !ev.shiftKey && ev.target.matches('textarea.umalinha')) {
+      ev.preventDefault();
+      if (ev.target.id && ev.target.id.startsWith('nova-')) ACOES['cat-nova']($(`[data-a="cat-nova"][data-k="${ev.target.id.slice(5)}"]`));
+      else ev.target.blur();
+    }
   });
   document.addEventListener('input', ev => {
     const id = ev.target.id;
@@ -780,6 +841,18 @@
       mudar(t.id, { temp, ep: +ev.target.value });
     }
     if (id === 'f-notas' && t && ev.target.value !== t.notas) mudar(t.id, { notas: ev.target.value });
+    if (ev.target.dataset && ev.target.dataset.cat) {
+      const c = Object.values(S.e.categorias).flat().find(x => x.id === ev.target.dataset.cat), nome = ev.target.value.trim();
+      if (c && nome && nome !== c.nome) categorias({ acao: 'renomear', id: c.id, nome });
+      else if (c && !nome) { ev.target.value = c.nome; }
+    }
+    const filtro = { 'f-tipo': 'tipo', 'f-sit': 'situacao', 'f-cat': 'categoria', 'f-quem': 'quem' }[id];
+    if (filtro) {
+      S.busca[filtro] = ev.target.value;
+      if (filtro === 'tipo' && S.busca.categoria && !(S.e.categorias[S.busca.tipo] || []).some(c => c.id === S.busca.categoria) && S.busca.tipo) S.busca.categoria = '';
+      salvarBusca();
+      render();
+    }
     if (id === 'dados-arquivo' && ev.target.files[0]) {
       const f = ev.target.files[0], r = new FileReader();
       r.onload = () => { S.importar = { nome: f.name, b64: String(r.result).split(',')[1] || '' }; render(); };

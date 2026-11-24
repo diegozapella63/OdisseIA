@@ -18,6 +18,7 @@ import time
 import urllib.error
 import urllib.request
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -262,13 +263,13 @@ def adicionar(corpo, quem_usa=""):
         raise ValueError("Escolha um filme ou uma série da busca.")
     situacao = corpo.get("situacao") or "quero"
     if situacao not in R.SITUACOES:
-        raise ValueError("A situação vale quero, vendo, visto ou abandonado.")
+        raise ValueError("A situação vale quero ou visto.")
     R.conferir_tipo(ler(), tipo)
     with TRAVA:
         ja = R.de_tmdb(ler(), tipo, n)
     if ja:
         return {"titulo": ja, "novo": False}
-    det = tmdb_fez(cliente().detalhes, tipo, n)
+    det = detalhes(tipo, n)
     capa = cliente().imagem(det.get("capa"), "w342") if det.get("capa") else None
     quem = [quem_usa] if quem_usa and ler()["ajustes"]["quem"] else []
     with TRAVA:
@@ -300,9 +301,61 @@ def so_ligados(rs):
     return [r for r in rs if r["tipo"] in ligados or (r["tipo"] == "colecao" and "filme" in ligados)]
 
 
+DETALHES = {}  # (tipo, tmdb) → (quando, detalhes): os detalhes lidos do TMDB valem 12 horas (a coleção de cada filme da lista)
+
+
+def detalhes(tipo, n):
+    v = DETALHES.get((tipo, n))
+    if v and time.time() - v[0] < 12 * 3600:
+        return v[1]
+    det = tmdb_fez(cliente().detalhes, tipo, n)
+    if len(DETALHES) > 3000:
+        DETALHES.clear()
+    DETALHES[(tipo, n)] = (time.time(), det)
+    return det
+
+
+def com_colecao(rs):
+    """0.3.0 (o dono: "uma opção direta nessa tela para eu clicar e abrir a coleção"): cada filme da lista com a coleção
+    dele, pelos detalhes (8 de cada vez, guardados por 12 horas). Um filme que não deu fica sem."""
+    def um(r):
+        try:
+            r["colecao"] = detalhes("filme", r["tmdb"]).get("colecao")
+        except T.ErroTMDB:
+            r["colecao"] = None
+    filmes = [r for r in rs if r["tipo"] == "filme"]
+    if filmes:
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            list(ex.map(um, filmes))
+    return rs
+
+
+def lista_colecoes(pagina):
+    """As coleções dos filmes mais populares e mais bem avaliados (o TMDB não tem uma lista de coleções), sem repetir."""
+    try:
+        pagina = max(1, min(5, int(pagina)))
+    except (TypeError, ValueError):
+        pagina = 1
+    filmes = []
+    for nome in ("populares", "avaliados"):
+        filmes += tmdb_fez(cliente().lista, nome, "filme", pagina)[0]
+    out, vistos = [], set()
+    for r in com_colecao(filmes):
+        c = r.get("colecao")
+        if c and c["id"] not in vistos:
+            vistos.add(c["id"])
+            out.append({"tmdb": c["id"], "tipo": "colecao", "nome": c["nome"], "original": "", "ano": None, "data": "", "capa": c.get("capa") or "", "sinopse": ""})
+    return out, pagina < 5
+
+
 def lista_pronta(nome, tipo="", pagina=1):
+    if nome == "colecoes":
+        if "filme" not in R.tipos_ligados(ler()):
+            return {"resultados": [], "mais": False}
+        rs, mais = lista_colecoes(pagina)
+        return {"resultados": rs, "mais": mais}
     rs, mais = tmdb_fez(cliente().lista, nome, tipo_de_busca(tipo), pagina)
-    return {"resultados": marcar_ja(so_ligados(rs)), "mais": mais}
+    return {"resultados": marcar_ja(com_colecao(so_ligados(rs))), "mais": mais}
 
 
 def colecao(n):
@@ -332,7 +385,7 @@ def adicionar_colecao(corpo, quem_usa=""):
     novos = []
     for f in entram:
         if not R.de_tmdb(d, "filme", f["tmdb"]):
-            det = tmdb_fez(cliente().detalhes, "filme", f["tmdb"])
+            det = detalhes("filme", f["tmdb"])
             novos.append((det, cliente().imagem(det["capa"], "w342") if det.get("capa") else None))
     res = {"nome": col["nome"], "novos": 0, "marcados": 0, "ja": 0, "fora": len(col["filmes"]) - len(entram)}
     with TRAVA:
@@ -390,7 +443,7 @@ def mudar_titulo(corpo):
         if not t:
             raise ValueError("Esse título não está mais na lista.")
         if acao == "mudar":
-            R.mudar(t, corpo.get("campos"), {p["id"] for p in pessoas()} | set(t["quem"]), agora_iso())
+            R.mudar(t, corpo.get("campos"), {p["id"] for p in pessoas()} | set(t["quem"]), agora_iso(), d["categorias"][t["tipo"]])
         elif acao == "proximo":
             R.proximo_ep(t, agora_iso())
         elif acao == "apagar":
@@ -404,13 +457,13 @@ def mudar_titulo(corpo):
 
 def precisa_atualizar(t, agora):
     """No laço: as séries que a casa vê ou quer ver, de dia em dia (o próximo episódio); o resto, de semana em semana."""
-    if not t.get("tmdb") or t["situacao"] == "abandonado":
+    if not t.get("tmdb"):
         return False
     try:
         idade = agora - datetime.fromisoformat(t.get("tmdb_em") or "2000-01-01T00:00:00")
     except ValueError:
         return True
-    if t["tipo"] == "serie" and t["situacao"] in ("vendo", "quero"):
+    if t["tipo"] == "serie" and t["situacao"] == "quero":
         return idade > timedelta(hours=20)
     return idade > timedelta(days=7)
 
@@ -597,7 +650,7 @@ class Conexao:
                 return
             url, ip = self.endereco()
             corpo = {"app": "odisseia", "nome": "OdisseIA",
-                     "assunto": "filmes e séries da casa: o que cada um está vendo, já viu ou quer ver, episódios, notas e onde assistir",
+                     "assunto": "filmes e séries da casa: o que cada um quer ver ou já viu, episódios, categorias e onde assistir",
                      "versao": VERSAO, "url": url, "ip_url": f"http://{ip}:{PORTA}" if ip else None, "chave": self.chave(),
                      "ferramentas": "/api/integracao/ferramentas", "gravado_em": datetime.now().isoformat(timespec="seconds")}
             _gravar(self.arq_share, json.dumps(corpo, ensure_ascii=False, indent=1), 0o600)
@@ -698,7 +751,7 @@ def usar_ferramenta(corpo):
 def estado(usuario=""):
     d = ler()
     ligados = R.tipos_ligados(d)
-    return {"versao": VERSAO, "rev": d["rev"], "titulos": [t for t in d["titulos"] if t["tipo"] in ligados], "ajustes": d["ajustes"], "hoje": agora_iso()[:10],
+    return {"versao": VERSAO, "rev": d["rev"], "titulos": [t for t in d["titulos"] if t["tipo"] in ligados], "categorias": d["categorias"], "ajustes": d["ajustes"], "hoje": agora_iso()[:10],
             "pessoas": [{"id": p["id"], "nome": p["nome"]} for p in pessoas()], "eu": eu(usuario), "tmdb": estado_tmdb(),
             "correria": {"ligado": d["ajustes"]["correria"], "ultimo": CORRERIA.ultimo}}
 
@@ -815,7 +868,7 @@ class Handler(BaseHTTPRequestHandler):
             if c == "/api/busca":
                 tipo = (q.get("tipo") or [""])[0]
                 rs = tmdb_fez(cliente().buscar, (q.get("q") or [""])[0], tipo_de_busca(tipo))
-                return self.enviar(200, {"resultados": marcar_ja(so_ligados(rs))})
+                return self.enviar(200, {"resultados": marcar_ja(com_colecao(so_ligados(rs)))})
             if c == "/api/lista":
                 return self.enviar(200, lista_pronta((q.get("nome") or [""])[0], (q.get("tipo") or [""])[0], (q.get("pagina") or ["1"])[0]))
             m = re.match(r"^/api/capa/(t[0-9a-f]{8}\.(?:jpg|png))$", c)
@@ -894,6 +947,12 @@ class Handler(BaseHTTPRequestHandler):
                 if corpo.get("acao") == "atualizar":
                     return self.enviar(200, {"titulo": atualizar(str(corpo.get("id") or ""))})
                 return self.enviar(200, mudar_titulo(corpo))
+            if c == "/api/categorias":
+                with TRAVA:
+                    d = ler()
+                    R.mudar_categorias(d, corpo)
+                    salvar(d)
+                return self.enviar(200, {"categorias": d["categorias"], "rev": d["rev"]})
             if c == "/api/ajustes":
                 return self.enviar(200, {"ajustes": mudar_ajustes(corpo)})
             if c == "/api/tmdb":

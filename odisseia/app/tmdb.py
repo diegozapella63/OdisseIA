@@ -19,7 +19,7 @@ TAMANHOS = ("w92", "w185", "w342", "w500")
 MAX_IMG = 3 * 1024 * 1024
 # as listas prontas do Adicionar (0.2.0, o dono: "os mais vistos, os mais bem avaliados... listas prontas onde eu clico e
 # marco como visto"): o nome na tela e, por tipo, a rota do TMDB (Em alta é a mesma para os dois)
-LISTAS = {"alta": "Em alta", "populares": "Mais populares", "avaliados": "Mais bem avaliados", "estreias": "Estreias"}
+LISTAS = {"alta": "Em alta", "populares": "Mais populares", "avaliados": "Mais bem avaliados", "colecoes": "Coleções", "estreias": "Estreias"}
 ROTAS = {"populares": ("popular", "popular"), "avaliados": ("top_rated", "top_rated"), "estreias": ("now_playing", "on_the_air")}
 MAX_PAGINAS = 20
 
@@ -95,7 +95,7 @@ class TMDB:
     def lista(self, nome, tipo="", pagina=1):
         """Uma lista pronta do TMDB: (resultados, tem_mais). Sem tipo, Em alta mistura os dois; Mais populares e Mais bem
         avaliados intercalam filmes e séries; Estreias são os filmes nos cinemas do Brasil (numa série, as que estão no ar)."""
-        if nome not in LISTAS:
+        if nome not in LISTAS or nome == "colecoes":  # as coleções saem dos filmes populares (server.lista_colecoes)
             raise ErroTMDB("Lista desconhecida.")
         try:
             pagina = max(1, min(MAX_PAGINAS, int(pagina)))
@@ -150,7 +150,7 @@ class TMDB:
         return {"tmdb": x.get("id"), "nome": c["nome"], "capa": c["capa"], "sinopse": c["sinopse"], "filmes": filmes[:60]}
 
     def detalhes(self, tipo, tmdb_id):
-        """Os detalhes de um filme ou de uma série, já no formato do app (sem o que é da casa: situação, quem, nota)."""
+        """Os detalhes de um filme ou de uma série, já no formato do app (sem o que é da casa: situação, quem, categoria)."""
         try:
             n = int(tmdb_id)
         except (TypeError, ValueError):
@@ -233,7 +233,8 @@ def detalhes(x, tipo):
         except (TypeError, ValueError):
             d["duracao"] = None
         c = x.get("belongs_to_collection")
-        d["colecao"] = {"id": c["id"], "nome": _txt(c.get("name"), 160)} if isinstance(c, dict) and isinstance(c.get("id"), int) else None
+        capa = c.get("poster_path") if isinstance(c, dict) and isinstance(c.get("poster_path"), str) and CAPA_RE.match(c.get("poster_path")) else ""
+        d["colecao"] = {"id": c["id"], "nome": _txt(c.get("name"), 160), "capa": capa} if isinstance(c, dict) and isinstance(c.get("id"), int) else None
         return d
     temps = []
     for s in x.get("seasons") or []:

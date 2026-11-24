@@ -1,12 +1,16 @@
 """As regras dos títulos, as mesmas para a tela e para as ferramentas do CorrerIA: limpar o que chega, achar um título,
-criar com os detalhes do TMDB, mudar a situação, quem, a nota e o episódio, e o próximo episódio. Só mexem no dicionário
+criar com os detalhes do TMDB, mudar a situação, quem, a categoria e o episódio, e o próximo episódio. Só mexem no dicionário
 dos dados; quem grava é o server.py."""
 import re
 import secrets
 import unicodedata
 from datetime import date, datetime
 
-SITUACOES = {"quero": "Quero ver", "vendo": "Vendo", "visto": "Visto", "abandonado": "Abandonado"}
+# 0.3.0 (o dono: "pode tirar a opção de vendo, só vou controlar visto e quero ver"): duas situações; o Vendo e o Abandonado
+# de antes viram Quero ver (a série continua com o episódio em que parou)
+SITUACOES = {"quero": "Quero ver", "visto": "Visto"}
+MAX_CATEGORIAS = 40
+CAT_RE = re.compile(r"^c[0-9a-f]{6}$")
 TIPOS = {"filme": "Filme", "serie": "Série"}
 MAX_TITULOS = 3000
 MAX_NOTAS = 2000
@@ -64,9 +68,9 @@ def limpar_titulo(t):
     o = {"id": t["id"], "tipo": t["tipo"], "tmdb": _int(t.get("tmdb"), 0, 10 ** 9) or None, "nome": nome, "original": _txt(t.get("original"), 160),
          "ano": _int(t.get("ano"), 0, 3000) or None, "capa": str(t.get("capa") or "") if re.match(r"^t[0-9a-f]{8}\.(jpg|png)$", str(t.get("capa") or "")) else "",
          "capa_tmdb": str(t.get("capa_tmdb") or "")[:90], "sinopse": _txt(t.get("sinopse"), 1200), "generos": _nomes(t.get("generos"), 6),
-         "situacao": t.get("situacao") if t.get("situacao") in SITUACOES else "quero",
+         "situacao": "visto" if t.get("situacao") == "visto" else "quero",
          "quem": [p for p in (t.get("quem") if isinstance(t.get("quem"), list) else []) if isinstance(p, str) and PESSOA_RE.match(p)][:12],
-         "nota": _int(t.get("nota"), 0, 5), "notas": str(t.get("notas") or "")[:MAX_NOTAS],
+         "categoria": str(t.get("categoria") or "") if CAT_RE.match(str(t.get("categoria") or "")) else "", "notas": str(t.get("notas") or "")[:MAX_NOTAS],
          "criado": str(t.get("criado") or "")[:25], "atualizado": str(t.get("atualizado") or "")[:25],
          "visto_em": str(t.get("visto_em") or "") if DATA_RE.match(str(t.get("visto_em") or "")) else None,
          "tmdb_em": str(t.get("tmdb_em") or "")[:25]}
@@ -76,7 +80,7 @@ def limpar_titulo(t):
     if o["tipo"] == "filme":
         o["duracao"] = _int(t.get("duracao"), 0, 2000) or None
         c = t.get("colecao") if isinstance(t.get("colecao"), dict) else {}
-        o["colecao"] = {"id": _int(c.get("id"), 1, 10 ** 9), "nome": _txt(c.get("nome"), 160)} if _int(c.get("id"), 0, 10 ** 9) else None
+        o["colecao"] = {"id": _int(c.get("id"), 1, 10 ** 9), "nome": _txt(c.get("nome"), 160), "capa": str(c.get("capa") or "")[:90]} if _int(c.get("id"), 0, 10 ** 9) else None
     else:
         temps = []
         for s in t.get("temporadas") if isinstance(t.get("temporadas"), list) else []:
@@ -101,6 +105,19 @@ def limpar_dados(d):
             vistos.add(o["id"])
             titulos.append(o)
     aj = d.get("ajustes") if isinstance(d.get("ajustes"), dict) else {}
+    cats = d.get("categorias") if isinstance(d.get("categorias"), dict) else {}
+    categorias = {}
+    for k in TIPOS:
+        vistos, lista = set(), []
+        for c in cats.get(k) if isinstance(cats.get(k), list) else []:
+            if isinstance(c, dict) and CAT_RE.match(str(c.get("id") or "")) and _txt(c.get("nome"), 40) and c["id"] not in vistos:
+                vistos.add(c["id"])
+                lista.append({"id": c["id"], "nome": _txt(c.get("nome"), 40)})
+        categorias[k] = lista[:MAX_CATEGORIAS]
+    validas = {c["id"] for k in categorias for c in categorias[k]}
+    for t in titulos:
+        if t["categoria"] not in validas or t["categoria"] not in {c["id"] for c in categorias[t["tipo"]]}:
+            t["categoria"] = ""
     tipos = aj.get("tipos") if isinstance(aj.get("tipos"), dict) else {}
     tipos = {k: tipos.get(k) is not False for k in TIPOS}
     if not any(tipos.values()):
@@ -108,7 +125,7 @@ def limpar_dados(d):
     ajustes = {"cor": aj.get("cor") if isinstance(aj.get("cor"), str) and re.match(r"^[a-z]{2,12}$", aj["cor"]) else "lilas",
                "cor_dia": aj.get("cor_dia") is not False, "quem": aj.get("quem") is not False, "correria": aj.get("correria") is True,
                "tipos": tipos}
-    return {"versao": 1, "rev": _int(d.get("rev"), 0, 10 ** 12), "titulos": titulos[:MAX_TITULOS], "ajustes": ajustes}
+    return {"versao": 1, "rev": _int(d.get("rev"), 0, 10 ** 12), "titulos": titulos[:MAX_TITULOS], "categorias": categorias, "ajustes": ajustes}
 
 
 def ep_txt(temp, ep):
@@ -140,7 +157,7 @@ def de_tmdb(d, tipo, tmdb_id):
 
 
 def aplicar_detalhes(t, det, agora):
-    """O que vem do TMDB por cima do título (o que é da casa, como a situação, quem, a nota e o episódio, fica)."""
+    """O que vem do TMDB por cima do título (o que é da casa, como a situação, quem, a categoria e o episódio, fica)."""
     for k in ("nome", "original", "ano", "sinopse", "generos", "onde"):
         if det.get(k) not in (None, "") or k in ("generos", "onde"):
             t[k] = det.get(k) if det.get(k) is not None else t.get(k)
@@ -167,10 +184,10 @@ def criar(d, det, situacao="quero", quem=(), agora=None):
     if len(d["titulos"]) >= MAX_TITULOS:
         raise ErroRegra(f"A lista chegou a {MAX_TITULOS} títulos.")
     if situacao not in SITUACOES:
-        raise ErroRegra("A situação vale quero, vendo, visto ou abandonado.")
+        raise ErroRegra("A situação vale quero ou visto.")
     t = {"id": novo_id({x["id"] for x in d["titulos"]}), "tipo": det["tipo"], "tmdb": det.get("tmdb"), "nome": det.get("nome") or "Sem nome",
          "original": det.get("original") or "", "ano": det.get("ano"), "capa": "", "capa_tmdb": "", "sinopse": "", "generos": [],
-         "situacao": "quero", "quem": [], "nota": 0, "notas": "", "criado": agora, "atualizado": agora, "visto_em": None, "tmdb_em": "",
+         "situacao": "quero", "quem": [], "categoria": "", "notas": "", "criado": agora, "atualizado": agora, "visto_em": None, "tmdb_em": "",
          "onde": {"assinatura": [], "gratis": [], "alugar": [], "comprar": [], "link": ""}}
     if t["tipo"] == "filme":
         t.update(duracao=None, colecao=None)
@@ -223,8 +240,9 @@ def ja_saiu(t, temp, ep):
     return not u or (temp, ep) <= (u["temp"], u["ep"])
 
 
-def mudar(t, campos, pessoas, agora=None):
-    """Muda a situação, quem, a nota, o episódio e as notas. pessoas: os ids que valem (None: não confere)."""
+def mudar(t, campos, pessoas, agora=None, categorias=None):
+    """Muda a situação, quem, a categoria, o episódio e as notas. pessoas: os ids que valem (None: não confere);
+    categorias: as do tipo do título (None: não confere)."""
     agora = agora or datetime.now().isoformat(timespec="seconds")
     hoje = agora[:10]
     if not isinstance(campos, dict):
@@ -238,11 +256,11 @@ def mudar(t, campos, pessoas, agora=None):
             if fora:
                 raise ErroRegra("Pessoa que não está na casa: " + ", ".join(fora) + ".")
         t["quem"] = list(dict.fromkeys(q))[:12]
-    if "nota" in campos:
-        n = campos["nota"]
-        if not isinstance(n, int) or isinstance(n, bool) or not 0 <= n <= 5:
-            raise ErroRegra("A nota vai de 1 a 5 (0 tira a nota).")
-        t["nota"] = n
+    if "categoria" in campos:
+        c = campos["categoria"] or ""
+        if c and (not isinstance(c, str) or (categorias is not None and c not in {x["id"] for x in categorias})):
+            raise ErroRegra("Categoria desconhecida" + (": valem " + ", ".join(x["nome"] for x in categorias) if categorias else "") + ".")
+        t["categoria"] = c
     if "notas" in campos:
         t["notas"] = str(campos["notas"] or "")[:MAX_NOTAS]
     if "temp" in campos or "ep" in campos:
@@ -260,12 +278,10 @@ def mudar(t, campos, pessoas, agora=None):
             if s and not 1 <= ep <= s["episodios"]:
                 raise ErroRegra(f"A temporada {temp} tem {s['episodios']} episódios.")
             t["temp"], t["ep"] = temp, ep
-        if t["temp"] and t["situacao"] == "quero" and "situacao" not in campos:
-            t["situacao"] = "vendo"
     if "situacao" in campos:
         s = campos["situacao"]
         if s not in SITUACOES:
-            raise ErroRegra("A situação vale quero, vendo, visto ou abandonado.")
+            raise ErroRegra("A situação vale quero ou visto.")
         antes = t["situacao"]
         t["situacao"] = s
         if s == "visto" and antes != "visto":
@@ -287,10 +303,7 @@ def proximo_ep(t, agora=None):
     s = seguinte(t)
     if not s or not ja_saiu(t, *s):
         raise ErroRegra("Você já viu todos os episódios que saíram" + (f" (o próximo sai em {data_br(t['proximo']['data'])})." if t.get("proximo") else "."))
-    campos = {"temp": s[0], "ep": s[1]}
-    if t["situacao"] in ("quero", "abandonado"):
-        campos["situacao"] = "vendo"
-    mudar(t, campos, None, agora)
+    mudar(t, {"temp": s[0], "ep": s[1]}, None, agora)
     if t.get("fim") and not seguinte(t) or t.get("fim") and t.get("ultimo") and (t["temp"], t["ep"]) >= (t["ultimo"]["temp"], t["ultimo"]["ep"]):
         mudar(t, {"situacao": "visto"}, None, agora)
     return t
@@ -312,3 +325,63 @@ def tipos_ligados(d):
 def conferir_tipo(d, tipo):
     if tipo in TIPOS and tipo not in tipos_ligados(d):
         raise ErroRegra(f"{'Filmes' if tipo == 'filme' else 'Séries'} estão desligados em Opções › O que controlar.")
+
+
+def em_andamento(t):
+    """Uma série em Quero ver com algum episódio visto: a que a casa está vendo."""
+    return t["tipo"] == "serie" and t["situacao"] == "quero" and bool(t.get("temp"))
+
+
+def nome_categoria(d, t):
+    return next((c["nome"] for c in d.get("categorias", {}).get(t["tipo"], []) if c["id"] == t.get("categoria")), "")
+
+
+def achar_categoria(d, tipo, nome):
+    """O id da categoria do tipo pelo nome (sem acento nem maiúsculas); "" tira."""
+    if not str(nome or "").strip():
+        return ""
+    alvo = sem_acento(nome)
+    c = next((c for c in d["categorias"][tipo] if sem_acento(c["nome"]) == alvo), None)
+    if not c:
+        valem = ", ".join(x["nome"] for x in d["categorias"][tipo])
+        raise ErroRegra(f"«{nome}» não é uma categoria de {'filmes' if tipo == 'filme' else 'séries'}." + (f" Valem: {valem}." if valem else " Crie em Mais › Categorias."))
+    return c["id"]
+
+
+def mudar_categorias(d, corpo):
+    """Mais › Categorias: {acao: nova, tipo, nome} | {acao: renomear, id, nome} | {acao: apagar, id}. Apagar tira a
+    categoria dos títulos."""
+    acao = corpo.get("acao")
+    nome = _txt(corpo.get("nome"), 40)
+    if acao == "nova":
+        tipo = corpo.get("tipo")
+        if tipo not in TIPOS:
+            raise ErroRegra("O tipo vale filme ou serie.")
+        if not nome:
+            raise ErroRegra("Escreva o nome da categoria.")
+        lista = d["categorias"][tipo]
+        if any(sem_acento(c["nome"]) == sem_acento(nome) for c in lista):
+            raise ErroRegra("Essa categoria já existe.")
+        if len(lista) >= MAX_CATEGORIAS:
+            raise ErroRegra(f"Até {MAX_CATEGORIAS} categorias por tipo.")
+        usados = {c["id"] for k in d["categorias"] for c in d["categorias"][k]}
+        c = {"id": next(i for i in ("c" + secrets.token_hex(3) for _ in range(99)) if i not in usados), "nome": nome}
+        lista.append(c)
+        return c
+    tipo, c = next(((k, c) for k in d["categorias"] for c in d["categorias"][k] if c["id"] == corpo.get("id")), (None, None))
+    if not c:
+        raise ErroRegra("Essa categoria não existe mais.")
+    if acao == "renomear":
+        if not nome:
+            raise ErroRegra("Escreva o nome da categoria.")
+        if any(sem_acento(x["nome"]) == sem_acento(nome) and x is not c for x in d["categorias"][tipo]):
+            raise ErroRegra("Essa categoria já existe.")
+        c["nome"] = nome
+        return c
+    if acao == "apagar":
+        d["categorias"][tipo] = [x for x in d["categorias"][tipo] if x is not c]
+        for t in d["titulos"]:
+            if t.get("categoria") == c["id"]:
+                t["categoria"] = ""
+        return c
+    raise ErroRegra("Ação desconhecida.")

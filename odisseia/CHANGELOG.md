@@ -1,5 +1,14 @@
 # Mudanças
 
+## 0.3.0
+
+- **Só Quero ver e Visto**: o Vendo e o Abandonado saíram (o que estava neles virou Quero ver). Uma série em Quero ver com algum episódio visto aparece em **Continuar vendo**, no Agora.
+- **Categoria no lugar da Nota**: você cria as categorias em **Mais › Categorias**, uma lista para as séries e outra para os filmes, e escolhe uma em cada título. O Buscar filtra por elas.
+- **Quem › Todos**: marca a casa toda de uma vez.
+- **Coleções no +**: o filme que faz parte de uma coleção tem o botão **Coleção** embaixo da capa, e a lista pronta **Coleções** mostra as sagas dos filmes mais vistos. Na capa da coleção, o ✓ marca todos os filmes já lançados como vistos (e o marcador, todos como Quero ver), sem abrir.
+- **Buscar** no padrão dos outros apps: o **Filtros** fecha e abre (o aparelho lembra) e os filtros são caixas lado a lado (tipo, situação, categoria e pessoa).
+- **Pelo CorrerIA**: a categoria (marcar, adicionar e buscar) e «todos» para a casa toda.
+
 ## 0.2.0
 
 - **Adicionar com listas prontas**: o + abre em **Em alta**, **Mais populares**, **Mais bem avaliados** e **Estreias** (os filmes nos cinemas do Brasil, as séries no ar), com as capas em grade e **Mostrar mais**. O campo de busca não sobe mais o teclado sozinho.

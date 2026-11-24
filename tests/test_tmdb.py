@@ -84,7 +84,7 @@ class TestColecoes(unittest.TestCase):
         c = cliente().colecao(301)
         self.assertEqual([(f["nome"], f["data"]) for f in c["filmes"]], [("A Grande Viagem", "2019-05-10"), ("A Grande Viagem 2", "2022-07-01"), ("A Grande Viagem 3", "2027-06-01")])
         self.assertEqual((c["nome"], c["capa"]), ("Coleção A Grande Viagem", "/viagem.jpg"))
-        self.assertEqual(cliente().detalhes("filme", 101)["colecao"], {"id": 301, "nome": "Coleção A Grande Viagem"})
+        self.assertEqual(cliente().detalhes("filme", 101)["colecao"], {"id": 301, "nome": "Coleção A Grande Viagem", "capa": "/viagem.jpg"})
         self.assertIsNone(cliente().detalhes("filme", 103)["colecao"])
         with self.assertRaisesRegex(T.ErroTMDB, "número"):
             cliente().colecao("x")

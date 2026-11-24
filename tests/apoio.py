@@ -33,12 +33,12 @@ ONDE = {"results": {"BR": {"link": "https://www.themoviedb.org/movie/101/watch?l
 FILMES = {
     101: {"id": 101, "title": "A Grande Viagem", "original_title": "The Long Trip", "release_date": "2019-05-10", "runtime": 132,
           "genres": [{"name": "Aventura"}, {"name": "Drama"}], "overview": "Uma família cruza o país num ônibus velho.",
-          "poster_path": "/viagem.jpg", "status": "Released", "watch/providers": ONDE, "belongs_to_collection": {"id": 301, "name": "Coleção A Grande Viagem"}},
+          "poster_path": "/viagem.jpg", "status": "Released", "watch/providers": ONDE, "belongs_to_collection": {"id": 301, "name": "Coleção A Grande Viagem", "poster_path": "/viagem.jpg"}},
     105: {"id": 105, "title": "A Grande Viagem 2", "original_title": "The Long Trip 2", "release_date": "2022-07-01", "runtime": 120, "genres": [],
           "overview": "A família volta para a estrada.", "poster_path": "/viagem.jpg", "watch/providers": {"results": {}},
-          "belongs_to_collection": {"id": 301, "name": "Coleção A Grande Viagem"}},
+          "belongs_to_collection": {"id": 301, "name": "Coleção A Grande Viagem", "poster_path": "/viagem.jpg"}},
     106: {"id": 106, "title": "A Grande Viagem 3", "original_title": "The Long Trip 3", "release_date": "2027-06-01", "runtime": None, "genres": [],
-          "overview": "", "poster_path": None, "watch/providers": {"results": {}}, "belongs_to_collection": {"id": 301, "name": "Coleção A Grande Viagem"}},
+          "overview": "", "poster_path": None, "watch/providers": {"results": {}}, "belongs_to_collection": {"id": 301, "name": "Coleção A Grande Viagem", "poster_path": "/viagem.jpg"}},
     103: {"id": 103, "title": "Farol Distante", "original_title": "Farol Distante", "release_date": "2021-08-01", "runtime": 95,
           "genres": [{"name": "Suspense"}], "overview": "", "poster_path": "/farol.jpg", "status": "Released", "watch/providers": {"results": {}}},
 }
@@ -199,6 +199,7 @@ def limpar():
     os.makedirs(S.DATA_DIR, exist_ok=True)
     S.ESTADO_TMDB.update(erro="", em="")
     S.IMGS.clear()
+    S.DETALHES.clear()
     S.CORRERIA._chave = None
     S.CORRERIA.ultimo = None
 

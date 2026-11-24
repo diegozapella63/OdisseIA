@@ -55,8 +55,8 @@ class TestServidor(unittest.TestCase):
         self.chave()
         st, r = self.get("/api/busca?q=mar")
         self.assertEqual([(x["nome"], x["ja"]) for x in r["resultados"]], [("Mar de Estrelas", None)])
-        t = self.add("serie", 202, "vendo")
-        self.assertEqual((t["nome"], t["quem"], t["situacao"]), ("Mar de Estrelas", ["person.ana"], "vendo"), "quem adiciona vê")
+        t = self.add("serie", 202, "quero")
+        self.assertEqual((t["nome"], t["quem"], t["situacao"]), ("Mar de Estrelas", ["person.ana"], "quero"), "quem adiciona vê")
         st, capa = self.get("/api/capa/" + t["capa"])
         self.assertTrue(capa.startswith(b"\xff\xd8\xff"))
         self.assertEqual(self.get("/api/busca?q=mar")[1]["resultados"][0]["ja"], t["id"])
@@ -64,8 +64,13 @@ class TestServidor(unittest.TestCase):
         self.assertEqual((r["novo"], r["titulo"]["id"]), (False, t["id"]))
         st, r = self.post("/api/titulo", {"acao": "proximo", "id": t["id"]})
         self.assertEqual((r["titulo"]["temp"], r["titulo"]["ep"]), (1, 1))
-        st, r = self.post("/api/titulo", {"acao": "mudar", "id": t["id"], "campos": {"nota": 5, "quem": ["person.beto"]}})
-        self.assertEqual((st, r["titulo"]["nota"], r["titulo"]["quem"]), (200, 5, ["person.beto"]))
+        st, r = self.post("/api/categorias", {"acao": "nova", "tipo": "serie", "nome": "Para ver a dois"})
+        cat = r["categorias"]["serie"][0]["id"]
+        st, r = self.post("/api/titulo", {"acao": "mudar", "id": t["id"], "campos": {"categoria": cat, "quem": ["person.beto"]}})
+        self.assertEqual((st, r["titulo"]["categoria"], r["titulo"]["quem"]), (200, cat, ["person.beto"]))
+        self.assertEqual(self.post("/api/titulo", {"acao": "mudar", "id": t["id"], "campos": {"categoria": "c000000"}})[0], 400)
+        self.assertEqual(self.post("/api/categorias", {"acao": "nova", "tipo": "serie", "nome": "para ver a dois"})[0], 400)
+        self.assertEqual(self.get("/api/estado")[1]["categorias"]["serie"][0]["nome"], "Para ver a dois")
         st, r = self.post("/api/titulo", {"acao": "mudar", "id": t["id"], "campos": {"quem": ["person.zeca"]}})
         self.assertEqual(st, 400)
         self.assertEqual(self.get("/api/rev")[1]["rev"], S.ler()["rev"])
@@ -193,12 +198,12 @@ class TestServidor(unittest.TestCase):
     def test_laco_escolhe_quem_atualizar(self):
         from datetime import datetime
         agora = datetime(2026, 11, 24, 10)
-        base = {"tmdb": 1, "tipo": "serie", "situacao": "vendo", "tmdb_em": "2026-11-23T20:00:00"}
+        base = {"tmdb": 1, "tipo": "serie", "situacao": "quero", "tmdb_em": "2026-11-23T20:00:00"}
         self.assertFalse(S.precisa_atualizar(base, agora))
         self.assertTrue(S.precisa_atualizar(dict(base, tmdb_em="2026-11-23T09:00:00"), agora))
         self.assertFalse(S.precisa_atualizar(dict(base, tipo="filme", tmdb_em="2026-11-20T09:00:00"), agora))
         self.assertTrue(S.precisa_atualizar(dict(base, tipo="filme", tmdb_em="2026-11-10T09:00:00"), agora))
-        self.assertFalse(S.precisa_atualizar(dict(base, situacao="abandonado", tmdb_em=""), agora))
+        self.assertFalse(S.precisa_atualizar(dict(base, situacao="visto", tmdb_em="2026-11-20T09:00:00"), agora), "a série vista: de semana em semana")
         self.assertTrue(S.precisa_atualizar(dict(base, tmdb_em="ontem"), agora))
         self.assertFalse(S.precisa_atualizar(dict(base, tmdb=None), agora))
 
@@ -229,9 +234,9 @@ class TestCorrerIA(unittest.TestCase):
         self.assertEqual(self.usar("resumo")[1]["texto"], "A lista da casa está vazia.")
         self.assertIn("Falta a chave do TMDB", self.usar("adicionar", {"nome": "Mar de Estrelas"})[1]["erro"])
         pedir(self.base, "POST", "/api/tmdb", {"chave": apoio.CHAVE})
-        st, r = self.usar("adicionar", {"nome": "mar de estrelas", "situacao": "vendo"})
+        st, r = self.usar("adicionar", {"nome": "mar de estrelas", "situacao": "quero"})
         self.assertEqual(st, 200, r)
-        self.assertRegex(r["texto"], r"^Adicionado: t[0-9a-f]{8} \| Mar de Estrelas \(2023\) · série · vendo · Beto$")
+        self.assertRegex(r["texto"], r"^Adicionado: t[0-9a-f]{8} \| Mar de Estrelas \(2023\) · série · quero ver · Beto$")
         t = S.ler()["titulos"][0]
         self.assertTrue(t["capa"] and os.path.exists(S.caminho_capa(t["capa"])))
         self.assertIn("Já está na lista", self.usar("adicionar", {"nome": "Mar de Estrelas"})[1]["texto"])
@@ -239,11 +244,16 @@ class TestCorrerIA(unittest.TestCase):
         r = self.usar("adicionar", {"nome": "The Long Trip", "ano": 2020, "quem": ["ana", "Beto"]})[1]
         self.assertIn("A Grande Viagem (2019) · filme · quero ver · Ana, Beto", r["texto"])
         self.assertIn("parou em T1 E1", self.usar("proximo_episodio", {"titulo": "mar"})[1]["texto"] + self.usar("buscar", {"tipo": "serie"})[1]["texto"])
-        r = self.usar("marcar", {"titulo": "Mar de Estrelas", "temporada": 2, "episodio": 2, "nota": 4})[1]
-        self.assertIn("parou em T2 E2 · nota 4", r["texto"])
+        pedir(self.base, "POST", "/api/categorias", {"acao": "nova", "tipo": "serie", "nome": "Para ver a dois"})
+        r = self.usar("marcar", {"titulo": "Mar de Estrelas", "temporada": 2, "episodio": 2, "categoria": "para ver a dois"})[1]
+        self.assertIn("parou em T2 E2 · Para ver a dois", r["texto"])
+        self.assertEqual(self.usar("buscar", {"categoria": "Para ver a dois"})[1]["texto"].count("\n- "), 1)
+        self.assertIn("Ana, Beto", self.usar("marcar", {"titulo": "mar", "quem": ["todos"]})[1]["texto"], "«todos» é a casa toda")
         self.assertIn("todos os episódios que saíram", self.usar("proximo_episodio", {"titulo": "mar"})[1]["erro"])
         r = self.usar("resumo")[1]["texto"]
-        self.assertIn("2 títulos: 1 quero ver, 1 vendo, 0 visto, 0 abandonado.", r)
+        self.assertIn("2 títulos: 2 quero ver, 0 visto.", r)
+        self.assertIn("Séries em andamento:\n- ", r)
+        self.assertIn("Categorias da casa: séries: Para ver a dois.", r)
         self.assertIn("27/11/2026: Mar de Estrelas T2 E3", r)
         v = self.usar("ver", {"titulo": "grande viagem"})[1]["texto"]
         self.assertIn("Onde assistir no Brasil (JustWatch): assinatura: Cine Lumen; alugar: Loja Pipoca.", v)
@@ -251,13 +261,14 @@ class TestCorrerIA(unittest.TestCase):
         v = self.usar("ver", {"titulo": "mar"})[1]["texto"]
         self.assertIn("Temporadas: T1 (3 ep.), T2 (4 ep.).", v)
         self.assertIn("Próximo: T2 E3 em 27/11/2026.", v)
-        self.assertEqual(self.usar("buscar", {"pessoa": "ana"})[1]["texto"].count("\n- "), 1)
+        self.assertEqual(self.usar("buscar", {"pessoa": "ana"})[1]["texto"].count("\n- "), 2, "a série é de todos agora")
         self.assertEqual(self.usar("buscar", {"texto": "zzz"})[1]["texto"], "Nenhum título com esses filtros.")
         self.assertIn("Apagado: A Grande Viagem.", self.usar("apagar", {"titulo": "A Grande Viagem"})[1]["texto"])
         self.assertEqual(len(S.ler()["titulos"]), 1)
         self.assertEqual(S.CORRERIA.ultimo["app"], "WhatsApp")
         for args, erro in (({"titulo": "mar", "cor": "x"}, "Argumento desconhecido: cor"), ({}, "Falta: titulo"), ({"titulo": 3}, "texto"),
-                           ({"titulo": "mar", "nota": "4"}, "inteiro"), ({"titulo": "mar", "nota": 9}, "vai de 0 a 5"),
+                           ({"titulo": "mar", "temporada": "2"}, "inteiro"), ({"titulo": "mar", "temporada": -1}, "temporada é 0 ou mais"),
+                           ({"titulo": "mar", "categoria": "Terror"}, "não é uma categoria"), ({"titulo": "mar", "nota": 4}, "Argumento desconhecido: nota"),
                            ({"titulo": "mar", "situacao": "x"}, "situacao vale"), ({"titulo": "mar", "quem": "ana"}, "lista de nomes"),
                            ({"titulo": "mar", "quem": ["Zeca"]}, "não é uma pessoa"), ({"titulo": "mar"}, "Diga o que mudar"), ({"titulo": "nada"}, "Nenhum título")):
             st, r = self.usar("marcar", args)
@@ -280,7 +291,7 @@ class TestBordas(unittest.TestCase):
 
     def test_laco_atualiza_e_para_sem_internet(self):
         S.guardar_chave(apoio.CHAVE)
-        S.adicionar({"tipo": "serie", "tmdb": 202, "situacao": "vendo"})
+        S.adicionar({"tipo": "serie", "tmdb": 202, "situacao": "quero"})
         d = S.ler()
         d["titulos"][0]["tmdb_em"] = "2000-01-01T00:00:00"
         d["titulos"][0]["proximo"] = None
@@ -404,14 +415,14 @@ class TestNovidades020(unittest.TestCase):
         ts = {t["nome"]: t for t in S.ler()["titulos"]}
         self.assertEqual(sorted(ts), ["A Grande Viagem", "A Grande Viagem 2"], "o que ainda não saiu fica de fora")
         self.assertTrue(all(t["situacao"] == "visto" for t in ts.values()))
-        self.assertEqual(ts["A Grande Viagem"]["colecao"], {"id": 301, "nome": "Coleção A Grande Viagem"})
+        self.assertEqual(ts["A Grande Viagem"]["colecao"], {"id": 301, "nome": "Coleção A Grande Viagem", "capa": "/viagem.jpg"})
         st, r = self.post("/api/titulo", {"acao": "adicionar_colecao", "colecao": 301, "situacao": "quero"})
         self.assertEqual((r["novos"], r["ja"]), (1, 2), "Quero ver não mexe no que já estava")
         self.assertEqual(S.ler()["titulos"][0]["nome"], "A Grande Viagem 3")
         rev = S.ler()["rev"]
         st, r = self.post("/api/titulo", {"acao": "adicionar_colecao", "colecao": 301, "situacao": "quero"})
         self.assertEqual((r["novos"], S.ler()["rev"]), (0, rev), "nada a mudar, nada gravado")
-        for corpo in ({"acao": "adicionar_colecao", "colecao": "x"}, {"acao": "adicionar_colecao", "colecao": 301, "situacao": "vendo"}):
+        for corpo in ({"acao": "adicionar_colecao", "colecao": "x"}, {"acao": "adicionar_colecao", "colecao": 301, "situacao": "abandonado"}):
             self.assertEqual(self.post("/api/titulo", corpo)[0], 400)
 
     def test_o_que_controlar(self):
@@ -456,3 +467,55 @@ class TestNovidades020(unittest.TestCase):
         self.assertEqual(S.ferramentas.texto_colecao({"nome": "X", "novos": 0, "marcados": 1, "ja": 1, "fora": 2}, "visto"),
                          "X: 1 marcado como Visto, 1 já estava na lista, 2 ainda não saíram.")
         self.assertEqual(S.ferramentas.texto_colecao({"nome": "X", "novos": 0, "marcados": 0, "ja": 0, "fora": 0}, "quero"), "X: nada a mudar.")
+
+
+class TestNovidades030(unittest.TestCase):
+    """0.3.0: a coleção de cada filme nas listas, a lista pronta Coleções e as categorias."""
+
+    def setUp(self):
+        apoio.limpar()
+        apoio.fixar_hoje(self)
+        self.base = apoio.Servidor.subir()
+        S.guardar_chave(apoio.CHAVE)
+
+    def test_colecao_de_cada_filme(self):
+        r = pedir(self.base, "GET", "/api/lista?nome=populares&tipo=filme&pagina=2")[1]
+        self.assertEqual([(x["nome"], (x.get("colecao") or {}).get("id")) for x in r["resultados"]], [("A Grande Viagem 3", 301), ("Farol Distante", None)])
+        pedir(self.base, "GET", "/api/lista?nome=populares&tipo=filme")
+        n = len([p for p in apoio.TMDB.pedidos if p[0] == "/3/movie/101"])
+        pedir(self.base, "GET", "/api/busca?q=grande")
+        self.assertEqual(len([p for p in apoio.TMDB.pedidos if p[0] == "/3/movie/101"]), n, "os detalhes ficam guardados")
+        self.assertNotIn("colecao", pedir(self.base, "GET", "/api/lista?nome=populares&tipo=serie")[1]["resultados"][0])
+        with mock.patch.object(S, "detalhes", side_effect=S.T.ErroTMDB("x")):
+            self.assertIsNone(S.com_colecao([{"tipo": "filme", "tmdb": 1}])[0]["colecao"])
+        S.DETALHES.update({(str(i), i): (0, {}) for i in range(3001)})
+        S.DETALHES.pop(("filme", 103), None)
+        S.detalhes("filme", 103)
+        self.assertEqual(len(S.DETALHES), 1, "passou de 3000: começa de novo")
+
+    def test_lista_de_colecoes(self):
+        r = pedir(self.base, "GET", "/api/lista?nome=colecoes")[1]
+        self.assertEqual([(x["tipo"], x["nome"], x["capa"]) for x in r["resultados"]], [("colecao", "Coleção A Grande Viagem", "/viagem.jpg")], "uma vez só")
+        self.assertTrue(r["mais"])
+        self.assertFalse(pedir(self.base, "GET", "/api/lista?nome=colecoes&pagina=9")[1]["mais"])
+        self.assertTrue(pedir(self.base, "GET", "/api/lista?nome=colecoes&pagina=x")[1]["mais"])
+        pedir(self.base, "POST", "/api/ajustes", {"tipos": {"filme": False}})
+        self.assertEqual(pedir(self.base, "GET", "/api/lista?nome=colecoes")[1], {"resultados": [], "mais": False})
+
+    def test_categorias(self):
+        st, r = pedir(self.base, "POST", "/api/categorias", {"acao": "nova", "tipo": "filme", "nome": "Clássicos"})
+        c = r["categorias"]["filme"][0]
+        self.assertEqual((st, c["nome"]), (200, "Clássicos"))
+        S.adicionar({"tipo": "filme", "tmdb": 101})
+        t = S.ler()["titulos"][0]
+        pedir(self.base, "POST", "/api/titulo", {"acao": "mudar", "id": t["id"], "campos": {"categoria": c["id"]}})
+        st, r = pedir(self.base, "POST", "/api/categorias", {"acao": "renomear", "id": c["id"], "nome": "Os clássicos"})
+        self.assertEqual(r["categorias"]["filme"][0]["nome"], "Os clássicos")
+        st, r = pedir(self.base, "POST", "/api/categorias", {"acao": "apagar", "id": c["id"]})
+        self.assertEqual((r["categorias"]["filme"], S.ler()["titulos"][0]["categoria"]), ([], ""))
+        self.assertEqual(pedir(self.base, "POST", "/api/categorias", {"acao": "voar"})[0], 400)
+        pedir(self.base, "POST", "/api/categorias", {"acao": "nova", "tipo": "filme", "nome": "Suspense"})
+        r = S.usar_ferramenta({"nome": "adicionar", "argumentos": {"nome": "farol", "categoria": "suspense"}})["texto"]
+        self.assertIn("Farol Distante (2021) · filme · quero ver · Suspense", r)
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "não é uma categoria"):
+            S.usar_ferramenta({"nome": "adicionar", "argumentos": {"nome": "grande viagem 2", "categoria": "Terror"}})

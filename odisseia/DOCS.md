@@ -20,7 +20,7 @@ A chave fica só no app (em `/data/segredos.json`); a tela mostra só o fim dela
 
 ## Adicionar (o + no meio da barra)
 
-Abre nas **listas prontas** do TMDB: **Em alta** (na semana), **Mais populares**, **Mais bem avaliados** e **Estreias** (os filmes nos cinemas do Brasil; nas séries, as que estão no ar). **Mostrar mais** traz a próxima página. Para procurar um título, escreva o nome: a busca é no TMDB, em português. Tudo, Filmes ou Séries filtra.
+Abre nas **listas prontas** do TMDB: **Em alta** (na semana), **Mais populares**, **Mais bem avaliados**, **Coleções** e **Estreias** (os filmes nos cinemas do Brasil; nas séries, as que estão no ar). **Mostrar mais** traz a próxima página. Para procurar um título, escreva o nome: a busca é no TMDB, em português. Tudo, Filmes ou Séries filtra.
 
 Em cada capa:
 - **Já vi** (o visto): põe na lista como **Visto**. Numa série, marca a série inteira, até o último episódio que saiu. O que ainda não saiu não tem esse botão.
@@ -29,23 +29,27 @@ Em cada capa:
 
 O que já está na lista mostra a situação no canto da capa.
 
+## Categorias
+
+Em **Mais › Categorias** ficam as categorias da casa, uma lista para as séries e outra para os filmes (até 40 em cada). Escreva o nome e toque em **Adicionar** (ou Enter); o nome muda no próprio campo; a lixeira apaga (os títulos ficam sem categoria). O Buscar filtra pela categoria.
+
 ## Coleções de filmes
 
-As sagas (os filmes de uma mesma história) aparecem na busca com a etiqueta **Coleção**, e o filme que faz parte de uma mostra o botão dela. A coleção abre com todos os filmes, na ordem em que saíram: **Quero ver todos** põe os que faltam na lista; **Já vi todos** põe os que já saíram como Visto (e marca como Visto os que já estavam na lista).
+As sagas (os filmes de uma mesma história) aparecem na busca com a etiqueta **Coleção**, na lista pronta **Coleções** (as sagas dos filmes mais populares e mais bem avaliados) e no botão **Coleção** embaixo da capa de um filme que faz parte de uma. Na capa da coleção, o ✓ marca todos os filmes já lançados como Visto, e o marcador, todos como Quero ver, sem abrir. A coleção abre com todos os filmes, na ordem em que saíram: **Quero ver todos** põe os que faltam na lista; **Já vi todos** põe os que já saíram como Visto (e marca como Visto os que já estavam na lista).
 
 ## O título
 
-- **Situação**: Quero ver, Vendo, Visto ou Abandonado. Visto numa série marca até o último episódio que saiu.
+- **Situação**: Quero ver ou Visto. Visto numa série marca até o último episódio que saiu. A série em Quero ver com algum episódio visto aparece em **Continuar vendo**, no Agora.
 - **Parou em** (séries): a temporada e o último episódio visto. **Vi o T2 E6** marca o seguinte. No último episódio de uma série que acabou, ela vira **Visto** sozinha.
-- **Nota**: de 1 a 5 estrelas (tocar de novo na mesma tira).
-- **Quem**: quem da casa está vendo ou viu (as pessoas do Home Assistant). Desliga em **Configurações › Opções › Quem vê**.
+- **Categoria**: uma das categorias da casa (as de séries ou as de filmes), ou Nenhuma. Sem nenhuma criada, o botão **Criar categorias** leva a Mais › Categorias.
+- **Quem**: quem da casa quer ver ou viu (as pessoas do Home Assistant); **Todos** marca a casa toda. Desliga em **Configurações › Opções › Quem vê**.
 - **Onde assistir**: no Brasil, por assinatura, grátis, para alugar ou comprar. Dados da JustWatch, pelo TMDB.
 - **Notas**: o que a casa achou, quem indicou.
 - **Atualizar** busca de novo no TMDB (o app já atualiza sozinho: as séries que a casa vê ou quer ver, uma vez por dia; o resto, uma vez por semana).
 
 ## Buscar e Histórico
 
-**Buscar** filtra a lista pelo nome, pelo tipo, pela situação e pela pessoa. Os **Abandonados** ficam recolhidos no fim. **Histórico** mostra o que a casa terminou de ver, mês a mês, numa aba para as séries e outra para os filmes.
+**Buscar** filtra a lista pelo nome e, em **Filtros** (que fecha e abre), pelo tipo, pela situação, pela categoria e pela pessoa. **Histórico** mostra o que a casa terminou de ver, mês a mês, numa aba para as séries e outra para os filmes.
 
 ## O que controlar
 

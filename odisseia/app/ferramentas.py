@@ -7,8 +7,10 @@ from datetime import date, datetime, timedelta
 import regras as R
 import tmdb as T
 
-INSTRUCOES = ("OdisseIA: os filmes e as séries da casa: o que cada pessoa está vendo, já viu, quer ver ou abandonou, o "
-              "episódio em que parou, a nota (1 a 5) e onde assistir no Brasil (dados da JustWatch). Os ids dos títulos "
+INSTRUCOES = ("OdisseIA: os filmes e as séries da casa: o que cada pessoa quer ver ou já viu (as duas situações, quero e "
+              "visto), o episódio em que parou numa série (em andamento: em Quero ver, com algum episódio visto), a "
+              "categoria (as da casa, uma lista para filmes e outra para séries) e onde assistir no Brasil (dados da "
+              "JustWatch). Os ids dos títulos "
               "começam com t. Para marcar o episódio seguinte ao último visto, use proximo_episodio; para um episódio "
               "certo, marcar com temporada e episodio. Para pôr um título novo, adicionar procura pelo nome no TMDB; uma "
               "série inteira já vista é adicionar com situacao visto (marca até o último episódio que saiu). Uma coleção "
@@ -22,15 +24,17 @@ def _f(nome, titulo, descricao, props=None, obrig=(), grava=False, apaga=False):
 
 
 _TIT = {"type": "string", "description": "O id do título (t…) ou o nome."}
-_QUEM = {"type": "array", "items": {"type": "string"}, "description": "Os nomes das pessoas da casa (troca a lista)."}
+_QUEM = {"type": "array", "items": {"type": "string"}, "description": "Os nomes das pessoas da casa (troca a lista); «todos» põe a casa toda."}
+_CAT = {"type": "string", "description": "O nome de uma categoria da casa (as de filmes ou as de séries); vazio tira."}
 FERRAMENTAS = [
-    _f("resumo", "Resumo", "Quantos títulos há em cada situação, o que a casa está vendo agora (com o episódio e quantos "
-       "faltam) e os episódios que vão sair nos próximos 14 dias."),
+    _f("resumo", "Resumo", "Quantos títulos há em cada situação, as séries em andamento (com o episódio e quantos faltam), "
+       "os episódios que vão sair nos próximos 14 dias e as categorias da casa."),
     _f("buscar", "Buscar na lista", "Os títulos da lista da casa, com filtros. Sem filtro, os mais recentes.",
        {"texto": {"type": "string", "description": "Parte do nome."}, "tipo": {"type": "string", "enum": ["filme", "serie"]},
         "situacao": {"type": "string", "enum": SIT}, "pessoa": {"type": "string", "description": "O nome de quem vê ou viu."},
+        "categoria": {"type": "string", "description": "O nome de uma categoria da casa."},
         "limite": {"type": "integer", "minimum": 1, "maximum": 50}}),
-    _f("ver", "Ver um título", "Tudo de um título: a sinopse, os gêneros, as temporadas, o episódio, a nota, as notas e "
+    _f("ver", "Ver um título", "Tudo de um título: a sinopse, os gêneros, as temporadas, o episódio, a categoria, as notas e "
        "onde assistir no Brasil.", {"titulo": _TIT}, ["titulo"]),
     _f("lista_pronta", "Lista pronta", "Uma lista pronta do TMDB (em alta na semana, mais populares, mais bem avaliados ou "
        "estreias: os filmes nos cinemas do Brasil, as séries no ar), com o que já está na lista da casa. Para sugerir o que ver.",
@@ -38,14 +42,14 @@ FERRAMENTAS = [
     _f("adicionar", "Adicionar", "Procura o filme ou a série pelo nome no TMDB e põe na lista da casa (o primeiro que "
        "combina com o tipo e o ano). Se já está na lista, diz.",
        {"nome": {"type": "string"}, "tipo": {"type": "string", "enum": ["filme", "serie"]},
-        "ano": {"type": "integer", "minimum": 1880, "maximum": 2100}, "situacao": {"type": "string", "enum": SIT}, "quem": _QUEM},
+        "ano": {"type": "integer", "minimum": 1880, "maximum": 2100}, "situacao": {"type": "string", "enum": SIT}, "quem": _QUEM, "categoria": _CAT},
        ["nome"], grava=True),
     _f("adicionar_colecao", "Adicionar uma coleção", "Procura uma coleção de filmes (uma saga) pelo nome no TMDB e põe "
        "todos os filmes dela na lista. Com situacao visto, só os que já saíram, e os que já estavam na lista viram Visto.",
        {"nome": {"type": "string"}, "situacao": {"type": "string", "enum": ["quero", "visto"]}}, ["nome"], grava=True),
-    _f("marcar", "Marcar", "Muda a situação, a nota (1 a 5; 0 tira), o episódio (temporada e episodio, numa série), "
+    _f("marcar", "Marcar", "Muda a situação (quero ou visto), a categoria, o episódio (temporada e episodio, numa série), "
        "quem vê e as notas de um título.",
-       {"titulo": _TIT, "situacao": {"type": "string", "enum": SIT}, "nota": {"type": "integer", "minimum": 0, "maximum": 5},
+       {"titulo": _TIT, "situacao": {"type": "string", "enum": SIT}, "categoria": _CAT,
         "temporada": {"type": "integer", "minimum": 0}, "episodio": {"type": "integer", "minimum": 0}, "quem": _QUEM,
         "notas": {"type": "string"}}, ["titulo"], grava=True),
     _f("proximo_episodio", "Próximo episódio", "Marca como visto o episódio seguinte ao último visto de uma série.",
@@ -85,12 +89,14 @@ def conferir(nome, args):
         if "enum" in p and v not in p["enum"]:
             raise ErroFerramenta(f"{k} vale: {', '.join(p['enum'])}.")
         if p["type"] == "integer" and ("minimum" in p and v < p["minimum"] or "maximum" in p and v > p["maximum"]):
-            raise ErroFerramenta(f"{k} vai de {p.get('minimum')} a {p.get('maximum')}.")
+            raise ErroFerramenta(f"{k} vai de {p['minimum']} a {p['maximum']}." if "maximum" in p else f"{k} é {p['minimum']} ou mais.")
     return args
 
 
 def ids_de(nomes, pessoas):
-    """Os ids das pessoas pelos nomes (o primeiro nome basta, sem acento nem maiúsculas)."""
+    """Os ids das pessoas pelos nomes (o primeiro nome basta, sem acento nem maiúsculas); «todos» é a casa toda."""
+    if any(R.sem_acento(n) in ("todos", "todas", "a casa toda") for n in nomes):
+        return [p["id"] for p in pessoas]
     out = []
     for n in nomes:
         alvo = R.sem_acento(n)
@@ -106,15 +112,16 @@ def nomes_de(ids, pessoas):
     return [m.get(i, i.split(".", 1)[-1].replace("_", " ").title()) for i in ids]
 
 
-def linha(t, pessoas):
+def linha(t, pessoas, d=None):
     s = f"{t['id']} | {t['nome']}" + (f" ({t['ano']})" if t["ano"] else "") + f" · {R.TIPOS[t['tipo']].lower()} · {R.SITUACOES[t['situacao']].lower()}"
     if t["tipo"] == "serie" and t["temp"]:
         s += f" · parou em {R.ep_txt(t['temp'], t['ep'])}"
         f = R.faltam(t)
         if f:
             s += f" · faltam {f}"
-    if t["nota"]:
-        s += f" · nota {t['nota']}"
+    cat = R.nome_categoria(d, t) if d else ""
+    if cat:
+        s += f" · {cat}"
     if t["quem"]:
         s += " · " + ", ".join(nomes_de(t["quem"], pessoas))
     return s
@@ -133,16 +140,19 @@ def resumo(d, pessoas, hoje=None):
         return "A lista da casa está vazia."
     cont = ", ".join(f"{sum(1 for t in ts if t['situacao'] == k)} {n.lower()}" for k, n in R.SITUACOES.items())
     out = [f"{len(ts)} títulos: {cont}."]
-    vendo = [t for t in ts if t["situacao"] == "vendo"]
+    vendo = [t for t in ts if R.em_andamento(t)]
     if vendo:
-        out.append("Vendo agora:")
-        out += ["- " + linha(t, pessoas) for t in vendo[:12]]
+        out.append("Séries em andamento:")
+        out += ["- " + linha(t, pessoas, d) for t in vendo[:12]]
     ate = (hoje + timedelta(days=14)).isoformat()
-    prox = sorted((t for t in ts if t["tipo"] == "serie" and t["situacao"] in ("vendo", "quero", "visto") and t.get("proximo")
+    prox = sorted((t for t in ts if t["tipo"] == "serie" and t.get("proximo")
                    and hoje.isoformat() <= t["proximo"]["data"] <= ate), key=lambda t: t["proximo"]["data"])
     if prox:
         out.append("Episódios que saem nos próximos 14 dias:")
         out += [f"- {R.data_br(t['proximo']['data'])}: {t['nome']} {R.ep_txt(t['proximo']['temp'], t['proximo']['ep'])}" for t in prox[:12]]
+    cats = [f"{'filmes' if k == 'filme' else 'séries'}: {', '.join(c['nome'] for c in d['categorias'][k])}" for k in R.TIPOS if d.get("categorias", {}).get(k)]
+    if cats:
+        out.append("Categorias da casa: " + "; ".join(cats) + ".")
     return "\n".join(out)
 
 
@@ -167,14 +177,17 @@ def chamar(nome, args, d, pessoas, pessoa=None, det=None, agora=None):
             if a.get("pessoa"):
                 pid = ids_de([a["pessoa"]], pessoas)[0]
                 ts = [t for t in ts if pid in t["quem"]]
+            if a.get("categoria"):
+                alvo = R.sem_acento(a["categoria"])
+                ts = [t for t in ts if R.sem_acento(R.nome_categoria(d, t)) == alvo]
             ts = sorted(ts, key=lambda t: t["atualizado"], reverse=True)
             lim = a.get("limite") or 20
             if not ts:
                 return "Nenhum título com esses filtros.", False
-            return "\n".join([f"{len(ts)} títulos" + (f" (os {lim} mais recentes)" if len(ts) > lim else "") + ":"] + ["- " + linha(t, pessoas) for t in ts[:lim]]), False
+            return "\n".join([f"{len(ts)} títulos" + (f" (os {lim} mais recentes)" if len(ts) > lim else "") + ":"] + ["- " + linha(t, pessoas, d) for t in ts[:lim]]), False
         t = R.achar(d, a.get("titulo")) if "titulo" in a else None
         if nome == "ver":
-            out = [linha(t, pessoas)]
+            out = [linha(t, pessoas, d)]
             if t["generos"]:
                 out.append("Gêneros: " + ", ".join(t["generos"]) + ".")
             if t["tipo"] == "filme" and t.get("duracao"):
@@ -196,20 +209,25 @@ def chamar(nome, args, d, pessoas, pessoa=None, det=None, agora=None):
             if not det:
                 raise ErroFerramenta(f"Não achei «{a['nome']}» no TMDB.")
             quem = ids_de(a["quem"], pessoas) if "quem" in a else ([pessoa] if pessoa and pessoa in {p["id"] for p in pessoas} else [])
+            cat = R.achar_categoria(d, det["tipo"], a["categoria"]) if a.get("categoria") else ""
             novo, criou = R.criar(d, det, a.get("situacao") or "quero", quem, agora)
             if not criou:
-                return f"Já está na lista: {linha(novo, pessoas)}", False
-            return f"Adicionado: {linha(novo, pessoas)}", True
+                return f"Já está na lista: {linha(novo, pessoas, d)}", False
+            if cat:
+                novo["categoria"] = cat
+            return f"Adicionado: {linha(novo, pessoas, d)}", True
         if nome == "marcar":
-            campos = {k: a[k] for k in ("situacao", "nota", "notas") if k in a}
+            campos = {k: a[k] for k in ("situacao", "notas") if k in a}
+            if "categoria" in a:
+                campos["categoria"] = R.achar_categoria(d, t["tipo"], a["categoria"])
             if "temporada" in a or "episodio" in a:
                 campos["temp"], campos["ep"] = a.get("temporada", t.get("temp", 0)), a.get("episodio", t.get("ep", 0))
             if "quem" in a:
                 campos["quem"] = ids_de(a["quem"], pessoas)
             if not campos:
-                raise ErroFerramenta("Diga o que mudar: situacao, nota, temporada e episodio, quem ou notas.")
+                raise ErroFerramenta("Diga o que mudar: situacao, categoria, temporada e episodio, quem ou notas.")
             R.mudar(t, campos, {p["id"] for p in pessoas}, agora)
-            return f"Feito: {linha(t, pessoas)}", True
+            return f"Feito: {linha(t, pessoas, d)}", True
         if nome == "proximo_episodio":
             R.proximo_ep(t, agora)
             return f"Feito: {t['nome']} {R.ep_txt(t['temp'], t['ep'])} visto." + (" A série acabou: ficou como Visto." if t["situacao"] == "visto" else ""), True

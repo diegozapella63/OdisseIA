@@ -236,6 +236,31 @@ textarea.inp { resize: vertical; min-height: 96px; display: block; }
 .cz-nome { font: 600 16px/1.15 var(--font-d); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .cz small { color: var(--muted); font-size: 12.5px; line-height: 1.3; }
 @media (max-width: 340px) { .cartazes { gap: 14px 8px; } .cz-bt { width: 36px; height: 36px; } }
+.cz-col { justify-self: start; display: inline-flex; align-items: center; gap: 5px; min-height: 32px; margin-top: 2px; padding: 0 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-text); font: 600 12.5px/1 var(--font); }
+.cz-col .ic-s { width: 14px; height: 14px; }
+
+/* Buscar (0.3.0): a busca, o Filtros que fecha e abre e as caixas lado a lado, como nos outros apps */
+.sbar { margin-bottom: 18px; }
+.sbar .busca { margin-bottom: 8px; }
+.filtros-h { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 0 2px; color: var(--text); font: 600 15px/1.2 var(--font); text-align: left; }
+.filtros-h > span { flex: 1; min-width: 0; }
+.filtros-h > svg:first-child { color: var(--accent-text); }
+.filtros-h .seta { color: var(--muted); transform: rotate(90deg); transition: transform .2s; }
+.filtros-h[aria-expanded="false"] .seta { transform: none; }
+.sfiltros { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 6px; }
+.sfiltros[hidden] { display: none; }
+.sfiltros.n1 { grid-template-columns: 1fr; }
+.sfiltros.n3 > :first-child { grid-column: 1 / -1; }
+.sfiltros .select { font-size: 15px; padding-left: 12px; padding-right: 32px; background-position: right 10px center; }
+@media (min-width: 1000px) { .sfiltros { grid-template-columns: repeat(4, minmax(0, 1fr)); } .sfiltros.n3 > :first-child { grid-column: auto; } .sfiltros.n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* Mais › Categorias */
+.cats { list-style: none; margin: 0; padding: 0; }
+.cat-l { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); }
+.cats > li:first-child { border-top: 0; padding-top: 0; }
+.cat-l .conf-box { flex: 1; }
+textarea.inp.umalinha { min-height: var(--altura); height: auto; max-height: 40vh; field-sizing: content; resize: vertical; }
+textarea.inp.umalinha::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* o Adicionar: a busca no TMDB */
 .resultados { list-style: none; margin: 14px 0 0; padding: 0; }
 .resultados > li + li { border-top: 1px solid var(--line); }
