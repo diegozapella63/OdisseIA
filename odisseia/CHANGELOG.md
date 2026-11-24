@@ -1,5 +1,14 @@
 # Mudanças
 
+## 0.2.0
+
+- **Adicionar com listas prontas**: o + abre em **Em alta**, **Mais populares**, **Mais bem avaliados** e **Estreias** (os filmes nos cinemas do Brasil, as séries no ar), com as capas em grade e **Mostrar mais**. O campo de busca não sobe mais o teclado sozinho.
+- **Já vi e Quero ver direto na capa**: o visto numa série marca a série inteira, até o último episódio que saiu; o que ainda não saiu não tem o Já vi. Tocar na capa abre o título, e o Voltar volta para a lista.
+- **Coleções de filmes** (as sagas): aparecem na busca e no filme que faz parte de uma; abrem com todos os filmes e **Quero ver todos** ou **Já vi todos** (só os que já saíram).
+- **Histórico** no lugar de Vistos, com uma aba para **Séries** e outra para **Filmes**.
+- **Opções › O que controlar**: ligue só séries, só filmes ou os dois. O que fica desligado some da tela e do CorrerIA, sem apagar nada.
+- **Pelo CorrerIA**: as listas prontas ("o que está em alta?") e uma coleção inteira de uma vez.
+
 ## 0.1.1
 
 - O app aparece na loja de aplicativos do Home Assistant depois de adicionar o repositório (a descrição do app impedia a leitura).

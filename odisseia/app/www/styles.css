@@ -185,7 +185,8 @@ textarea.inp { resize: vertical; min-height: 96px; display: block; }
 .folha-tt { min-width: 0; overflow-wrap: anywhere; }
 .fechar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); flex: none; }
 .fechar:active { background: var(--card-2); }
-.folha-corpo { overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: 18px max(20px, env(safe-area-inset-right, 0px)) 22px max(20px, env(safe-area-inset-left, 0px)); }
+.folha.fixa { animation: none; }
+.folha-corpo { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: 18px max(20px, env(safe-area-inset-right, 0px)) 22px max(20px, env(safe-area-inset-left, 0px)); }
 .folha-pe { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; border-top: 1px solid var(--line); padding: 12px max(20px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px)); }
 .folha-pe .btn { min-width: 0; padding: 12px 10px; }
 .folha-pe .conf { grid-column: 1 / -1; margin: 0 0 2px; color: var(--text-2); }
@@ -212,6 +213,29 @@ textarea.inp { resize: vertical; min-height: 96px; display: block; }
 .credito { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
 .sinopse { margin: 0; color: var(--text-2); font-size: 15px; line-height: 1.55; }
 
+/* o Adicionar (0.2.0): as listas prontas em pílulas que rolam para o lado e as capas em grade, com Quero ver e Já vi */
+.chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 14px -20px 0; padding: 0 20px; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--text-2); font: 500 14px/1 var(--font); white-space: nowrap; }
+.chip.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.chip.on .ic-s { color: var(--bg); }
+.cartazes { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 10px; }
+@media (min-width: 560px) { .cartazes { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.cz { min-width: 0; display: grid; gap: 3px; align-content: start; }
+.cz-quadro { position: relative; }
+.cz-capa { position: relative; display: block; width: 100%; aspect-ratio: 2 / 3; border-radius: 12px; overflow: hidden; background: var(--card-2); }
+.cz-capa img { width: 100%; height: 100%; object-fit: cover; transition: opacity .15s; }
+.cz-sem { display: grid; place-items: center; width: 100%; height: 100%; color: var(--muted); }
+.cz.feito .cz-capa img { opacity: .5; }
+.cz-sit { position: absolute; left: 6px; top: 6px; max-width: calc(100% - 12px); display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; background: rgba(10, 12, 16, .72); color: #fff; font: 600 12px/1.3 var(--font); white-space: nowrap; overflow: hidden; }
+.cz-sit .ic-s { width: 13px; height: 13px; }
+.cz-acoes { position: absolute; right: 6px; bottom: 6px; display: flex; gap: 6px; }
+.cz-bt { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: rgba(10, 12, 16, .72); color: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, .3); }
+.cz-bt.vi { background: var(--accent); color: var(--on-accent); }
+.cz-bt:active { transform: scale(.92); }
+.cz-nome { font: 600 16px/1.15 var(--font-d); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.cz small { color: var(--muted); font-size: 12.5px; line-height: 1.3; }
+@media (max-width: 340px) { .cartazes { gap: 14px 8px; } .cz-bt { width: 36px; height: 36px; } }
 /* o Adicionar: a busca no TMDB */
 .resultados { list-style: none; margin: 14px 0 0; padding: 0; }
 .resultados > li + li { border-top: 1px solid var(--line); }

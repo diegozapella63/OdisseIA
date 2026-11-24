@@ -1,5 +1,5 @@
 /* OdisseIA · a tela (JavaScript puro, sem build). Os filmes e as séries da casa: Agora (o que a casa está vendo, os
-   episódios que vão sair e o que quer ver), Buscar, o + (procura no TMDB), Vistos e Mais (Configurações e Sobre).
+   episódios que vão sair e o que quer ver), Buscar, o + (procura no TMDB), Histórico e Mais (Configurações e Sobre).
    Ações por data-a; tudo vem de /api/estado e as mudanças voltam pelo /api/titulo. */
 (function () {
   'use strict';
@@ -63,12 +63,12 @@
   const lerJSON = (k, padrao) => { try { return JSON.parse(guardada(k) || '') || padrao; } catch (e) { return padrao; } };
 
   const SIT = { quero: ['Quero ver', 'bookmark'], vendo: ['Vendo', 'play'], visto: ['Visto', 'visto'], abandonado: ['Abandonado', 'ban'] };
-  const TIPO = { filme: ['Filme', 'film'], serie: ['Série', 'tv'] };
+  const TIPO = { filme: ['Filme', 'film'], serie: ['Série', 'tv'], colecao: ['Coleção de filmes', 'layers'] };
   const ABAS = [['integracoes', 'Integrações', 'layers'], ['dados', 'Dados', 'database'], ['aparencia', 'Aparência', 'palette'], ['opcoes', 'Opções', 'toggle']];
   const S = {
     e: null, tela: 'agora', aba: guardada('odisseia-aba') || 'integracoes', tema: guardada('odisseia-tema') || 'auto',
-    folha: null, busca: Object.assign({ texto: '', tipo: '', situacao: '', quem: '' }, lerJSON('odisseia-busca', {})),
-    add: { q: '', tipo: '', res: null, erro: '', buscando: false }, aband: false, tempEsc: {}, conf: '', dados: null, trocarChave: false,
+    folha: null, folhas: [], col: null, hist: guardada('odisseia-historico') || 'serie', busca: Object.assign({ texto: '', tipo: '', situacao: '', quem: '' }, lerJSON('odisseia-busca', {})),
+    add: { q: '', tipo: '', res: null, erro: '', buscando: false, lista: 'alta', listas: {} }, aband: false, tempEsc: {}, conf: '', dados: null, trocarChave: false,
   };
   const api = {
     get: rota => fetch('api/' + rota, { cache: 'no-store' }).then(ok),
@@ -168,6 +168,8 @@
     return d ? [d.n, 1] : null;
   }
   const jaSaiu = (t, s) => !t.ultimo || s[0] < t.ultimo.temp || (s[0] === t.ultimo.temp && s[1] <= t.ultimo.ep);
+  // os tipos que a casa controla (Opções › O que controlar)
+  const ligados = () => Object.keys(TIPO).filter(k => k !== 'colecao' && S.e.ajustes.tipos[k]);
   const podeProximo = t => { const s = t.tipo === 'serie' && seguinte(t); return s && jaSaiu(t, s) ? s : null; };
 
   /* ---------- pedaços da tela */
@@ -176,7 +178,7 @@
   const cab = (icone, titulo, chave, extra = '') => `<div class="rot" role="button" tabindex="0" data-dobra="${esc(chave || titulo)}" aria-expanded="${!fechadas().has(chave || titulo)}"><span class="rot-ic">${ic(icone)}</span><h2>${titulo}</h2>${extra}<span class="dobra-ic" aria-hidden="true">${ic('chev', 'ic-s')}</span></div>`;
   const card = (id, icone, titulo, corpo, chave) => `<section class="card${fechadas().has(chave || titulo) ? ' fechada' : ''}" id="${id}">${cab(icone, titulo, chave)}${corpo}</section>`;
   const lbl = (icone, titulo, para) => para ? `<label for="${para}">${ic(icone, 'ic-s')}${titulo}</label>` : `<span class="lbl">${ic(icone, 'ic-s')}${titulo}</span>`;
-  const ICONE_TELA = { Agora: 'clock', Buscar: 'search', Vistos: 'visto', Mais: 'mais', 'Configurações': 'gear', Sobre: 'info' };
+  const ICONE_TELA = { Agora: 'clock', Buscar: 'search', 'Histórico': 'visto', Mais: 'mais', 'Configurações': 'gear', Sobre: 'info' };
   const topo = (titulo, volta, extra = '') => `<header class="cab-tela">${volta ? `<button class="voltar" data-a="voltar">${ic('back', 'ic-s')}${volta}</button>` : extra}<h1><span class="rot-ic tela-ic" aria-hidden="true">${ic(ICONE_TELA[titulo])}</span>${titulo}</h1></header>`;
   const capa = (t, g) => t.capa ? `<img class="capa${g ? ' g' : ''}" src="api/capa/${esc(t.capa)}" alt="" loading="lazy">` : `<span class="capa${g ? ' g' : ''}">${ic(TIPO[t.tipo][1])}</span>`;
   const avs = ids => ids && ids.length && S.e.ajustes.quem ? `<span class="pessoas-mini">${ids.map(i => `<span class="av" title="${esc((pessoa(i) || {}).nome || i)}">${esc(inicial(i))}</span>`).join('')}</span>` : '';
@@ -242,30 +244,33 @@
   function filtrados() {
     const b = S.busca, alvo = semAcento(b.texto.trim());
     return ordem(S.e.titulos.filter(t => (!alvo || semAcento(t.nome).includes(alvo) || semAcento(t.original).includes(alvo))
-      && (!b.tipo || t.tipo === b.tipo) && (!b.quem || t.quem.includes(b.quem))));
+      && (!b.tipo || t.tipo === b.tipo || !ligados().includes(b.tipo)) && (!b.quem || t.quem.includes(b.quem))));
   }
   function telaBuscar() {
     const b = S.busca, e = S.e;
     const todos = filtrados(), aband = todos.filter(t => t.situacao === 'abandonado');
     const ativos = todos.filter(t => t.situacao !== 'abandonado' && (!b.situacao || t.situacao === b.situacao));
-    const segTipo = [['', 'Tudo'], ['filme', 'Filmes'], ['serie', 'Séries']].map(([v, n]) => `<button class="${b.tipo === v ? 'on' : ''}" data-a="f-tipo" data-v="${v}">${n}</button>`).join('');
+    const segTipo = ligados().length > 1 ? `<div class="campo">${lbl('film', 'Tipo')}<div class="seg">${[['', 'Tudo'], ['filme', 'Filmes'], ['serie', 'Séries']].map(([v, n]) => `<button class="${b.tipo === v ? 'on' : ''}" data-a="f-tipo" data-v="${v}">${n}</button>`).join('')}</div></div>` : '';
     const escSit = [['', 'Todos', 'layers'], ['quero', 'Quero ver', 'bookmark'], ['vendo', 'Vendo', 'play'], ['visto', 'Vistos', 'visto']]
       .map(([v, n, i]) => `<button class="escolha${b.situacao === v ? ' on' : ''}" data-a="f-sit" data-v="${v}">${ic(i, 'ic-s')}${n}</button>`).join('');
     const quem = e.ajustes.quem && e.pessoas.length > 1 ? `<div class="campo">${lbl('users', 'Quem')}<div class="seg">${[['', 'Todos'], ...e.pessoas.map(p => [p.id, p.nome.split(' ')[0]])]
       .map(([v, n]) => `<button class="${b.quem === v ? 'on' : ''}" data-a="f-quem" data-v="${esc(v)}">${esc(n)}</button>`).join('')}</div></div>` : '';
     let h = topo('Buscar') + `<label class="busca">${ic('search')}<input id="b-texto" type="search" placeholder="Nome do filme ou da série" value="${esc(b.texto)}" enterkeyhint="search" autocomplete="off">${b.texto ? `<button class="limpar" data-a="b-limpar" aria-label="Limpar">${ic('x', 'ic-s')}</button>` : ''}</label>`;
-    h += card('filtros', 'sliders', 'Filtros', `<div class="filtros"><div class="campo">${lbl('film', 'Tipo')}<div class="seg">${segTipo}</div></div>
+    h += card('filtros', 'sliders', 'Filtros', `<div class="filtros">${segTipo}
       <div class="campo">${lbl('layers', 'Situação')}<div class="escolhas">${escSit}</div></div>${quem}</div>`);
     const corpo = (ativos.length ? lista(ativos, { mais1: true }) : `<p class="vazio">${e.titulos.length ? 'Nenhum título com esses filtros.' : 'A lista está vazia.'}</p>`)
       + (aband.length && (!b.situacao || b.texto) ? `<button class="recolhido" data-a="aband" aria-expanded="${S.aband}">${ic('chev', 'ic-s')}Abandonados (${aband.length})</button>${S.aband ? lista(aband) : ''}` : '');
     return h + card('resultado', 'list', `Títulos <span class="cont">${ativos.length}</span>`, corpo, 'Títulos');
   }
 
-  /* ---------- Vistos: o que a casa já viu, por mês */
-  function telaVistos() {
-    const vistos = S.e.titulos.filter(t => t.situacao === 'visto').sort((a, b) => String(b.visto_em || '').localeCompare(String(a.visto_em || '')));
-    let h = topo('Vistos');
-    if (!vistos.length) return h + card('nada-visto', 'visto', 'Nada visto ainda', '<p class="lead">O que a casa terminar de ver aparece aqui, mês a mês.</p>');
+  /* ---------- Histórico: o que a casa já viu, por mês, numa aba para cada tipo (0.2.0, o dono: "e se for jogos?") */
+  const HIST = [['serie', 'Séries', 'tv', 'Nenhuma série vista'], ['filme', 'Filmes', 'film', 'Nenhum filme visto']];
+  function telaHistorico() {
+    const abas = HIST.filter(([k]) => ligados().includes(k));
+    const aba = abas.some(([k]) => k === S.hist) ? S.hist : abas[0][0], vaz = HIST.find(([k]) => k === aba)[3];
+    const vistos = S.e.titulos.filter(t => t.situacao === 'visto' && t.tipo === aba).sort((a, b) => String(b.visto_em || '').localeCompare(String(a.visto_em || '')));
+    let h = topo('Histórico') + (abas.length < 2 ? '' : `<div class="abas" role="tablist">${abas.map(([k, n, i]) => `<button role="tab" aria-selected="${aba === k}" class="${aba === k ? 'on' : ''}" data-a="hist" data-v="${k}">${ic(i, 'ic-s')}${n}</button>`).join('')}</div>`);
+    if (!vistos.length) return h + card('nada-visto', HIST.find(([k]) => k === aba)[2], vaz, '<p class="lead">O que a casa terminar de ver aparece aqui, mês a mês.</p>', 'nada-visto');
     const grupos = new Map();
     for (const t of vistos) {
       const k = t.visto_em ? t.visto_em.slice(0, 7) : '';
@@ -274,7 +279,7 @@
     }
     for (const [k, ts] of grupos) {
       const nome = k ? new Date(k + '-15T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^./, c => c.toUpperCase()) : 'Sem data';
-      h += card('m-' + (k || 'sem'), 'calendar', `${nome} <span class="cont">${ts.length}</span>`, lista(ts), 'vistos-' + (k || 'sem'));
+      h += card('m-' + (k || 'sem'), 'calendar', `${nome} <span class="cont">${ts.length}</span>`, lista(ts), 'historico-' + (k || 'sem'));
     }
     return h;
   }
@@ -336,8 +341,11 @@
           <svg viewBox="-5 -5 40 30" aria-hidden="true"><path class="sw-ring" d="${TAG}"/><path class="sw-gap" d="${TAG}"/><path class="sw-fill" d="${TAG + FURO}"/><path class="sw-check" d="m14.6 10.3 3.2 3.2 6.5-6.9"/></svg><span>${c.nome}</span></button>`).join('')}</div>`);
   }
   function abaOpcoes() {
-    const a = S.e.ajustes;
-    return card('quem-ve', 'users', 'Quem vê', `<div class="linha-sw"><div><b>${ic('users', 'ic-s')}Marcar quem vê</b><span>Cada título diz quem da casa está vendo ou já viu.</span></div>
+    const a = S.e.ajustes, so = ligados().length === 1;
+    const tipo = (k, icone, nome, txt) => `<div class="linha-sw"><div><b>${ic(icone, 'ic-s')}${nome}</b><span>${so && a.tipos[k] ? 'Pelo menos um fica ligado.' : txt}</span></div>
+      <button class="sw${a.tipos[k] ? ' on' : ''}" data-a="aj-tipo" data-k="${k}" role="switch" aria-checked="${a.tipos[k]}" aria-label="${nome}"${so && a.tipos[k] ? ' disabled' : ''}></button></div>`;
+    return card('controlar', 'layers', 'O que controlar', `<p class="lead">Desligado some da tela e do CorrerIA; nada é apagado.</p>
+      ${tipo('serie', 'tv', 'Séries', 'O episódio em que cada um parou e os que vão sair.')}${tipo('filme', 'film', 'Filmes', 'Os filmes e as coleções (as sagas).')}`) + card('quem-ve', 'users', 'Quem vê', `<div class="linha-sw"><div><b>${ic('users', 'ic-s')}Marcar quem vê</b><span>Cada título diz quem da casa está vendo ou já viu.</span></div>
       <button class="sw${a.quem ? ' on' : ''}" data-a="aj" data-k="quem" role="switch" aria-checked="${a.quem}" aria-label="Marcar quem vê"></button></div>`);
   }
   function telaConfig() {
@@ -368,20 +376,43 @@
   }
 
   /* ---------- as janelas: Adicionar e o título aberto */
+  // 0.2.0 (o dono: "pensa num processo bem legal para ficar bonito e prático"): o Adicionar abre nas listas prontas do
+  // TMDB (Em alta, Mais populares, Mais bem avaliados, Estreias) e mostra as capas em grade; em cada capa, Quero ver (o
+  // marcador) e Já vi (o visto, que numa série marca até o último episódio que saiu), sem sair da janela. Tocar na capa
+  // abre o título (e, fora da lista, põe como Quero ver); uma coleção abre os filmes dela.
+  const LISTAS = [['alta', 'Em alta', 'zap'], ['populares', 'Mais populares', 'users'], ['avaliados', 'Mais bem avaliados', 'star'], ['estreias', 'Estreias', 'calendar']];
+  function cartaz(r, i, o) {
+    // o que ainda não saiu (um filme da coleção, uma estreia futura) não tem o Já vi
+    const col = r.tipo === 'colecao', sit = r.situacao && SIT[r.situacao], saiu = r.saiu !== false && !(r.data && r.data > hojeISO());
+    const img = r.capa ? `<img src="api/img/w185${esc(r.capa)}" alt="" loading="lazy">` : `<span class="cz-sem">${ic(TIPO[r.tipo][1])}</span>`;
+    const meta = [r.ano, col ? 'Coleção' : TIPO[r.tipo][0], saiu ? '' : (r.data ? 'sai em ' + new Date(r.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'sem data')].filter(Boolean).join(' · ');
+    return `<li class="cz${r.situacao === 'visto' ? ' feito' : ''}"><div class="cz-quadro"><button class="cz-capa" data-a="cz-abrir" data-o="${o}" data-i="${i}" aria-label="${esc(r.nome)}">${img}
+        ${sit ? `<span class="cz-sit">${ic(sit[1], 'ic-s')}${sit[0]}</span>` : col ? `<span class="cz-sit">${ic('layers', 'ic-s')}Coleção</span>` : ''}</button>
+      ${col ? '' : `<span class="cz-acoes">${r.ja ? '' : `<button class="cz-bt" data-a="cz-quero" data-o="${o}" data-i="${i}" aria-label="Quero ver ${esc(r.nome)}">${ic('bookmark', 'ic-s')}</button>`}
+        ${r.situacao === 'visto' || !saiu ? '' : `<button class="cz-bt vi" data-a="cz-visto" data-o="${o}" data-i="${i}" aria-label="Já vi ${esc(r.nome)}">${ic('check', 'ic-s')}</button>`}</span>`}</div>
+      <b class="cz-nome">${esc(r.nome)}</b><small>${esc(meta)}</small></li>`;
+  }
+  const grade = (rs, o) => `<ul class="cartazes">${rs.map((r, i) => cartaz(r, i, o)).join('')}</ul>`;
   function folhaAdicionar() {
-    const a = S.add, semChave = !S.e.tmdb.chave;
-    const seg = [['', 'Tudo'], ['filme', 'Filme'], ['serie', 'Série']].map(([v, n]) => `<button class="${a.tipo === v ? 'on' : ''}" data-a="add-tipo" data-v="${v}">${n}</button>`).join('');
+    const a = S.add, semChave = !S.e.tmdb.chave, busca = a.q.trim().length >= 2;
+    const seg = ligados().length > 1 ? `<div class="seg">${[['', 'Tudo'], ['filme', 'Filmes'], ['serie', 'Séries']].map(([v, n]) => `<button class="${a.tipo === v ? 'on' : ''}" data-a="add-tipo" data-v="${v}">${n}</button>`).join('')}</div>` : '';
     let res = '';
     if (semChave) res = `<p class="lead" style="margin-top:14px">Falta a chave do TMDB.</p><div class="acoes"><button class="btn pri" data-a="ir-config" data-v="integracoes">${ic('key', 'ic-s')}Pôr a chave</button></div>`;
-    else if (a.erro) res = `<p class="status erro" style="margin-top:14px">${esc(a.erro)}</p>`;
-    else if (a.buscando && !a.res) res = '<p class="vazio" style="margin-top:14px">Procurando…</p>';
-    else if (a.res && !a.res.length) res = '<p class="vazio" style="margin-top:14px">Nada com esse nome no TMDB.</p>';
-    else if (a.res) {
-      res = `<ul class="resultados">${a.res.map((r, i) => `<li><button class="tit" data-a="add-escolher" data-i="${i}">${r.capa ? `<img class="capa" src="api/img/w92${esc(r.capa)}" alt="" loading="lazy">` : `<span class="capa">${ic(TIPO[r.tipo][1])}</span>`}
-        <span class="t-txt"><b>${esc(r.nome)}</b><small>${[TIPO[r.tipo][0], r.ano].filter(Boolean).join(' · ')}${r.original && r.original !== r.nome ? ' · ' + esc(r.original) : ''}</small>${r.ja ? `<small class="dest na-lista">${ic('check', 'ic-s')}Na lista</small>` : ''}</span></button></li>`).join('')}</ul>`;
+    else if (busca) {
+      if (a.erro) res = `<p class="status erro" style="margin-top:14px">${esc(a.erro)}</p>`;
+      else if (!a.res) res = '<p class="vazio" style="margin-top:14px">Procurando…</p>';
+      else if (!a.res.length) res = '<p class="vazio" style="margin-top:14px">Nada com esse nome no TMDB.</p>';
+      else res = grade(a.res, 'busca');
+    } else {
+      const L = a.listas[a.lista + ':' + a.tipo];
+      res = `<div class="chips" role="tablist" aria-label="Listas prontas">${LISTAS.map(([k, n, i]) => `<button class="chip${a.lista === k ? ' on' : ''}" role="tab" aria-selected="${a.lista === k}" data-a="add-lista" data-v="${k}">${ic(i, 'ic-s')}${n}</button>`).join('')}</div>`;
+      if (!L || (!L.itens.length && L.carregando)) res += '<p class="vazio" style="margin-top:14px">Abrindo…</p>';
+      else if (L.erro && !L.itens.length) res += `<p class="status erro" style="margin-top:14px">${esc(L.erro)}</p>`;
+      else res += grade(L.itens, 'lista') + (L.mais ? `<div class="acoes" style="margin-top:16px"><button class="btn out" data-a="add-mais"${L.carregando ? ' disabled' : ''}>${ic('plus', 'ic-s')}Mostrar mais</button></div>` : '');
+      if (!L) carregarLista();
     }
-    return { titulo: 'Adicionar', icone: 'plus', alta: true, corpo: `<label class="busca" style="margin-bottom:12px">${ic('search')}<input id="add-q" type="search" placeholder="Nome do filme ou da série" value="${esc(a.q)}" enterkeyhint="search" autocomplete="off"${semChave ? ' disabled' : ''}></label>
-      <div class="seg">${seg}</div>${res}` };
+    return { titulo: 'Adicionar', icone: 'plus', alta: true, corpo: `<label class="busca" style="margin-bottom:12px">${ic('search')}<input id="add-q" type="search" placeholder="Nome do filme ou da série" value="${esc(a.q)}" enterkeyhint="search" autocomplete="off"${semChave ? ' disabled' : ''}>${a.q ? `<button class="limpar" data-a="add-limpar" aria-label="Limpar">${ic('x', 'ic-s')}</button>` : ''}</label>
+      ${seg}${res}` };
   }
   function folhaTitulo(t) {
     const e = S.e, pode = podeProximo(t);
@@ -402,6 +433,9 @@
         ${linhas.length ? `<p class="ep-info">${esc(linhas.join(' '))}</p>` : ''}
         ${pode ? `<div class="acoes"><button class="btn pri" data-a="proximo" data-id="${t.id}">${ic('check', 'ic-s')}Vi o ${ep(pode[0], pode[1])}</button></div>` : ''}</div></div>`;
     }
+    if (t.tipo === 'filme' && t.colecao) {
+      h += `<div class="campo">${lbl('layers', 'Coleção')}<div class="acoes"><button class="btn out" data-a="abrir-colecao" data-id="${t.colecao.id}">${ic('layers', 'ic-s')}${esc(t.colecao.nome)}</button></div></div>`;
+    }
     h += `<div class="campo">${lbl('star', 'Nota')}<div class="estrelas" role="radiogroup" aria-label="Nota">${[1, 2, 3, 4, 5].map(n => `<button class="${t.nota >= n ? 'on' : ''}" data-a="nota" data-v="${n}" role="radio" aria-checked="${t.nota === n}" aria-label="${plural(n, 'estrela', 'estrelas')}">${ic('star')}</button>`).join('')}</div></div>`;
     if (e.ajustes.quem && e.pessoas.length) {
       h += `<div class="campo">${lbl('users', 'Quem')}<div class="escolhas">${e.pessoas.map(p => `<button class="escolha${t.quem.includes(p.id) ? ' on' : ''}" data-a="quem" data-v="${esc(p.id)}">${ic(t.quem.includes(p.id) ? 'check' : 'user', 'ic-s')}${esc(p.nome.split(' ')[0])}</button>`).join('')}</div></div>`;
@@ -415,6 +449,22 @@
       : `<button class="btn out" data-a="conf" data-v="apagar:${t.id}">${ic('trash', 'ic-s')}Apagar</button><button class="btn out" data-a="atualizar" data-id="${t.id}"${t.tmdb ? '' : ' disabled'}>${ic('refresh', 'ic-s')}Atualizar</button>`;
     return { titulo: t.nome, icone: TIPO[t.tipo][1], corpo: h, pe };
   }
+  function folhaColecao(f) {
+    const c = S.col && S.col.id === f.id ? S.col : null;
+    if (!c) {
+      S.col = { id: f.id, dados: null, erro: '' };
+      api.get('colecao?id=' + f.id).then(r => { if (S.col && S.col.id === f.id) { S.col.dados = r.colecao; render(); } })
+        .catch(err => { if (S.col && S.col.id === f.id) { S.col.erro = err.message; render(); } });
+      return { titulo: 'Coleção de filmes', icone: 'layers', corpo: '<p class="vazio">Abrindo…</p>' };
+    }
+    if (c.erro) return { titulo: 'Coleção de filmes', icone: 'layers', corpo: `<p class="status erro">${esc(c.erro)}</p>` };
+    if (!c.dados) return { titulo: 'Coleção de filmes', icone: 'layers', corpo: '<p class="vazio">Abrindo…</p>' };
+    const d = c.dados, saiu = d.filmes.filter(x => x.saiu);
+    const pe = `<button class="btn out" data-a="col-todos" data-v="quero"${d.filmes.every(x => x.ja) ? ' disabled' : ''}>${ic('bookmark', 'ic-s')}Quero ver todos</button>
+      <button class="btn pri" data-a="col-todos" data-v="visto"${saiu.every(x => x.situacao === 'visto') ? ' disabled' : ''}>${ic('visto', 'ic-s')}Já vi todos</button>`;
+    return { titulo: d.nome, icone: 'layers', alta: true, pe, corpo: `${d.sinopse ? `<p class="sinopse">${esc(d.sinopse)}</p>` : ''}
+      <div class="campo" style="margin-top:14px">${lbl('film', plural(d.filmes.length, 'filme', 'filmes'))}${grade(d.filmes, 'col')}</div>` };
+  }
   function pintarJanela() {
     const el = $('#janela');
     const f = S.folha;
@@ -424,11 +474,13 @@
       document.body.classList.remove('com-folha');
       return;
     }
-    const j = f.tipo === 'adicionar' ? folhaAdicionar() : folhaTitulo(t);
+    const j = f.tipo === 'adicionar' ? folhaAdicionar() : f.tipo === 'colecao' ? folhaColecao(f) : folhaTitulo(t);
     const corpoAntes = el.querySelector('.folha-corpo'), rolou = corpoAntes && corpoAntes.dataset.k === (f.tipo + (f.id || '')) ? corpoAntes.scrollTop : 0;
     const foco = document.activeElement && el.contains(document.activeElement) ? document.activeElement.id : '';
     const sel = foco && document.activeElement.selectionStart;
-    el.innerHTML = `<div class="veu" data-a="fechar"></div><div class="folha${j.alta ? ' alta' : ''}" role="dialog" aria-modal="true" aria-label="${esc(j.titulo)}">
+    // a mesma janela pintada de novo (um toque, a lista que chegou) não sobe outra vez
+    const fixa = corpoAntes && corpoAntes.dataset.k === (f.tipo + (f.id || ''));
+    el.innerHTML = `<div class="veu" data-a="fechar"></div><div class="folha${j.alta ? ' alta' : ''}${fixa ? ' fixa' : ''}" role="dialog" aria-modal="true" aria-label="${esc(j.titulo)}">
       <div class="folha-cab"><h2><span class="folha-ic">${ic(j.icone)}</span><span class="folha-tt">${esc(j.titulo)}</span></h2><button class="fechar" data-a="fechar" aria-label="Fechar">${ic('x')}</button></div>
       <div class="folha-corpo" data-k="${f.tipo + (f.id || '')}">${j.corpo}</div>${j.pe ? `<div class="folha-pe">${j.pe}</div>` : ''}</div>`;
     document.body.classList.add('com-folha');
@@ -438,7 +490,7 @@
   }
 
   /* ---------- a barra de baixo e a lateral (o padrão da família) */
-  const NAV = [['agora', 'Agora', 'clock'], ['buscar', 'Buscar', 'search'], ['+', 'Adicionar', 'plus'], ['vistos', 'Vistos', 'visto'], ['mais', 'Mais', 'mais']];
+  const NAV = [['agora', 'Agora', 'clock'], ['buscar', 'Buscar', 'search'], ['+', 'Adicionar', 'plus'], ['historico', 'Histórico', 'visto'], ['mais', 'Mais', 'mais']];
   const aba = () => (['config', 'sobre'].includes(S.tela) ? 'mais' : S.tela);
   function pintarNav() {
     $('#nav').innerHTML = `<div class="in">${NAV.map(([k, n, i]) => k === '+' ? `<button class="add" data-a="adicionar" aria-label="Adicionar"><span class="pill">${ic(i)}</span></button>`
@@ -453,7 +505,7 @@
   function render() {
     if (!S.e) return;
     document.body.dataset.tela = S.tela;
-    const h = S.tela === 'buscar' ? telaBuscar() : S.tela === 'vistos' ? telaVistos() : S.tela === 'mais' ? telaMais() : S.tela === 'config' ? telaConfig() : S.tela === 'sobre' ? telaSobre() : telaAgora();
+    const h = S.tela === 'buscar' ? telaBuscar() : S.tela === 'historico' ? telaHistorico() : S.tela === 'mais' ? telaMais() : S.tela === 'config' ? telaConfig() : S.tela === 'sobre' ? telaSobre() : telaAgora();
     const app = $('#app');
     const foco = document.activeElement && app.contains(document.activeElement) ? document.activeElement.id : '';
     const sel = foco && document.activeElement.selectionStart;
@@ -468,26 +520,31 @@
     if (tela === S.tela && !S.folha) return;
     S.tela = tela;
     S.folha = null;
+    S.folhas = [];
     S.conf = '';
     if (!sem) history.pushState({ t: tela }, '');
     render();
     window.scrollTo(0, 0);
   }
-  function abrirFolha(f) {
-    const ja = S.folha;
-    S.folha = f;
+  // sobre: a janela abre por cima da de agora (uma coleção a partir da busca, um filme a partir da coleção) e o Voltar
+  // do celular, o X e o Esc voltam para a de baixo; sem sobre, troca a de agora
+  function abrirFolha(f, sobre) {
     S.conf = '';
-    if (ja) history.replaceState({ t: S.tela, folha: 1 }, ''); else history.pushState({ t: S.tela, folha: 1 }, '');
+    if (S.folhas.length && sobre) { S.folhas.push(f); history.pushState({ t: S.tela, folha: S.folhas.length }, ''); }
+    else if (S.folhas.length) { S.folhas[S.folhas.length - 1] = f; history.replaceState({ t: S.tela, folha: S.folhas.length }, ''); }
+    else { S.folhas = [f]; history.pushState({ t: S.tela, folha: 1 }, ''); }
+    S.folha = f;
     render();
   }
   function fecharFolha() {
     if (history.state && history.state.folha) history.back();
-    else { S.folha = null; render(); }
+    else { S.folhas = []; S.folha = null; render(); }
   }
   window.addEventListener('popstate', ev => {
     const st = ev.state || { t: 'agora' };
     if (window.__selectSheet && window.__selectSheet.isOpen()) return;
-    S.folha = st.folha ? S.folha : null;
+    S.folhas = S.folhas.slice(0, st.folha || 0);
+    S.folha = S.folhas[S.folhas.length - 1] || null;
     S.conf = '';
     if (st.t && st.t !== S.tela) { S.tela = st.t; window.scrollTo(0, 0); }
     render();
@@ -512,6 +569,17 @@
     aplicarCor();
     render();
   }
+  function carregarLista(mais) {
+    const a = S.add, k = a.lista + ':' + a.tipo, L = a.listas[k] || (a.listas[k] = { itens: [], pagina: 0, mais: false, carregando: false, erro: '' });
+    if (L.carregando || !S.e.tmdb.chave) return;
+    L.carregando = true;
+    api.get(`lista?nome=${a.lista}&tipo=${a.tipo}&pagina=${L.pagina + 1}`).then(r => {
+      const vistos = new Set(L.itens.map(x => x.tipo + x.tmdb));
+      L.itens.push(...r.resultados.filter(x => !vistos.has(x.tipo + x.tmdb)));
+      L.pagina += 1; L.mais = r.mais; L.erro = '';
+    }).catch(err => { L.erro = err.message; }).then(() => { L.carregando = false; render(); });
+    if (mais) render();
+  }
   let buscaT = 0, buscaN = 0;
   function buscarTMDB() {
     clearTimeout(buscaT);
@@ -535,24 +603,74 @@
       render();
     }, 400);
   }
+  // o item de uma capa: da busca, da lista pronta ou da coleção aberta
+  function itemDe(el) {
+    const i = +el.dataset.i, o = el.dataset.o;
+    return o === 'col' ? S.col.dados.filmes[i] : o === 'busca' ? S.add.res[i] : S.add.listas[S.add.lista + ':' + S.add.tipo].itens[i];
+  }
+  async function adicionarUm(r, situacao) {
+    const x = await api.post('titulo', { acao: 'adicionar', tmdb: r.tmdb, tipo: r.tipo || 'filme', situacao });
+    trocar(x.titulo);
+    r.ja = x.titulo.id;
+    r.situacao = x.titulo.situacao;
+    if (!x.novo) toast('Já estava na lista.');
+    return x;
+  }
+  // o mesmo texto do ferramentas.texto_colecao (o CorrerIA)
+  function textoColecao(r, situacao) {
+    const p = [];
+    if (r.novos) p.push(`${r.novos} ${r.novos === 1 ? 'filme posto' : 'filmes postos'} na lista`);
+    if (r.marcados) p.push(`${r.marcados} ${r.marcados === 1 ? 'marcado' : 'marcados'} como Visto`);
+    if (r.fora) p.push(`${r.fora} ainda não ${r.fora === 1 ? 'saiu' : 'saíram'}`);
+    return `${r.nome}: ${p.length ? p.join(', ') : 'nada a mudar'}.` + (r.novos && situacao === 'visto' ? '' : '');
+  }
   const salvarBusca = () => guardar('odisseia-busca', JSON.stringify({ tipo: S.busca.tipo, situacao: S.busca.situacao, quem: S.busca.quem }));
 
   const ACOES = {
     ir: el => ir(el.dataset.v),
     voltar: () => history.back(),
-    adicionar: () => { S.add = { q: '', tipo: '', res: null, erro: '', buscando: false }; abrirFolha({ tipo: 'adicionar' }); setTimeout(() => { const q = $('#add-q'); if (q) q.focus({ preventScroll: true }); }, 60); },
+    // abre nas listas prontas, sem o foco no campo (o teclado não sobe por cima delas)
+    adicionar: () => { S.add = { q: '', tipo: '', res: null, erro: '', buscando: false, lista: guardada('odisseia-lista') || 'alta', listas: {} }; abrirFolha({ tipo: 'adicionar' }); },
     fechar: () => fecharFolha(),
     abrir: el => abrirFolha({ tipo: 'titulo', id: el.dataset.id }),
-    'add-tipo': el => { S.add.tipo = el.dataset.v; buscarTMDB(); render(); },
-    'add-escolher': async el => {
-      const r = S.add.res[+el.dataset.i];
-      if (r.ja) { abrirFolha({ tipo: 'titulo', id: r.ja }); return; }
+    'add-tipo': el => { S.add.tipo = el.dataset.v; if (S.add.q.trim().length >= 2) { S.add.res = null; buscarTMDB(); } render(); },
+    'add-lista': el => { S.add.lista = el.dataset.v; guardar('odisseia-lista', S.add.lista); render(); },
+    'add-mais': () => carregarLista(true),
+    'add-limpar': () => { S.add.q = ''; S.add.res = null; render(); },
+    'cz-abrir': async el => {
+      const r = itemDe(el);
+      if (r.tipo === 'colecao') { S.col = null; abrirFolha({ tipo: 'colecao', id: r.tmdb }, true); return; }
+      if (r.ja) { abrirFolha({ tipo: 'titulo', id: r.ja }, true); return; }
+      el.disabled = true;
+      try { const x = await adicionarUm(r, 'quero'); abrirFolha({ tipo: 'titulo', id: x.titulo.id }, true); } catch (err) { el.disabled = false; toast(err.message); }
+    },
+    'cz-quero': async el => {
+      const r = itemDe(el);
+      el.disabled = true;
+      try { const x = await adicionarUm(r, 'quero'); toast(`${x.titulo.nome}: Quero ver.`); render(); } catch (err) { el.disabled = false; toast(err.message); }
+    },
+    // uma série inteira (até o último episódio que saiu) ou um filme, já como Visto, sem sair da janela
+    'cz-visto': async el => {
+      const r = itemDe(el);
       el.disabled = true;
       try {
-        const x = await api.post('titulo', { acao: 'adicionar', tmdb: r.tmdb, tipo: r.tipo, situacao: 'quero' });
-        trocar(x.titulo);
-        toast(x.novo ? `${x.titulo.nome}: na lista.` : 'Já estava na lista.');
-        abrirFolha({ tipo: 'titulo', id: x.titulo.id });
+        let t;
+        if (r.ja) {
+          const x = await api.post('titulo', { acao: 'mudar', id: r.ja, campos: { situacao: 'visto' } });
+          trocar(x.titulo); S.e.rev = x.rev; t = x.titulo; r.situacao = 'visto';
+        } else t = (await adicionarUm(r, 'visto')).titulo;
+        toast(`${t.nome}: Visto` + (t.tipo === 'serie' && t.temp ? `, até ${ep(t.temp, t.ep)}.` : '.'));
+        render();
+      } catch (err) { el.disabled = false; toast(err.message); }
+    },
+    'abrir-colecao': el => { S.col = null; abrirFolha({ tipo: 'colecao', id: +el.dataset.id }, true); },
+    'col-todos': async el => {
+      el.disabled = true;
+      try {
+        const r = await api.post('titulo', { acao: 'adicionar_colecao', colecao: S.col.id, situacao: el.dataset.v });
+        toast(textoColecao(r, el.dataset.v));
+        S.col = null;
+        await carregar();
       } catch (err) { el.disabled = false; toast(err.message); }
     },
     sit: el => mudar(S.folha.id, { situacao: el.dataset.v }),
@@ -590,8 +708,9 @@
     aband: () => { S.aband = !S.aband; render(); },
     'ver-quero': () => { S.busca.situacao = 'quero'; S.busca.texto = ''; salvarBusca(); ir('buscar'); },
     'lado-sit': el => { S.busca.texto = ''; if (el.dataset.v === 'abandonado') { S.busca.situacao = ''; S.aband = true; } else S.busca.situacao = el.dataset.v; salvarBusca(); S.tela === 'buscar' ? render() : ir('buscar'); },
-    'ir-config': el => { if (el.dataset.v) { S.aba = el.dataset.v; guardar('odisseia-aba', S.aba); } if (S.folha) { S.folha = null; history.replaceState({ t: S.tela }, ''); } ir('config'); },
+    'ir-config': el => { if (el.dataset.v) { S.aba = el.dataset.v; guardar('odisseia-aba', S.aba); } if (S.folha) { S.folha = null; S.folhas = []; history.replaceState({ t: S.tela }, ''); } ir('config'); },
     sobre: () => ir('sobre'),
+    hist: el => { S.hist = el.dataset.v; guardar('odisseia-historico', S.hist); render(); },
     aba: el => { S.aba = el.dataset.v; S.conf = ''; guardar('odisseia-aba', S.aba); render(); },
     tema: el => { S.tema = el.dataset.v; guardar('odisseia-tema', S.tema); aplicarTema(); render(); },
     cor: async el => { try { S.e.ajustes = (await api.post('ajustes', { cor: el.dataset.v })).ajustes; aplicarCor(); render(); } catch (err) { toast(err.message); } },
@@ -603,6 +722,9 @@
         aplicarCor();
         render();
       } catch (err) { toast(err.message); }
+    },
+    'aj-tipo': async el => {
+      try { S.e.ajustes = (await api.post('ajustes', { tipos: { [el.dataset.k]: !S.e.ajustes.tipos[el.dataset.k] } })).ajustes; S.add.listas = {}; await carregar(); } catch (err) { toast(err.message); }
     },
     'chave-salvar': async el => {
       const v = ($('#f-chave') || {}).value || '';

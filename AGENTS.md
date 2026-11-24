@@ -90,7 +90,7 @@ verdade, com a sua chave em Configurações). `ODISSEIA_TMDB` e `ODISSEIA_TMDB_I
 - Tudo em português do Brasil, sem palavras em inglês na tela. **Menos é mais**: textos curtos, sem avisos repetidos.
 - Celular primeiro (390 px; nada passa da largura em 320 px); com 1000 px ou mais, a barra lateral (`#lado`) no lugar da de
   baixo e as janelas no meio. Tema claro e escuro.
-- A barra de baixo: **Agora**, **Buscar**, o **+** (Adicionar, só o ícone), **Vistos** e **Mais**.
+- A barra de baixo: **Agora**, **Buscar**, o **+** (Adicionar, só o ícone), **Histórico** e **Mais**.
 - **Inativos no fim, recolhidos**: os **Abandonados (n)** no fim do Buscar, recolhidos (abrem num toque).
 - **Caixas de seleção no visual do app** (`selectsheet.js`): a temporada e o episódio são `<select class="inp select">`.
 - Dados de exemplo e de testes sempre inventados (Ana, Beto, títulos inventados): nunca a lista real do dono.
@@ -112,6 +112,14 @@ verdade, com a sua chave em Configurações). `ODISSEIA_TMDB` e `ODISSEIA_TMDB_I
 - Avisos no celular (todos chegam como Home Assistant): o título começa pelo nome do app, uma vez só ("ResolvIA · 📅 Vence hoje"), e o ícone pequeno é o do app (`notification_icon`); o canal e o grupo de cada aviso ficam como estão (o canal guarda o som e a importância que a pessoa escolheu no Android).
 - **Dados**: Exportar › Backup na pasta share › Importar › Versões anteriores › Onde ficam os dados › Começar do zero.
 - **Aparência**: o tema vale no aparelho (começa em Sistema); o fundo e os cartões são os do tema do Home Assistant (`hatema.js`, igual em todos os apps: publica `--ha-bg-light`, `--ha-card-light`, `--ha-bg-dark` e `--ha-card-dark`, as do modo de agora lidas do Home Assistant e as do outro, do tema padrão dele; os cinzas, como linhas e campos, saem do cartão misturado com o texto, `color-mix`, nunca uma cor fixa puxada para a cor do app); a cor do app vale para a casa toda; uma paleta só, de 12 cores (Vermelho, Coral, Laranja, Ouro, Verde, Menta, Turquesa, Azul, Índigo, Lilás, Rosa, Grafite); a Cor do dia é a mesma em todos os apps (as 11 sem o Grafite, pelo número do dia).
+
+0.2.0 (o dono: "adicionar uma série inteira como vista"; "uma série inteira de filmes"; "os mais vistos, os mais bem avaliados... listas prontas onde eu clico e marco como visto"; "pensa num processo bem legal para ficar bonito e prático"; "Vistos? e se for jogos?"; "nas opções poder dizer o que quer controlar"):
+- O Adicionar (`folhaAdicionar`) abre nas listas prontas (`tmdb.LISTAS`, `TMDB.lista`, `GET /api/lista?nome&tipo&pagina` → `{resultados, mais}`; `zip_longest` intercala filmes e séries) e mostra as capas em grade (`cartaz`/`grade`, `.cartazes`): na capa, **Quero ver** (`cz-quero`) e **Já vi** (`cz-visto`; fora o que ainda não saiu, pela `data`); `cz-abrir` abre o título por cima (`abrirFolha(f, true)`). Sem o foco no campo ao abrir.
+- As janelas em pilha (`S.folhas`, o estado do histórico `{folha: profundidade}`): uma aberta de dentro de outra volta para ela no Voltar; `.folha.fixa` não sobe de novo quando a mesma janela é pintada outra vez.
+- Coleções de filmes: `TMDB.colecoes` (na busca, até 2 na frente, `tipo: colecao`), `TMDB.colecao`, `colecao` do filme (`belongs_to_collection`), `GET /api/colecao?id` e `POST /api/titulo {acao: adicionar_colecao, colecao, situacao: quero|visto}` (`server.adicionar_colecao`: Visto só os que já saíram e marca os que estavam; Quero ver não mexe nos que estavam).
+- **Histórico** (`telaHistorico`, `odisseia-historico`): uma aba por tipo ligado.
+- **O que controlar** (`ajustes.tipos`, `R.tipos_ligados`, `R.conferir_tipo`): o tipo desligado sai do `/api/estado`, da busca e das listas (`tipo_de_busca`, `so_ligados`) e do que as ferramentas veem (e volta inteiro ao gravar); pelo menos um fica ligado.
+- Ferramentas novas: `lista_pronta` e `adicionar_colecao` (`texto_lista`, `texto_colecao`).
 
 ## Conversa com o dono
 

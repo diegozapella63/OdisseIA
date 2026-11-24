@@ -75,6 +75,8 @@ def limpar_titulo(t):
     o["onde"]["link"] = str(w.get("link") or "")[:300] if str(w.get("link") or "").startswith("https://") else ""
     if o["tipo"] == "filme":
         o["duracao"] = _int(t.get("duracao"), 0, 2000) or None
+        c = t.get("colecao") if isinstance(t.get("colecao"), dict) else {}
+        o["colecao"] = {"id": _int(c.get("id"), 1, 10 ** 9), "nome": _txt(c.get("nome"), 160)} if _int(c.get("id"), 0, 10 ** 9) else None
     else:
         temps = []
         for s in t.get("temporadas") if isinstance(t.get("temporadas"), list) else []:
@@ -99,8 +101,13 @@ def limpar_dados(d):
             vistos.add(o["id"])
             titulos.append(o)
     aj = d.get("ajustes") if isinstance(d.get("ajustes"), dict) else {}
+    tipos = aj.get("tipos") if isinstance(aj.get("tipos"), dict) else {}
+    tipos = {k: tipos.get(k) is not False for k in TIPOS}
+    if not any(tipos.values()):
+        tipos = {k: True for k in TIPOS}
     ajustes = {"cor": aj.get("cor") if isinstance(aj.get("cor"), str) and re.match(r"^[a-z]{2,12}$", aj["cor"]) else "lilas",
-               "cor_dia": aj.get("cor_dia") is not False, "quem": aj.get("quem") is not False, "correria": aj.get("correria") is True}
+               "cor_dia": aj.get("cor_dia") is not False, "quem": aj.get("quem") is not False, "correria": aj.get("correria") is True,
+               "tipos": tipos}
     return {"versao": 1, "rev": _int(d.get("rev"), 0, 10 ** 12), "titulos": titulos[:MAX_TITULOS], "ajustes": ajustes}
 
 
@@ -140,6 +147,7 @@ def aplicar_detalhes(t, det, agora):
     t["capa_tmdb"] = det.get("capa") or t.get("capa_tmdb", "")
     if t["tipo"] == "filme":
         t["duracao"] = det.get("duracao") or t.get("duracao")
+        t["colecao"] = det.get("colecao") if "colecao" in det else t.get("colecao")
     else:
         t["temporadas"] = det.get("temporadas") or t.get("temporadas") or []
         t["proximo"], t["ultimo"], t["fim"] = det.get("proximo"), det.get("ultimo"), det.get("fim") is True
@@ -165,7 +173,7 @@ def criar(d, det, situacao="quero", quem=(), agora=None):
          "situacao": "quero", "quem": [], "nota": 0, "notas": "", "criado": agora, "atualizado": agora, "visto_em": None, "tmdb_em": "",
          "onde": {"assinatura": [], "gratis": [], "alugar": [], "comprar": [], "link": ""}}
     if t["tipo"] == "filme":
-        t["duracao"] = None
+        t.update(duracao=None, colecao=None)
     else:
         t.update(temporadas=[], temp=0, ep=0, proximo=None, ultimo=None, fim=False)
     aplicar_detalhes(t, det, agora)
@@ -294,3 +302,13 @@ def data_br(iso):
     except ValueError:
         return str(iso or "")
     return d.strftime("%d/%m/%Y")
+
+
+def tipos_ligados(d):
+    """Os tipos que a casa controla (Opções › O que controlar): os outros somem da tela e do CorrerIA, sem apagar nada."""
+    return [k for k in TIPOS if d["ajustes"]["tipos"].get(k)]
+
+
+def conferir_tipo(d, tipo):
+    if tipo in TIPOS and tipo not in tipos_ligados(d):
+        raise ErroRegra(f"{'Filmes' if tipo == 'filme' else 'Séries'} estão desligados em Opções › O que controlar.")

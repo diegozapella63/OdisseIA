@@ -225,7 +225,7 @@ class TestCorrerIA(unittest.TestCase):
         self.assertEqual(oct(os.stat(arq).st_mode & 0o777), "0o600")
         self.assertEqual(self.ferr("GET", chave="errada")[0], 401)
         st, r = self.ferr("GET")
-        self.assertEqual([f["nome"] for f in r["ferramentas"]], ["resumo", "buscar", "ver", "adicionar", "marcar", "proximo_episodio", "apagar"])
+        self.assertEqual([f["nome"] for f in r["ferramentas"]], ["resumo", "buscar", "ver", "lista_pronta", "adicionar", "adicionar_colecao", "marcar", "proximo_episodio", "apagar"])
         self.assertEqual(self.usar("resumo")[1]["texto"], "A lista da casa está vazia.")
         self.assertIn("Falta a chave do TMDB", self.usar("adicionar", {"nome": "Mar de Estrelas"})[1]["erro"])
         pedir(self.base, "POST", "/api/tmdb", {"chave": apoio.CHAVE})
@@ -360,3 +360,99 @@ class TestBordas(unittest.TestCase):
         cls.assert_called_once()
         th.return_value.start.assert_called_once()
         srv.serve_forever.assert_called_once()
+
+
+class TestNovidades020(unittest.TestCase):
+    """0.2.0: Já vi (a série inteira), as coleções, as listas prontas e O que controlar."""
+
+    def setUp(self):
+        apoio.limpar()
+        apoio.fixar_hoje(self)
+        self.base = apoio.Servidor.subir()
+        S.guardar_chave(apoio.CHAVE)
+
+    def get(self, rota):
+        return pedir(self.base, "GET", rota)
+
+    def post(self, rota, corpo):
+        return pedir(self.base, "POST", rota, corpo)
+
+    def test_serie_inteira_como_vista(self):
+        st, r = self.post("/api/titulo", {"acao": "adicionar", "tipo": "serie", "tmdb": 202, "situacao": "visto"})
+        t = r["titulo"]
+        self.assertEqual((t["situacao"], t["temp"], t["ep"], t["visto_em"]), ("visto", 2, 2, "2026-11-24"))
+
+    def test_listas_prontas(self):
+        st, r = self.get("/api/lista?nome=populares")
+        self.assertEqual((st, [x["tipo"] for x in r["resultados"]], r["mais"]), (200, ["filme", "serie", "filme", "serie"], True))
+        self.post("/api/titulo", {"acao": "adicionar", "tipo": "filme", "tmdb": 101, "situacao": "visto"})
+        r = self.get("/api/lista?nome=populares&tipo=filme&pagina=1")[1]
+        self.assertEqual((r["resultados"][0]["situacao"], r["resultados"][1]["ja"]), ("visto", None))
+        self.assertFalse(self.get("/api/lista?nome=populares&tipo=filme&pagina=2")[1]["mais"])
+        self.assertEqual(self.get("/api/lista?nome=nada")[0], 502)
+        self.assertEqual(len(self.get("/api/lista?nome=alta&pagina=x")[1]["resultados"]), 2, "a página que não é número é a primeira")
+
+    def test_colecao(self):
+        self.post("/api/titulo", {"acao": "adicionar", "tipo": "filme", "tmdb": 101, "situacao": "quero"})
+        st, r = self.get("/api/colecao?id=301")
+        c = r["colecao"]
+        self.assertEqual([(f["nome"], f["saiu"], f["situacao"]) for f in c["filmes"]],
+                         [("A Grande Viagem", True, "quero"), ("A Grande Viagem 2", True, None), ("A Grande Viagem 3", False, None)])
+        self.assertEqual(self.get("/api/colecao?id=x")[0], 400)
+        st, r = self.post("/api/titulo", {"acao": "adicionar_colecao", "colecao": 301, "situacao": "visto"})
+        self.assertEqual((r["novos"], r["marcados"], r["ja"], r["fora"]), (1, 1, 0, 1))
+        ts = {t["nome"]: t for t in S.ler()["titulos"]}
+        self.assertEqual(sorted(ts), ["A Grande Viagem", "A Grande Viagem 2"], "o que ainda não saiu fica de fora")
+        self.assertTrue(all(t["situacao"] == "visto" for t in ts.values()))
+        self.assertEqual(ts["A Grande Viagem"]["colecao"], {"id": 301, "nome": "Coleção A Grande Viagem"})
+        st, r = self.post("/api/titulo", {"acao": "adicionar_colecao", "colecao": 301, "situacao": "quero"})
+        self.assertEqual((r["novos"], r["ja"]), (1, 2), "Quero ver não mexe no que já estava")
+        self.assertEqual(S.ler()["titulos"][0]["nome"], "A Grande Viagem 3")
+        rev = S.ler()["rev"]
+        st, r = self.post("/api/titulo", {"acao": "adicionar_colecao", "colecao": 301, "situacao": "quero"})
+        self.assertEqual((r["novos"], S.ler()["rev"]), (0, rev), "nada a mudar, nada gravado")
+        for corpo in ({"acao": "adicionar_colecao", "colecao": "x"}, {"acao": "adicionar_colecao", "colecao": 301, "situacao": "vendo"}):
+            self.assertEqual(self.post("/api/titulo", corpo)[0], 400)
+
+    def test_o_que_controlar(self):
+        self.post("/api/titulo", {"acao": "adicionar", "tipo": "filme", "tmdb": 101})
+        self.post("/api/titulo", {"acao": "adicionar", "tipo": "serie", "tmdb": 202})
+        st, r = self.post("/api/ajustes", {"tipos": {"filme": False}})
+        self.assertEqual(r["ajustes"]["tipos"], {"filme": False, "serie": True})
+        self.assertEqual([t["tipo"] for t in self.get("/api/estado")[1]["titulos"]], ["serie"])
+        self.assertEqual(len(S.ler()["titulos"]), 2, "desligar não apaga")
+        self.assertEqual(self.post("/api/ajustes", {"tipos": {"serie": False}})[1]["erro"], "Deixe pelo menos um ligado.")
+        self.assertEqual(self.post("/api/ajustes", {"tipos": {"jogo": True}})[0], 400)
+        st, r = self.post("/api/titulo", {"acao": "adicionar", "tipo": "filme", "tmdb": 103})
+        self.assertEqual((st, r["erro"]), (400, "Filmes estão desligados em Opções › O que controlar."))
+        self.assertEqual(self.post("/api/titulo", {"acao": "adicionar_colecao", "colecao": 301})[0], 400)
+        self.assertEqual({x["tipo"] for x in self.get("/api/busca?q=grande")[1]["resultados"]}, set(), "sem filmes nem coleções")
+        self.assertEqual({x["tipo"] for x in self.get("/api/lista?nome=populares")[1]["resultados"]}, {"serie"})
+        r = S.usar_ferramenta({"nome": "buscar", "argumentos": {}})["texto"]
+        self.assertNotIn("Grande Viagem", r)
+        S.usar_ferramenta({"nome": "apagar", "argumentos": {"titulo": "mar"}})
+        self.assertEqual([t["nome"] for t in S.ler()["titulos"]], ["A Grande Viagem"], "o filme escondido continua guardado")
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "desligados"):
+            S.usar_ferramenta({"nome": "adicionar", "argumentos": {"nome": "Farol", "tipo": "filme"}})
+        r = S.usar_ferramenta({"nome": "adicionar", "argumentos": {"nome": "casa no morro"}})["texto"]
+        self.assertIn("Casa no Morro", r, "com um tipo só, ele vale")
+
+    def test_ferramentas_novas(self):
+        r = S.usar_ferramenta({"nome": "lista_pronta", "argumentos": {"lista": "avaliados", "tipo": "serie"}})["texto"]
+        self.assertEqual(r, "Mais bem avaliados (TMDB):\n- Mar de Estrelas (2023) · série\n- Casa no Morro (2018) · série")
+        r = S.usar_ferramenta({"nome": "adicionar_colecao", "argumentos": {"nome": "grande viagem", "situacao": "visto"}})["texto"]
+        self.assertEqual(r, "Coleção A Grande Viagem: 2 filmes postos na lista como Visto, 1 ainda não saiu.")
+        r = S.usar_ferramenta({"nome": "adicionar_colecao", "argumentos": {"nome": "grande viagem"}})["texto"]
+        self.assertEqual(r, "Coleção A Grande Viagem: 1 filme posto na lista como Quero ver, 2 já estavam na lista.")
+        r = S.usar_ferramenta({"nome": "lista_pronta", "argumentos": {"lista": "populares", "tipo": "filme"}})["texto"]
+        self.assertIn("A Grande Viagem (2019) · filme · na lista: visto", r)
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "Não achei a coleção"):
+            S.usar_ferramenta({"nome": "adicionar_colecao", "argumentos": {"nome": "zzz"}})
+        with mock.patch.object(S, "TMDB_API", "http://127.0.0.1:9/3"):
+            for nome, args in (("lista_pronta", {"lista": "alta"}), ("adicionar_colecao", {"nome": "x"})):
+                with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "internet"):
+                    S.usar_ferramenta({"nome": nome, "argumentos": args})
+        self.assertEqual(S.ferramentas.texto_lista("alta", []), "Em alta: nada agora.")
+        self.assertEqual(S.ferramentas.texto_colecao({"nome": "X", "novos": 0, "marcados": 1, "ja": 1, "fora": 2}, "visto"),
+                         "X: 1 marcado como Visto, 1 já estava na lista, 2 ainda não saíram.")
+        self.assertEqual(S.ferramentas.texto_colecao({"nome": "X", "novos": 0, "marcados": 0, "ja": 0, "fora": 0}, "quero"), "X: nada a mudar.")

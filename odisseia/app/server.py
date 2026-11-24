@@ -263,6 +263,7 @@ def adicionar(corpo, quem_usa=""):
     situacao = corpo.get("situacao") or "quero"
     if situacao not in R.SITUACOES:
         raise ValueError("A situação vale quero, vendo, visto ou abandonado.")
+    R.conferir_tipo(ler(), tipo)
     with TRAVA:
         ja = R.de_tmdb(ler(), tipo, n)
     if ja:
@@ -277,6 +278,86 @@ def adicionar(corpo, quem_usa=""):
             gravar_capa(t, capa)
             salvar(d)
     return {"titulo": t, "novo": novo}
+
+
+def marcar_ja(rs, d=None):
+    """Cada resultado do TMDB com ja (o id na lista) e a situação dele (None fora da lista)."""
+    d = d or ler()
+    for r in rs:
+        ja = R.de_tmdb(d, r["tipo"], r["tmdb"]) if r["tipo"] in R.TIPOS else None
+        r.update(ja=ja["id"] if ja else None, situacao=ja["situacao"] if ja else None)
+    return rs
+
+
+def tipo_de_busca(tipo):
+    """O tipo de uma busca: o pedido, ou o único ligado em Opções › O que controlar."""
+    ligados = R.tipos_ligados(ler())
+    return tipo if tipo in ligados else (ligados[0] if len(ligados) == 1 else "")
+
+
+def so_ligados(rs):
+    ligados = R.tipos_ligados(ler())
+    return [r for r in rs if r["tipo"] in ligados or (r["tipo"] == "colecao" and "filme" in ligados)]
+
+
+def lista_pronta(nome, tipo="", pagina=1):
+    rs, mais = tmdb_fez(cliente().lista, nome, tipo_de_busca(tipo), pagina)
+    return {"resultados": marcar_ja(so_ligados(rs)), "mais": mais}
+
+
+def colecao(n):
+    """Uma coleção de filmes (uma saga) com o que já está na lista: cada filme com ja (o id), situacao e saiu."""
+    col = tmdb_fez(cliente().colecao, n)
+    d, hoje = ler(), agora_iso()[:10]
+    for f in col["filmes"]:
+        ja = R.de_tmdb(d, "filme", f["tmdb"])
+        f.update(ja=ja["id"] if ja else None, situacao=ja["situacao"] if ja else None, saiu=bool(f["data"]) and f["data"] <= hoje)
+    return col
+
+
+def adicionar_colecao(corpo, quem_usa=""):
+    """Põe todos os filmes de uma coleção na lista, como Quero ver ou como Visto. Visto: só os que já saíram, e os que já
+    estavam na lista viram Visto; Quero ver não mexe nos que já estavam. {nome, novos, marcados, ja, fora}"""
+    n, situacao = corpo.get("colecao"), corpo.get("situacao") or "quero"
+    if not isinstance(n, int) or isinstance(n, bool):
+        raise ValueError("Escolha uma coleção da busca.")
+    if situacao not in ("quero", "visto"):
+        raise ValueError("Numa coleção, a situação vale quero ou visto.")
+    R.conferir_tipo(ler(), "filme")
+    col = tmdb_fez(cliente().colecao, n)
+    hoje = agora_iso()[:10]
+    with TRAVA:
+        d = ler()
+    entram = [f for f in col["filmes"] if situacao == "quero" or (f["data"] and f["data"] <= hoje)]
+    novos = []
+    for f in entram:
+        if not R.de_tmdb(d, "filme", f["tmdb"]):
+            det = tmdb_fez(cliente().detalhes, "filme", f["tmdb"])
+            novos.append((det, cliente().imagem(det["capa"], "w342") if det.get("capa") else None))
+    res = {"nome": col["nome"], "novos": 0, "marcados": 0, "ja": 0, "fora": len(col["filmes"]) - len(entram)}
+    with TRAVA:
+        d = ler()
+        quem = [quem_usa] if quem_usa and d["ajustes"]["quem"] else []
+        criados = set()
+        for det, capa in reversed(novos):  # o primeiro filme da coleção fica em cima
+            t, criou = R.criar(d, det, situacao, quem, agora_iso())
+            if criou:
+                gravar_capa(t, capa)
+                criados.add(t["id"])
+                res["novos"] += 1
+        for f in entram:
+            t = R.de_tmdb(d, "filme", f["tmdb"])
+            if not t or t["id"] in criados:
+                continue
+            if situacao == "visto" and t["situacao"] != "visto":
+                R.mudar(t, {"situacao": "visto"}, None, agora_iso())
+                res["marcados"] += 1
+            else:
+                res["ja"] += 1
+        if res["novos"] or res["marcados"]:
+            salvar(d)
+    res["rev"] = d["rev"]
+    return res
 
 
 def atualizar(tid):
@@ -549,9 +630,35 @@ def usar_ferramenta(corpo):
     pid = str(p.get("id") or "") if str(p.get("id") or "").startswith("person.") else next(
         (x["id"] for x in ps if R.sem_acento(x["nome"]) == R.sem_acento(p.get("nome"))), "")
     det, capa = None, None
+    if nome == "lista_pronta":
+        a = ferramentas.conferir(nome, args)
+        try:
+            r = lista_pronta(a["lista"], a.get("tipo") or "")
+        except T.ErroTMDB as e:
+            raise ferramentas.ErroFerramenta(str(e)) from e
+        CORRERIA.ultimo = {"app": str(corpo.get("cliente") or "CorrerIA")[:40], "em": agora_iso(), "nome": nome}
+        return {"texto": ferramentas.texto_lista(a["lista"], r["resultados"])}
+    if nome == "adicionar_colecao":
+        a = ferramentas.conferir(nome, args)
+        try:
+            col = ferramentas.melhor(tmdb_fez(cliente().colecoes, a["nome"]), a["nome"])
+            if not col:
+                raise ferramentas.ErroFerramenta(f"Não achei a coleção «{a['nome']}» no TMDB.")
+            res = adicionar_colecao({"colecao": col["tmdb"], "situacao": a.get("situacao") or "quero"}, pid)
+        except (T.ErroTMDB, ValueError) as e:
+            raise ferramentas.ErroFerramenta(str(e)) from e
+        texto = ferramentas.texto_colecao(res, a.get("situacao") or "quero")
+        CORRERIA.ultimo = {"app": str(corpo.get("cliente") or "CorrerIA")[:40], "em": agora_iso(), "nome": nome}
+        log("CorrerIA:", CORRERIA.ultimo["app"], nome, "→", texto)
+        return {"texto": texto}
+    ligados = R.tipos_ligados(ler())
     if nome == "adicionar":
         ferramentas.conferir(nome, args)
-        tipo = args.get("tipo")
+        tipo = args.get("tipo") or (ligados[0] if len(ligados) == 1 else None)
+        try:
+            R.conferir_tipo(ler(), tipo)
+        except R.ErroRegra as e:
+            raise ferramentas.ErroFerramenta(str(e)) from e
         try:
             achou = ferramentas.melhor(tmdb_fez(cliente().buscar, args["nome"], tipo or ""), args["nome"], tipo, args.get("ano"))
             if achou:
@@ -566,7 +673,11 @@ def usar_ferramenta(corpo):
             raise ferramentas.ErroFerramenta(str(e)) from e
     with TRAVA:
         d = ler()
+        # o que está desligado em Opções › O que controlar fica fora do que o CorrerIA vê, e volta inteiro ao gravar
+        fora = [t for t in d["titulos"] if t["tipo"] not in ligados]
+        d["titulos"] = [t for t in d["titulos"] if t["tipo"] in ligados]
         texto, mudou = ferramentas.chamar(nome, args, d, ps, pid, det, agora_iso())
+        d["titulos"] += fora
         if mudou:
             if nome == "adicionar" and capa:
                 gravar_capa(d["titulos"][0], capa)
@@ -586,7 +697,8 @@ def usar_ferramenta(corpo):
 
 def estado(usuario=""):
     d = ler()
-    return {"versao": VERSAO, "rev": d["rev"], "titulos": d["titulos"], "ajustes": d["ajustes"], "hoje": agora_iso()[:10],
+    ligados = R.tipos_ligados(d)
+    return {"versao": VERSAO, "rev": d["rev"], "titulos": [t for t in d["titulos"] if t["tipo"] in ligados], "ajustes": d["ajustes"], "hoje": agora_iso()[:10],
             "pessoas": [{"id": p["id"], "nome": p["nome"]} for p in pessoas()], "eu": eu(usuario), "tmdb": estado_tmdb(),
             "correria": {"ligado": d["ajustes"]["correria"], "ultimo": CORRERIA.ultimo}}
 
@@ -604,6 +716,14 @@ def mudar_ajustes(corpo):
                 if not isinstance(corpo[k], bool):
                     raise ValueError(f"{k}: ligado ou desligado.")
                 a[k] = corpo[k]
+        if "tipos" in corpo:
+            t = corpo["tipos"]
+            if not isinstance(t, dict) or any(k not in R.TIPOS or not isinstance(v, bool) for k, v in t.items()):
+                raise ValueError("tipos: filme e serie, ligado ou desligado.")
+            novos = dict(a["tipos"], **t)
+            if not any(novos.values()):
+                raise ValueError("Deixe pelo menos um ligado.")
+            a["tipos"] = novos
         salvar(d)
     if "correria" in corpo:
         publicar_correria()
@@ -694,12 +814,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.enviar(200, {"rev": ler()["rev"]})
             if c == "/api/busca":
                 tipo = (q.get("tipo") or [""])[0]
-                rs = tmdb_fez(cliente().buscar, (q.get("q") or [""])[0], tipo if tipo in R.TIPOS else "")
-                d = ler()
-                for r in rs:
-                    ja = R.de_tmdb(d, r["tipo"], r["tmdb"])
-                    r["ja"] = ja["id"] if ja else None
-                return self.enviar(200, {"resultados": rs})
+                rs = tmdb_fez(cliente().buscar, (q.get("q") or [""])[0], tipo_de_busca(tipo))
+                return self.enviar(200, {"resultados": marcar_ja(so_ligados(rs))})
+            if c == "/api/lista":
+                return self.enviar(200, lista_pronta((q.get("nome") or [""])[0], (q.get("tipo") or [""])[0], (q.get("pagina") or ["1"])[0]))
             m = re.match(r"^/api/capa/(t[0-9a-f]{8}\.(?:jpg|png))$", c)
             if m:
                 try:
@@ -715,6 +833,12 @@ class Handler(BaseHTTPRequestHandler):
                 if not dado:
                     return self.enviar(404, {"erro": "Sem capa."})
                 return self.enviar(200, dado, "image/png" if dado[:4] == b"\x89PNG" else "image/jpeg", {"Cache-Control": "private, max-age=86400"})
+            if c == "/api/colecao":
+                try:
+                    n = int((q.get("id") or [""])[0])
+                except ValueError:
+                    raise ValueError("Escolha uma coleção da busca.")
+                return self.enviar(200, {"colecao": colecao(n)})
             if c == "/api/dados":
                 return self.enviar(200, {"backups": backups(), "versoes": versoes()})
             if c == "/api/dados/exportar":
@@ -765,6 +889,8 @@ class Handler(BaseHTTPRequestHandler):
             if c == "/api/titulo":
                 if corpo.get("acao") == "adicionar":
                     return self.enviar(200, adicionar(corpo, eu(self.usuario())))
+                if corpo.get("acao") == "adicionar_colecao":
+                    return self.enviar(200, adicionar_colecao(corpo, eu(self.usuario())))
                 if corpo.get("acao") == "atualizar":
                     return self.enviar(200, {"titulo": atualizar(str(corpo.get("id") or ""))})
                 return self.enviar(200, mudar_titulo(corpo))

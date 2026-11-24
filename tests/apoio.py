@@ -33,7 +33,12 @@ ONDE = {"results": {"BR": {"link": "https://www.themoviedb.org/movie/101/watch?l
 FILMES = {
     101: {"id": 101, "title": "A Grande Viagem", "original_title": "The Long Trip", "release_date": "2019-05-10", "runtime": 132,
           "genres": [{"name": "Aventura"}, {"name": "Drama"}], "overview": "Uma família cruza o país num ônibus velho.",
-          "poster_path": "/viagem.jpg", "status": "Released", "watch/providers": ONDE},
+          "poster_path": "/viagem.jpg", "status": "Released", "watch/providers": ONDE, "belongs_to_collection": {"id": 301, "name": "Coleção A Grande Viagem"}},
+    105: {"id": 105, "title": "A Grande Viagem 2", "original_title": "The Long Trip 2", "release_date": "2022-07-01", "runtime": 120, "genres": [],
+          "overview": "A família volta para a estrada.", "poster_path": "/viagem.jpg", "watch/providers": {"results": {}},
+          "belongs_to_collection": {"id": 301, "name": "Coleção A Grande Viagem"}},
+    106: {"id": 106, "title": "A Grande Viagem 3", "original_title": "The Long Trip 3", "release_date": "2027-06-01", "runtime": None, "genres": [],
+          "overview": "", "poster_path": None, "watch/providers": {"results": {}}, "belongs_to_collection": {"id": 301, "name": "Coleção A Grande Viagem"}},
     103: {"id": 103, "title": "Farol Distante", "original_title": "Farol Distante", "release_date": "2021-08-01", "runtime": 95,
           "genres": [{"name": "Suspense"}], "overview": "", "poster_path": "/farol.jpg", "status": "Released", "watch/providers": {"results": {}}},
 }
@@ -49,6 +54,14 @@ SERIES = {
           "seasons": [{"season_number": 1, "episode_count": 2}],
           "last_episode_to_air": {"air_date": "2018-04-01", "season_number": 1, "episode_number": 2, "name": "Fim"},
           "next_episode_to_air": None, "watch/providers": {"results": {}}},
+}
+
+
+COLECOES = {
+    301: {"id": 301, "name": "Coleção A Grande Viagem", "original_name": "The Long Trip Collection", "overview": "Os três filmes da família na estrada.",
+          "poster_path": "/viagem.jpg", "parts": [{"id": 106, "title": "A Grande Viagem 3", "release_date": "2027-06-01"},
+                                                  {"id": 101, "title": "A Grande Viagem", "original_title": "The Long Trip", "release_date": "2019-05-10", "poster_path": "/viagem.jpg"},
+                                                  {"id": 105, "title": "A Grande Viagem 2", "release_date": "2022-07-01"}, {"id": "x"}]},
 }
 
 
@@ -77,6 +90,16 @@ class TMDBFalso:
                 if u.path in ("/3/movie/429", "/3/movie/500"):
                     return self.resp(int(u.path[-3:]), {})
                 m = u.path.split("/")
+                if u.path == "/3/search/collection":
+                    alvo = q.get("query", "").lower()
+                    return self.resp(200, {"results": [c for c in COLECOES.values() if alvo in c["name"].lower()] + ["x"]})
+                if u.path.startswith("/3/collection/"):
+                    n = int(u.path.rsplit("/", 1)[-1])
+                    return self.resp(200, COLECOES[n]) if n in COLECOES else self.resp(404, {})
+                lista = re_lista(u.path)
+                if lista:
+                    pag = int(q.get("page", 1))
+                    return self.resp(200, {"page": pag, "total_pages": 2, "results": lista[(pag - 1) * 2:pag * 2]})
                 if u.path.startswith("/3/search/"):
                     alvo = q.get("query", "").lower()
                     rs = []
@@ -113,6 +136,20 @@ class TMDBFalso:
     def fechar(self):
         self.srv.shutdown()
         self.srv.server_close()
+
+
+def re_lista(caminho):
+    """As listas prontas do TMDB de mentira: duas por página, duas páginas."""
+    m = caminho.split("/")
+    filmes = [dict(f, media_type="movie") for f in FILMES.values()]
+    series = [dict(s, media_type="tv") for s in SERIES.values()]
+    if len(m) == 5 and m[2] == "trending":
+        return {"all": filmes[:1] + series + filmes[1:], "movie": filmes, "tv": series}.get(m[3])
+    if len(m) == 4 and m[2] == "movie" and m[3] in ("popular", "top_rated", "now_playing"):
+        return filmes
+    if len(m) == 4 and m[2] == "tv" and m[3] in ("popular", "top_rated", "on_the_air"):
+        return series + [{"id": "x"}]
+    return None
 
 
 def porta_livre():

@@ -20,7 +20,18 @@ A chave fica só no app (em `/data/segredos.json`); a tela mostra só o fim dela
 
 ## Adicionar (o + no meio da barra)
 
-Escreva o nome: a busca é no TMDB, em português. Tudo, Filme ou Série filtra. Um toque põe o título na lista como **Quero ver** e abre ele. **Na lista** mostra o que já está lá.
+Abre nas **listas prontas** do TMDB: **Em alta** (na semana), **Mais populares**, **Mais bem avaliados** e **Estreias** (os filmes nos cinemas do Brasil; nas séries, as que estão no ar). **Mostrar mais** traz a próxima página. Para procurar um título, escreva o nome: a busca é no TMDB, em português. Tudo, Filmes ou Séries filtra.
+
+Em cada capa:
+- **Já vi** (o visto): põe na lista como **Visto**. Numa série, marca a série inteira, até o último episódio que saiu. O que ainda não saiu não tem esse botão.
+- **Quero ver** (o marcador): põe na lista como **Quero ver**.
+- Tocar na capa abre o título (fora da lista, ele entra como Quero ver). O Voltar do celular volta para a lista.
+
+O que já está na lista mostra a situação no canto da capa.
+
+## Coleções de filmes
+
+As sagas (os filmes de uma mesma história) aparecem na busca com a etiqueta **Coleção**, e o filme que faz parte de uma mostra o botão dela. A coleção abre com todos os filmes, na ordem em que saíram: **Quero ver todos** põe os que faltam na lista; **Já vi todos** põe os que já saíram como Visto (e marca como Visto os que já estavam na lista).
 
 ## O título
 
@@ -32,13 +43,17 @@ Escreva o nome: a busca é no TMDB, em português. Tudo, Filme ou Série filtra.
 - **Notas**: o que a casa achou, quem indicou.
 - **Atualizar** busca de novo no TMDB (o app já atualiza sozinho: as séries que a casa vê ou quer ver, uma vez por dia; o resto, uma vez por semana).
 
-## Buscar e Vistos
+## Buscar e Histórico
 
-**Buscar** filtra a lista pelo nome, pelo tipo, pela situação e pela pessoa. Os **Abandonados** ficam recolhidos no fim. **Vistos** mostra o que a casa terminou de ver, mês a mês.
+**Buscar** filtra a lista pelo nome, pelo tipo, pela situação e pela pessoa. Os **Abandonados** ficam recolhidos no fim. **Histórico** mostra o que a casa terminou de ver, mês a mês, numa aba para as séries e outra para os filmes.
+
+## O que controlar
+
+Em **Configurações › Opções › O que controlar**, ligue só as séries, só os filmes ou os dois. O que fica desligado some da tela e do CorrerIA; nada é apagado, e volta ao ligar de novo.
 
 ## Pelo CorrerIA
 
-Com **Configurações › Integrações › CorrerIA** ligado, o CorrerIA (WhatsApp, Claude e Gemini) pode perguntar o que a casa está vendo, adicionar um filme ou uma série pelo nome, marcar o próximo episódio, a nota, a situação e quem vê, e dizer onde assistir.
+Com **Configurações › Integrações › CorrerIA** ligado, o CorrerIA (WhatsApp, Claude e Gemini) pode perguntar o que a casa está vendo, adicionar um filme ou uma série pelo nome (também uma série inteira já vista), uma coleção de filmes inteira, marcar o próximo episódio, a nota, a situação e quem vê, dizer onde assistir e mostrar as listas prontas (em alta, mais populares, mais bem avaliados e estreias).
 
 ## Dados
 

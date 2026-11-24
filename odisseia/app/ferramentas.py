@@ -5,11 +5,14 @@ do que vale, para a IA tentar de novo."""
 from datetime import date, datetime, timedelta
 
 import regras as R
+import tmdb as T
 
 INSTRUCOES = ("OdisseIA: os filmes e as séries da casa: o que cada pessoa está vendo, já viu, quer ver ou abandonou, o "
               "episódio em que parou, a nota (1 a 5) e onde assistir no Brasil (dados da JustWatch). Os ids dos títulos "
               "começam com t. Para marcar o episódio seguinte ao último visto, use proximo_episodio; para um episódio "
-              "certo, marcar com temporada e episodio. Para pôr um título novo, adicionar procura pelo nome no TMDB.")
+              "certo, marcar com temporada e episodio. Para pôr um título novo, adicionar procura pelo nome no TMDB; uma "
+              "série inteira já vista é adicionar com situacao visto (marca até o último episódio que saiu). Uma coleção "
+              "de filmes (uma saga) inteira, de uma vez: adicionar_colecao.")
 SIT = list(R.SITUACOES)
 
 
@@ -29,11 +32,17 @@ FERRAMENTAS = [
         "limite": {"type": "integer", "minimum": 1, "maximum": 50}}),
     _f("ver", "Ver um título", "Tudo de um título: a sinopse, os gêneros, as temporadas, o episódio, a nota, as notas e "
        "onde assistir no Brasil.", {"titulo": _TIT}, ["titulo"]),
+    _f("lista_pronta", "Lista pronta", "Uma lista pronta do TMDB (em alta na semana, mais populares, mais bem avaliados ou "
+       "estreias: os filmes nos cinemas do Brasil, as séries no ar), com o que já está na lista da casa. Para sugerir o que ver.",
+       {"lista": {"type": "string", "enum": list(T.LISTAS)}, "tipo": {"type": "string", "enum": ["filme", "serie"]}}, ["lista"]),
     _f("adicionar", "Adicionar", "Procura o filme ou a série pelo nome no TMDB e põe na lista da casa (o primeiro que "
        "combina com o tipo e o ano). Se já está na lista, diz.",
        {"nome": {"type": "string"}, "tipo": {"type": "string", "enum": ["filme", "serie"]},
         "ano": {"type": "integer", "minimum": 1880, "maximum": 2100}, "situacao": {"type": "string", "enum": SIT}, "quem": _QUEM},
        ["nome"], grava=True),
+    _f("adicionar_colecao", "Adicionar uma coleção", "Procura uma coleção de filmes (uma saga) pelo nome no TMDB e põe "
+       "todos os filmes dela na lista. Com situacao visto, só os que já saíram, e os que já estavam na lista viram Visto.",
+       {"nome": {"type": "string"}, "situacao": {"type": "string", "enum": ["quero", "visto"]}}, ["nome"], grava=True),
     _f("marcar", "Marcar", "Muda a situação, a nota (1 a 5; 0 tira), o episódio (temporada e episodio, numa série), "
        "quem vê e as notas de um título.",
        {"titulo": _TIT, "situacao": {"type": "string", "enum": SIT}, "nota": {"type": "integer", "minimum": 0, "maximum": 5},
@@ -219,3 +228,31 @@ def melhor(resultados, nome, tipo=None, ano=None):
     alvo = R.sem_acento(nome)
     iguais = [r for r in rs if alvo in (R.sem_acento(r["nome"]), R.sem_acento(r["original"]))]
     return (iguais or rs or [None])[0]
+
+
+def texto_colecao(res, situacao):
+    """O que adicionar uma coleção fez, numa frase."""
+    sit = "Visto" if situacao == "visto" else "Quero ver"
+    partes = []
+    if res["novos"]:
+        partes.append(f"{res['novos']} {'filme posto' if res['novos'] == 1 else 'filmes postos'} na lista como {sit}")
+    if res["marcados"]:
+        partes.append(f"{res['marcados']} {'marcado' if res['marcados'] == 1 else 'marcados'} como Visto")
+    if res["ja"]:
+        partes.append(f"{res['ja']} já {'estava' if res['ja'] == 1 else 'estavam'} na lista")
+    if res["fora"]:
+        partes.append(f"{res['fora']} ainda não {'saiu' if res['fora'] == 1 else 'saíram'}")
+    return f"{res['nome']}: " + (", ".join(partes) if partes else "nada a mudar") + "."
+
+
+def texto_lista(nome, rs):
+    """Uma lista pronta do TMDB em linhas, dizendo o que a casa já tem."""
+    if not rs:
+        return f"{T.LISTAS[nome]}: nada agora."
+    out = [f"{T.LISTAS[nome]} (TMDB):"]
+    for r in rs:
+        s = f"- {r['nome']}" + (f" ({r['ano']})" if r["ano"] else "") + f" · {R.TIPOS[r['tipo']].lower()}"
+        if r.get("situacao"):
+            s += f" · na lista: {R.SITUACOES[r['situacao']].lower()}"
+        out.append(s)
+    return "\n".join(out)

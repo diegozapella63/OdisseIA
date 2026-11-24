@@ -6,6 +6,7 @@ leitura (v4, começa com eyJ) vai no cabeçalho. Nada aqui grava: o server.py gu
 import json
 import re
 import urllib.error
+from itertools import zip_longest
 import urllib.parse
 import urllib.request
 
@@ -16,6 +17,11 @@ IDIOMA = "pt-BR"
 CAPA_RE = re.compile(r"^/[A-Za-z0-9_-]{1,80}\.(?:jpg|jpeg|png)$")
 TAMANHOS = ("w92", "w185", "w342", "w500")
 MAX_IMG = 3 * 1024 * 1024
+# as listas prontas do Adicionar (0.2.0, o dono: "os mais vistos, os mais bem avaliados... listas prontas onde eu clico e
+# marco como visto"): o nome na tela e, por tipo, a rota do TMDB (Em alta é a mesma para os dois)
+LISTAS = {"alta": "Em alta", "populares": "Mais populares", "avaliados": "Mais bem avaliados", "estreias": "Estreias"}
+ROTAS = {"populares": ("popular", "popular"), "avaliados": ("top_rated", "top_rated"), "estreias": ("now_playing", "on_the_air")}
+MAX_PAGINAS = 20
 
 
 class ErroTMDB(Exception):
@@ -61,10 +67,13 @@ class TMDB:
         return True
 
     def buscar(self, texto, tipo=""):
-        """Filmes e séries pelo nome: [{tmdb, tipo, nome, original, ano, capa, sinopse}] (sem pessoas)."""
+        """Filmes e séries pelo nome: [{tmdb, tipo, nome, original, ano, capa, sinopse}] (sem pessoas). Com Tudo ou Filme,
+        as coleções de filmes (as sagas) que combinam vêm na frente (até 2), com tipo colecao."""
         texto = " ".join(str(texto or "").split())[:120]
         if len(texto) < 2:
             return []
+        if tipo == "colecao":
+            return self.colecoes(texto)
         rota = {"filme": "/search/movie", "serie": "/search/tv"}.get(tipo, "/search/multi")
         r = self._pedir(rota, {"query": texto, "language": IDIOMA, "include_adult": "false", "page": 1})
         out = []
@@ -75,7 +84,70 @@ class TMDB:
             if mt not in ("movie", "tv"):
                 continue
             out.append(resumo(x, "filme" if mt == "movie" else "serie"))
-        return out[:20]
+        cols = []
+        if tipo in ("", "filme") and len(texto) >= 3:
+            try:
+                cols = self.colecoes(texto)[:2]
+            except ErroTMDB:  # a busca das coleções é a mais: sem ela, os filmes e as séries
+                cols = []
+        return cols + out[:20]
+
+    def lista(self, nome, tipo="", pagina=1):
+        """Uma lista pronta do TMDB: (resultados, tem_mais). Sem tipo, Em alta mistura os dois; Mais populares e Mais bem
+        avaliados intercalam filmes e séries; Estreias são os filmes nos cinemas do Brasil (numa série, as que estão no ar)."""
+        if nome not in LISTAS:
+            raise ErroTMDB("Lista desconhecida.")
+        try:
+            pagina = max(1, min(MAX_PAGINAS, int(pagina)))
+        except (TypeError, ValueError):
+            pagina = 1
+        q = {"language": IDIOMA, "page": pagina}
+        if nome == "alta":
+            r = self._pedir(f"/trending/{ {'filme': 'movie', 'serie': 'tv'}.get(tipo, 'all') }/week", q)
+            fontes = [(None, r)]
+        else:
+            tipos = [tipo] if tipo in ("filme", "serie") else (["filme"] if nome == "estreias" else ["filme", "serie"])
+            fontes = []
+            for tp in tipos:
+                rota = ROTAS[nome][0 if tp == "filme" else 1]
+                fontes.append((tp, self._pedir(f"/{'movie' if tp == 'filme' else 'tv'}/{rota}", dict(q, region=PAIS) if tp == "filme" else q)))
+        listas = []
+        for tp, r in fontes:
+            itens = []
+            for x in r.get("results") or []:
+                if not isinstance(x, dict) or not isinstance(x.get("id"), int):
+                    continue
+                mt = tp or {"movie": "filme", "tv": "serie"}.get(x.get("media_type"))
+                if mt:
+                    itens.append(resumo(x, mt))
+            listas.append(itens)
+        out = [x for grupo in zip_longest(*listas) for x in grupo if x]
+        try:
+            total = min(int(r.get("total_pages") or 1) for _, r in fontes)
+        except (TypeError, ValueError):
+            total = 1
+        return out, pagina < min(total, MAX_PAGINAS)
+
+    def colecoes(self, texto):
+        """As coleções de filmes (as sagas) pelo nome."""
+        r = self._pedir("/search/collection", {"query": " ".join(str(texto or "").split())[:120], "language": IDIOMA, "page": 1})
+        out = []
+        for x in r.get("results") or []:
+            if isinstance(x, dict) and isinstance(x.get("id"), int):
+                out.append(dict(resumo(dict(x, title=x.get("name"), original_title=x.get("original_name")), "filme"), tipo="colecao", ano=None))
+        return out[:10]
+
+    def colecao(self, n):
+        """Uma coleção de filmes com os filmes dela, na ordem em que saíram (sem data, no fim)."""
+        try:
+            n = int(n)
+        except (TypeError, ValueError):
+            raise ErroTMDB("Essa coleção não tem o número do TMDB.")
+        x = self._pedir(f"/collection/{n}", {"language": IDIOMA})
+        filmes = [dict(resumo(p, "filme"), data=str(p.get("release_date") or "")[:10]) for p in x.get("parts") or [] if isinstance(p, dict) and isinstance(p.get("id"), int)]
+        filmes.sort(key=lambda f: (not f["data"], f["data"]))
+        c = resumo(dict(x, title=x.get("name"), original_title=x.get("original_name")), "filme")
+        return {"tmdb": x.get("id"), "nome": c["nome"], "capa": c["capa"], "sinopse": c["sinopse"], "filmes": filmes[:60]}
 
     def detalhes(self, tipo, tmdb_id):
         """Os detalhes de um filme ou de uma série, já no formato do app (sem o que é da casa: situação, quem, nota)."""
@@ -118,6 +190,7 @@ def resumo(x, tipo):
             "nome": _txt(x.get("title") if filme else x.get("name"), 160) or _txt(x.get("original_title") if filme else x.get("original_name"), 160),
             "original": _txt(x.get("original_title") if filme else x.get("original_name"), 160),
             "ano": _ano(x.get("release_date") if filme else x.get("first_air_date")),
+            "data": str((x.get("release_date") if filme else x.get("first_air_date")) or "")[:10],
             "capa": capa, "sinopse": _txt(x.get("overview"), 1200)}
 
 
@@ -159,6 +232,8 @@ def detalhes(x, tipo):
             d["duracao"] = int(x.get("runtime") or 0) or None
         except (TypeError, ValueError):
             d["duracao"] = None
+        c = x.get("belongs_to_collection")
+        d["colecao"] = {"id": c["id"], "nome": _txt(c.get("name"), 160)} if isinstance(c, dict) and isinstance(c.get("id"), int) else None
         return d
     temps = []
     for s in x.get("seasons") or []:

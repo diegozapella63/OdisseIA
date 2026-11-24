@@ -32,7 +32,12 @@ class TestRegras(unittest.TestCase):
         self.assertEqual(t["onde"], {"assinatura": ["A", "3"], "gratis": [], "alugar": [], "comprar": [], "link": ""})
         s = d["titulos"][1]
         self.assertEqual(([x["n"] for x in s["temporadas"]], s["temp"], s["ep"]), ([1, 2], 0, 0))
-        self.assertEqual(d["ajustes"], {"cor": "lilas", "cor_dia": False, "quem": True, "correria": False})
+        self.assertEqual(d["ajustes"], {"cor": "lilas", "cor_dia": False, "quem": True, "correria": False, "tipos": {"filme": True, "serie": True}})
+        self.assertEqual(R.limpar_dados({"ajustes": {"tipos": {"filme": False, "serie": False}}})["ajustes"]["tipos"], {"filme": True, "serie": True}, "nunca os dois desligados")
+        self.assertEqual(R.limpar_dados({"ajustes": {"tipos": {"filme": False}}})["ajustes"]["tipos"], {"filme": False, "serie": True})
+        f = R.limpar_titulo({"id": "t00000009", "tipo": "filme", "nome": "F", "colecao": {"id": 7, "nome": " Saga "}})
+        self.assertEqual(f["colecao"], {"id": 7, "nome": "Saga"})
+        self.assertIsNone(R.limpar_titulo({"id": "t00000009", "tipo": "filme", "nome": "F", "colecao": {"id": "x"}})["colecao"])
         self.assertEqual(d["rev"], 0)
         self.assertEqual(R.limpar_dados(None)["titulos"], [])
 

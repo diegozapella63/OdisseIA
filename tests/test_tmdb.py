@@ -1,5 +1,6 @@
 """tmdb.py com o TMDB de mentira: a chave nas duas formas, a busca, os detalhes em português, onde assistir no Brasil e as capas."""
 import unittest
+from unittest import mock
 
 from tests import apoio
 import tmdb as T
@@ -28,7 +29,7 @@ class TestTMDB(unittest.TestCase):
         self.assertEqual([r["tipo"] for r in cliente().buscar("ana")], [], "pessoas ficam de fora")
         self.assertEqual([r["nome"] for r in cliente().buscar("a", "filme")], [])
         self.assertEqual([r["nome"] for r in cliente().buscar("farol", "filme")], ["Farol Distante"])
-        self.assertEqual(apoio.TMDB.pedidos[-1][0], "/3/search/movie")
+        self.assertEqual([p[0] for p in apoio.TMDB.pedidos[-2:]], ["/3/search/movie", "/3/search/collection"])
         self.assertEqual([r["tipo"] for r in cliente().buscar("casa", "serie")], ["serie"])
 
     def test_detalhes(self):
@@ -72,3 +73,23 @@ class TestTMDBBordas(unittest.TestCase):
         self.assertIsNone(T.detalhes({"runtime": "x"}, "filme")["duracao"])
         s = T.detalhes({"seasons": [{"season_number": "x"}, None, {"season_number": 1, "episode_count": 0}], "next_episode_to_air": {"air_date": "logo", "season_number": 1, "episode_number": 1}}, "serie")
         self.assertEqual((s["temporadas"], s["proximo"]), ([], None))
+
+
+class TestColecoes(unittest.TestCase):
+    def test_colecoes(self):
+        rs = cliente().buscar("grande viagem")
+        self.assertEqual([(r["tipo"], r["nome"]) for r in rs][:2], [("colecao", "Coleção A Grande Viagem"), ("filme", "A Grande Viagem")], "a coleção vem na frente")
+        self.assertEqual([r["tipo"] for r in cliente().buscar("grande viagem", "serie")], [], "numa série, sem coleções")
+        self.assertEqual([r["nome"] for r in cliente().buscar("grande", "colecao")], ["Coleção A Grande Viagem"])
+        c = cliente().colecao(301)
+        self.assertEqual([(f["nome"], f["data"]) for f in c["filmes"]], [("A Grande Viagem", "2019-05-10"), ("A Grande Viagem 2", "2022-07-01"), ("A Grande Viagem 3", "2027-06-01")])
+        self.assertEqual((c["nome"], c["capa"]), ("Coleção A Grande Viagem", "/viagem.jpg"))
+        self.assertEqual(cliente().detalhes("filme", 101)["colecao"], {"id": 301, "nome": "Coleção A Grande Viagem"})
+        self.assertIsNone(cliente().detalhes("filme", 103)["colecao"])
+        with self.assertRaisesRegex(T.ErroTMDB, "número"):
+            cliente().colecao("x")
+        with self.assertRaisesRegex(T.ErroTMDB, "não achou"):
+            cliente().colecao(999)
+        fora = T.TMDB(apoio.CHAVE, f"http://127.0.0.1:{apoio.TMDB.porta}/3", "")
+        with mock.patch.object(fora, "colecoes", side_effect=T.ErroTMDB("x")):
+            self.assertEqual([r["tipo"] for r in fora.buscar("grande viagem")], ["filme", "filme", "filme"], "sem as coleções, os filmes")
