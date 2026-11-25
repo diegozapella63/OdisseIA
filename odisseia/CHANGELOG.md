@@ -1,5 +1,17 @@
 # Mudanças
 
+## 0.7.0
+
+- **A IA no OdisseIA**, como nos outros apps: no alto de toda tela, a **Conversa** e o **Falar**.
+- Na **Conversa**, pergunte sobre a lista da casa (o que ver, em que episódio pararam, o que vai sair, onde assistir) ou
+  peça para pôr, marcar ou apagar um título: a IA lê na hora e, para mudar, mostra o que vai fazer e espera o **Sim**.
+  Também pesquisa na internet (críticas, se vale a pena, quando sai a próxima temporada).
+- **Escolher fotos** na Conversa: mande a foto de um pôster, de um print de um streaming ou da capa de um jogo, e a IA acha
+  os títulos para pôr na lista.
+- **Falar**: toque no microfone, fale e toque em ✓; o que você falou vai para a Conversa.
+- Em Configurações › Integrações: **IA** (Usar IA e a IA de cada uso: para conversar, para ler fotos e para pesquisar na
+  internet), **Memória da IA** (a mesma de todos os apps), **Falar** e **Uso da IA**.
+
 ## 0.6.0
 
 - **Pelo CorrerIA**: a IA agora cria, renomeia e apaga as **categorias** (de filmes, séries ou jogos), como em Mais › Categorias. Só depois do seu sim.

@@ -45,6 +45,9 @@
     'external-link': '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
     zap: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
     chat: '<path d="M21 12a8 8 0 0 1-11.7 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12Z"/>',
+    mic: '<rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5"/>',
+    send: '<path d="m21.5 2.5-9 19-2.5-8.5L1.5 10z"/><path d="m21.5 2.5-11.5 10.5"/>',
+    chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
     hourglass: '<path d="M5 22h14M5 2h14"/><path d="M17 22v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 4.4a2 2 0 0 0-.6 1.4V22"/><path d="M7 2v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-4.4a2 2 0 0 0 .6-1.4V2"/>',
     'calendar-days': '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>',
     'list-checks': '<path d="M13 5h8M13 12h8M13 19h8"/><path d="m3 17 2 2 4-4M3 7l2 2 4-4"/>',
@@ -80,6 +83,7 @@
     e: null, tela: 'agora', aba: guardada('odisseia-aba') || 'integracoes', tema: guardada('odisseia-tema') || 'auto',
     folha: null, folhas: [], col: null, hist: guardada('odisseia-vistos') || 'serie', vcat: lerJSON('odisseia-vistos-cat', {}), sel: null, lote: null, catf: null, busca: Object.assign({ texto: '', tipo: '', situacao: '', quem: '', categoria: '' }, lerJSON('odisseia-busca', {})),
     add: { q: '', tipo: '', res: null, erro: '', buscando: false, lista: 'alta', listas: {} }, aband: false, tempEsc: {}, conf: '', dados: null, trocarChave: false,
+    ia: null, conv: null, ch: { texto: '', anexo: null, enviando: false, fala: '', rolar: false }, mem: null, uso: null,
   };
   const api = {
     get: rota => fetch('api/' + rota, { cache: 'no-store' }).then(ok),
@@ -218,7 +222,14 @@
   const card = (id, icone, titulo, corpo, chave) => `<section class="card${fechadas().has(chave || titulo) ? ' fechada' : ''}" id="${id}">${cab(icone, titulo, chave)}${corpo}</section>`;
   const lbl = (icone, titulo, para) => para ? `<label for="${para}">${ic(icone, 'ic-s')}${titulo}</label>` : `<span class="lbl">${ic(icone, 'ic-s')}${titulo}</span>`;
   const ICONE_TELA = { Agora: 'clock', Buscar: 'search', 'Concluídos': 'visto', Mais: 'mais', Categorias: 'tag', 'Configurações': 'gear', Sobre: 'info' };
-  const topo = (titulo, volta, extra = '') => `<header class="cab-tela">${volta ? `<button class="voltar" data-a="voltar">${ic('back', 'ic-s')}${volta}</button>` : extra}<h1><span class="rot-ic tela-ic" aria-hidden="true">${ic(ICONE_TELA[titulo])}</span>${titulo}</h1></header>`;
+  // 0.7.0: no alto de toda tela, como nos outros apps: a marca e o olá, a Conversa e o Falar (com a IA ligada e pronta)
+  function barraTopo() {
+    const eu = S.e && pessoa(S.e.eu);
+    return `<div class="mh-row"><p class="eyebrow"><span class="brand">Odisse<span>IA</span></span>${eu ? `<span class="ola"><span class="sep"> · </span>olá, ${esc(eu.nome.split(' ')[0])}</span>` : ''}</p>
+      ${iaOn() ? `<button class="chat-top" data-a="conversa" aria-label="Conversar com a IA" title="Conversar">${ic('chat')}</button>` : ''}
+      ${falaOn() ? `<button class="mic-top" data-a="falar-top" aria-label="Falar com a IA" title="Falar">${ic('mic')}</button>` : ''}</div>`;
+  }
+  const topo = (titulo, volta) => `<header class="cab-tela">${barraTopo()}${volta ? `<button class="voltar" data-a="voltar">${ic('back', 'ic-s')}${volta}</button>` : ''}<h1><span class="rot-ic tela-ic" aria-hidden="true">${ic(ICONE_TELA[titulo])}</span>${titulo}</h1></header>`;
   const capa = (t, g) => t.capa ? `<img class="capa${g ? ' g' : ''}" src="api/capa/${esc(t.capa)}" alt="" loading="lazy">` : `<span class="capa${g ? ' g' : ''}">${ic(TIPO[t.tipo][1])}</span>`;
   const avs = ids => ids && ids.length && S.e.ajustes.quem ? `<span class="pessoas-mini">${ids.map(i => `<span class="av" title="${esc((pessoa(i) || {}).nome || i)}">${esc(inicial(i))}</span>`).join('')}</span>` : '';
 
@@ -301,8 +312,7 @@
   /* ---------- Agora */
   function telaAgora() {
     const e = S.e, ts = e.titulos, eu = pessoa(e.eu);
-    const ola = `<p class="eyebrow"><span class="brand">Odisse<span>IA</span></span>${eu ? ` · olá, ${esc(eu.nome.split(' ')[0])}` : ''}</p>`;
-    let h = topo('Agora', '', ola);
+    let h = topo('Agora');
     const l = ligados(), faltaTV = !e.tmdb.chave && l.some(k => k !== 'jogo'), faltaJG = !e.igdb.chave && l.includes('jogo');
     if (faltaTV || faltaJG) {
       const txt = faltaTV && faltaJG ? `Para procurar, o app usa o ${site('https://www.themoviedb.org/settings/api', 'TMDB')} (filmes e séries) e o ${site('https://dev.twitch.tv/console', 'IGDB')} (jogos), os dois de graça. Ponha as contas em Configurações.`
@@ -500,7 +510,7 @@
       + card('importar', 'subir', 'Importar', `<p class="lead">O arquivo de um Exportar ou de um backup. Troca tudo o que há agora.</p>
         ${S.importar ? confirma(`Trocar tudo pelo arquivo ${S.importar.nome}?`, 'importar', 'subir', 'Importar') : `<div class="acoes"><button class="btn" data-a="escolher">${ic('subir', 'ic-s')}Escolher arquivo</button></div>`}`)
       + (d.versoes.length ? card('versoes', 'clock', `Versões anteriores (${d.versoes.length})`, zips('versao', d.versoes), 'Versões anteriores') : '')
-      + card('onde', 'database', 'Onde ficam os dados', '<p class="lead">Na pasta <code>/data</code> do app, que entra no backup do Home Assistant: <code>odisseia.json</code> (a lista), <code>capas</code> e <code>segredos.json</code> (as chaves do TMDB e do IGDB).</p>')
+      + card('onde', 'database', 'Onde ficam os dados', '<p class="lead">Na pasta <code>/data</code> do app, que entra no backup do Home Assistant: <code>odisseia.json</code> (a lista), <code>capas</code>, <code>segredos.json</code> (as chaves do TMDB e do IGDB), <code>conversa.json</code> (a Conversa) e <code>uso_ia.json</code> (o Uso da IA). A Memória da IA, de todos os apps, fica em <code>share/familia</code>.</p>')
       + card('zerar', 'trash', 'Começar do zero', `<p class="lead">Apaga a lista e as capas. As chaves e as configurações ficam.</p>
         ${S.conf === 'zerar' ? confirma('Apagar a lista toda agora?', 'zerar', 'trash', 'Apagar') : `<div class="acoes"><button class="btn out" data-a="conf" data-v="zerar">${ic('trash', 'ic-s')}Começar do zero</button></div>`}`);
   }
@@ -528,7 +538,8 @@
     const abas = `<div class="abas" role="tablist">${ABAS.map(([k, n, i]) => `<button role="tab" aria-selected="${S.aba === k}" class="${S.aba === k ? 'on' : ''}" data-a="aba" data-v="${k}">${ic(i, 'ic-s')}${n}</button>`).join('')}</div>`;
     const l = ligados();
     const corpo = S.aba === 'dados' ? abaDados() : S.aba === 'aparencia' ? abaAparencia() : S.aba === 'opcoes' ? abaOpcoes()
-      : (l.some(k => k !== 'jogo') ? cardTMDB() : '') + (l.includes('jogo') ? cardIGDB() : '') + cardCorrerIA();
+      : (l.some(k => k !== 'jogo') ? cardTMDB() : '') + (l.includes('jogo') ? cardIGDB() : '') + cardCorrerIA() + cardIA()
+        + (S.e.ajustes.ia ? cardMemoria() + cardFalar() + cardUso() : '');
     return topo('Configurações', 'Mais') + abas + corpo;
   }
   const GITHUB = 'https://github.com/diegozapella63';
@@ -689,7 +700,7 @@
     const el = $('#janela');
     const f = S.folha;
     const t = f && (f.tipo === 'titulo' || f.tipo === 'cat-titulo') ? S.e.titulos.find(x => x.id === f.id) : null;
-    const j = !f || ((f.tipo === 'titulo' || f.tipo === 'cat-titulo') && !t) ? null : f.tipo === 'adicionar' ? folhaAdicionar() : f.tipo === 'colecao' ? folhaColecao(f)
+    const j = !f || ((f.tipo === 'titulo' || f.tipo === 'cat-titulo') && !t) || (f.tipo === 'conversa' && !iaOn()) ? null : f.tipo === 'conversa' ? folhaConversa() : f.tipo === 'adicionar' ? folhaAdicionar() : f.tipo === 'colecao' ? folhaColecao(f)
       : f.tipo === 'categoria' ? folhaCategoria(f) : f.tipo === 'lote' ? folhaLote() : f.tipo === 'cat-titulo' ? folhaCatTitulo(t) : folhaTitulo(t);
     if (!j) {
       if (el.innerHTML) el.innerHTML = '';
@@ -701,7 +712,7 @@
     const sel = foco && document.activeElement.selectionStart;
     // a mesma janela pintada de novo (um toque, a lista que chegou) não sobe outra vez
     const fixa = corpoAntes && corpoAntes.dataset.k === (f.tipo + (f.id || ''));
-    el.innerHTML = `<div class="veu" data-a="fechar"></div><div class="folha${j.alta ? ' alta' : ''}${fixa ? ' fixa' : ''}" role="dialog" aria-modal="true" aria-label="${esc(j.titulo)}">
+    el.innerHTML = `<div class="veu" data-a="fechar"></div><div class="folha${j.alta ? ' alta' : ''}${j.conversa ? ' conversa' : ''}${fixa ? ' fixa' : ''}" role="dialog" aria-modal="true" aria-label="${esc(j.titulo)}">
       <div class="folha-cab"><h2><span class="folha-ic">${ic(j.icone)}</span><span class="folha-tt">${esc(j.titulo)}</span></h2><button class="fechar" data-a="fechar" aria-label="Fechar">${ic('x')}</button></div>
       <div class="folha-corpo" data-k="${f.tipo + (f.id || '')}">${j.corpo}</div>${j.pe ? `<div class="folha-pe">${j.pe}</div>` : ''}</div>`;
     document.body.classList.add('com-folha');
@@ -721,6 +732,7 @@
       c.classList.toggle('fechado', F.has(k));
     });
     if (rolou) corpo.scrollTop = rolou;
+    if (j.conversa && S.ch.rolar) { corpo.scrollTop = corpo.scrollHeight; S.ch.rolar = false; }  // a mensagem nova à vista
     if (foco && $('#' + foco)) { const x = $('#' + foco); x.focus({ preventScroll: true }); try { if (sel != null) x.setSelectionRange(sel, sel); } catch (e) { /* sem seleção */ } }
   }
 
@@ -758,6 +770,7 @@
     S.folhas = [];
     S.conf = '';
     S.sel = null; // o Selecionar acaba ao sair da tela
+    if (tela === 'config') { S.uso = null; S.usoPedido = false; S.memPedida = false; }  // o Uso e a Memória de agora
     if (!sem) history.pushState({ t: tela }, '');
     render();
     window.scrollTo(0, 0);
@@ -783,6 +796,7 @@
     if (window.__selectSheet && window.__selectSheet.isOpen()) return;
     S.folhas = S.folhas.slice(0, st.folha || 0);
     S.folha = S.folhas[S.folhas.length - 1] || null;
+    if (S.ch.fala && !(S.folha && S.folha.tipo === 'conversa')) pararFala();  // o Voltar fechou a Conversa: o microfone para
     S.conf = '';
     S.novaCat = null;
     if (S.sel && !st.sel) S.sel = null; // o Voltar do celular sai do Selecionar
@@ -805,9 +819,11 @@
   }
   async function carregar() {
     const e = await api.get('estado');
+    const primeira = !S.e;
     S.e = e;
     aplicarCor();
     render();
+    if (primeira) carregarIA();
   }
   function carregarLista(mais) {
     const a = S.add, k = a.lista + ':' + a.tipo, L = a.listas[k] || (a.listas[k] = { itens: [], pagina: 0, mais: false, carregando: false, erro: '' });
@@ -868,7 +884,294 @@
   }
   const salvarBusca = () => guardar('odisseia-busca', JSON.stringify({ tipo: S.busca.tipo, situacao: S.busca.situacao, quem: S.busca.quem, categoria: S.busca.categoria }));
 
+  /* ---------- a IA (0.7.0; o dono: "no topo das telas opções de chat e de falar igual os outros apps"; "toda a sorte de IA
+     deve estar no OdisseIA"). A Conversa (a IA do Home Assistant com as ferramentas daqui: lê na hora, muda depois do Sim),
+     o Falar (o microfone vira texto e vai para a Conversa), Escolher fotos (a IA vê a foto), a Memória da IA (a mesma de
+     todos os apps) e o Uso da IA. Tudo só com Usar IA ligado e uma IA no Home Assistant. */
+  const iaOn = () => !!(S.e && S.e.ajustes.ia && S.ia && S.ia.pronta);
+  const falaOn = () => iaOn() && !!(S.ia.fala && S.ia.fala.pronta);
+  const noCelular = () => { try { return matchMedia('(hover: none) and (pointer: coarse)').matches; } catch (e) { return false; } };
+  function carregarIA(novo) {
+    return api.get('ia' + (novo ? '?novo=1' : '')).then(r => { S.ia = r; render(); }).catch(() => { S.ia = { ligada: S.e && S.e.ajustes.ia, pronta: false, motivo: 'Não consegui ver a IA do Home Assistant.', entidades: [], fala: {} }; render(); });
+  }
+  // a Conversa: o texto da IA com *negrito* e as listas com "- "
+  function md(t) {
+    const linhas = String(t || '').split('\n');
+    let h = '', lista = false;
+    const neg = s => esc(s).replace(/\*([^*\n]+)\*/g, '<b>$1</b>');
+    for (const l of linhas) {
+      const m = /^\s*[-•]\s+(.*)$/.exec(l);
+      if (m) { if (!lista) { h += '<ul>'; lista = true; } h += `<li>${neg(m[1])}</li>`; continue; }
+      if (lista) { h += '</ul>'; lista = false; }
+      if (l.trim()) h += `<p>${neg(l)}</p>`;
+    }
+    return h + (lista ? '</ul>' : '');
+  }
+  const IDEIAS = ['O que tem de novo para ver?', 'Em que episódio paramos?', 'Me sugira um filme da nossa lista', 'Quais jogos vão sair?'];
+  function folhaConversa() {
+    const c = S.conv || { mensagens: [], pendente: null }, ch = S.ch, msgs = c.mensagens;
+    const bolha = (m, i) => {
+      const ult = i === msgs.length - 1;
+      if (m.papel === 'eu') return `<div class="msg eu">${m.mini ? `<img class="msg-mini" src="${esc(m.mini)}" alt="Foto">` : m.foto ? `<span class="msg-foto">${ic('image', 'ic-s')}Foto</span>` : ''}${m.texto ? `<div class="msg-t">${esc(m.texto).replace(/\n/g, '<br>')}</div>` : ''}</div>`;
+      return `<div class="msg ia${m.erro ? ' erro' : ''}"><div class="msg-t">${md(m.texto)}</div>${m.sim && ult && c.pendente ? `<div class="acoes dois msg-sim">
+          <button class="btn out" data-a="conv-sim" data-v="0">${ic('x', 'ic-s')}Não</button><button class="btn pri" data-a="conv-sim" data-v="1">${ic('check', 'ic-s')}Sim</button></div>`
+        : m.decidido ? `<p class="msg-dec">${m.decidido === 'sim' ? 'Você confirmou.' : 'Você disse não.'}</p>` : ''}</div>`;
+    };
+    const corpo = !msgs.length && !ch.enviando
+      ? `<div class="conv-vazia"><p class="lead">Pergunte sobre a lista da casa, peça para pôr ou marcar um título, ou mande a foto de um pôster.</p>
+          <div class="conv-ideias">${IDEIAS.map(t => `<button class="btn" data-a="conv-ideia" data-v="${esc(t)}">${ic('chat', 'ic-s')}${esc(t)}</button>`).join('')}</div></div>`
+      : `<div class="conv-topo"><button class="btn fino" data-a="conv-nova"${ch.enviando ? ' disabled' : ''}>${ic('refresh', 'ic-s')}Nova conversa</button></div>
+        <div class="msgs" aria-live="polite">${msgs.map(bolha).join('')}${ch.enviando ? `<div class="msg ia pensando"><span class="pontos"><i></i><i></i><i></i></span>Pensando…</div>` : ''}</div>`;
+    const f = ch.fala, ouvindo = f === 'ouvindo' || f === 'abrindo';
+    const vazio = !ch.texto.trim() && !ch.anexo;
+    const pri = f === 'entendendo' ? `<button class="conv-bt pri" disabled aria-label="Entendendo">${ic('hourglass')}</button>`
+      : ouvindo ? `<button class="conv-bt pri gravando" id="conv-pri" data-a="conv-falar" aria-label="Pronto: enviar o que falei"${f === 'abrindo' ? ' disabled' : ''}>${ic('check')}</button>`
+      : vazio && falaOn() ? `<button class="conv-bt pri" id="conv-pri" data-a="conv-falar" aria-label="Falar"${ch.enviando ? ' disabled' : ''}>${ic('mic')}</button>`
+      : `<button class="conv-bt pri" id="conv-pri" data-a="conv-enviar" aria-label="Enviar"${ch.enviando || vazio ? ' disabled' : ''}>${ic('send')}</button>`;
+    const pe = `<div class="conv-pe">${ch.anexo ? `<div class="conv-anexo"><img src="${esc(ch.anexo.mini)}" alt=""><span>${esc(ch.anexo.nome || 'Foto')}</span><button class="conv-bt" data-a="conv-tirar-foto" aria-label="Tirar a foto">${ic('x')}</button></div>` : ''}
+      <div class="conv-linha">${ouvindo ? `<button class="conv-bt" data-a="conv-falar-x" aria-label="Cancelar">${ic('x')}</button>`
+        : `<button class="conv-bt" data-a="conv-foto" aria-label="Escolher fotos"${ch.enviando ? ' disabled' : ''}>${ic('image')}</button>`}
+        <textarea id="conv-texto" class="inp" rows="1" data-size="off" maxlength="2000" enterkeyhint="${noCelular() ? 'enter' : 'send'}" placeholder="${ouvindo ? 'Ouvindo… toque em ✓ quando terminar' : f === 'entendendo' ? 'Entendendo…' : 'Pergunte ou peça'}" aria-label="Mensagem"${ouvindo || f ? ' disabled' : ''}>${esc(ch.texto)}</textarea>${pri}</div></div>`;
+    return { titulo: 'Conversa', icone: 'chat', alta: true, corpo, pe, conversa: true };
+  }
+  function abrirConversa(falar) {
+    if (!iaOn()) return;
+    if (!(S.folha && S.folha.tipo === 'conversa')) abrirFolha({ tipo: 'conversa' });
+    S.ch.rolar = true;
+    if (!S.conv) api.get('conversa').then(r => { S.conv = r; S.ch.rolar = true; render(); }).catch(err => toast(err.message));
+    render();
+    if (falar) setTimeout(falarConversa, 120);
+  }
+  async function enviarConversa(texto) {
+    const ch = S.ch, t = String(texto != null ? texto : ch.texto).trim(), anexo = ch.anexo;
+    if (ch.enviando || (!t && !anexo)) return;
+    S.conv = S.conv || { mensagens: [], pendente: null };
+    S.conv.mensagens = S.conv.mensagens.map(m => Object.assign({}, m, { sim: false }));
+    S.conv.mensagens.push(Object.assign({ papel: 'eu', texto: t }, anexo ? { foto: true, mini: anexo.mini } : {}));
+    S.conv.pendente = null;
+    ch.texto = ''; ch.anexo = null; ch.enviando = true; ch.rolar = true;
+    render();
+    try {
+      S.conv = await api.post('conversa', Object.assign({ texto: t }, anexo ? { anexo: { tipo: anexo.tipo, b64: anexo.b64, mini: anexo.mini } } : {}));
+    } catch (err) {
+      S.conv.mensagens.pop();
+      ch.texto = t; ch.anexo = anexo;
+      toast(err.message);
+    }
+    ch.enviando = false; ch.rolar = true;
+    render();
+    // uma mudança feita pela Conversa: a lista da tela vem de novo
+    try { const r = await api.get('rev'); if (r.rev !== S.e.rev) await carregar(); } catch (e) { /* depois, pela revisão */ }
+  }
+  // a foto: diminuída para 1600 px em JPEG (o que a IA lê bem), e a miniatura de 96 px para a conversa
+  function encolher(img, max, q) {
+    const k = Math.min(1, max / Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height));
+    const cv = document.createElement('canvas');
+    cv.width = Math.max(1, Math.round((img.naturalWidth || img.width) * k)); cv.height = Math.max(1, Math.round((img.naturalHeight || img.height) * k));
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    return cv.toDataURL('image/jpeg', q);
+  }
+  function lerFoto(arquivo) {
+    if (!/^image\//.test(arquivo.type)) return toast('Escolha uma foto.');
+    const url = URL.createObjectURL(arquivo), img = new Image();
+    img.onload = () => {
+      const grande = encolher(img, 1600, 0.85), mini = encolher(img, 96, 0.7);
+      URL.revokeObjectURL(url);
+      S.ch.anexo = { tipo: 'image/jpeg', b64: grande.split(',')[1], mini, nome: arquivo.name };
+      render();
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); toast('Não consegui abrir a foto.'); };
+    img.src = url;
+  }
+  /* o Falar: o microfone em PCM de 16 kHz, 16 bits, mono (o que a fala para texto do Home Assistant recebe, como o Assist;
+     o mesmo dos outros apps). Pronto: vira texto no servidor (/api/fala) e vai como a pergunta. Até 2 minutos. */
+  const TAXA = 16000, MAX_FALA = 120;
+  function Gravador(nivel) {
+    let pedacos = [], total = 0, taxa = TAXA, fluxo = null, ctx = null, fonte = null, no = null;
+    const fechar = () => {
+      try { if (no) no.onaudioprocess = null; if (fonte) fonte.disconnect(); if (no) no.disconnect(); } catch (e) { /* já fechado */ }
+      if (fluxo) fluxo.getTracks().forEach(t => t.stop());
+      if (ctx && ctx.state !== 'closed') ctx.close().catch(() => {});
+      fluxo = ctx = fonte = no = null;
+    };
+    this.iniciar = async () => {
+      const md = navigator.mediaDevices;
+      if (!md || !md.getUserMedia) throw Object.assign(new Error('sem_api'), { name: 'NoApi' });
+      fluxo = await md.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      const AC = window.AudioContext || window.webkitAudioContext;
+      try { ctx = new AC({ sampleRate: TAXA }); } catch (e) { ctx = new AC(); }
+      if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
+      taxa = ctx.sampleRate;
+      fonte = ctx.createMediaStreamSource(fluxo);
+      no = ctx.createScriptProcessor(4096, 1, 1);
+      no.onaudioprocess = ev => {
+        const d = ev.inputBuffer.getChannelData(0);
+        pedacos.push(new Float32Array(d)); total += d.length;
+        let soma = 0;
+        for (let i = 0; i < d.length; i += 4) soma += d[i] * d[i];
+        if (nivel) nivel(Math.min(1, Math.sqrt(soma / (d.length / 4)) * 5));
+      };
+      fonte.connect(no); no.connect(ctx.destination);
+    };
+    this.parar = () => {
+      fechar();
+      const tudo = new Float32Array(total);
+      let o = 0;
+      for (const p of pedacos) { tudo.set(p, o); o += p.length; }
+      pedacos = [];
+      const r = taxa / TAXA, n = Math.floor(tudo.length / r), out = new Int16Array(n);
+      for (let i = 0; i < n; i++) {
+        const a = Math.floor(i * r), b = Math.max(a + 1, Math.min(tudo.length, Math.floor((i + 1) * r)));
+        let s2 = 0;
+        for (let j = a; j < b; j++) s2 += tudo[j];
+        const v = Math.max(-1, Math.min(1, s2 / (b - a)));
+        out[i] = v < 0 ? v * 0x8000 : v * 0x7fff;
+      }
+      return out;
+    };
+    this.cancelar = () => { fechar(); pedacos = []; total = 0; };
+  }
+  function erroMicrofone(err) {
+    const n = (err && err.name) || '';
+    if (n === 'NotAllowedError' || n === 'SecurityError') return 'O microfone está bloqueado. Permita o microfone para o Home Assistant (no navegador, no cadeado ao lado do endereço; no app do celular, nas permissões do app Home Assistant) e tente de novo.';
+    if (n === 'NotFoundError' || n === 'OverconstrainedError') return 'Não achei um microfone neste aparelho.';
+    if (n === 'NotReadableError') return 'O microfone está sendo usado por outro app. Feche o outro e tente de novo.';
+    if (n === 'NoApi') return window.isSecureContext === false
+      ? 'O microfone só funciona com o Home Assistant aberto por um endereço seguro (https). Neste endereço (http), o celular e o navegador não deixam usar o microfone.'
+      : 'Este navegador não deixa usar o microfone aqui.';
+    return `Não consegui abrir o microfone (${(err && err.message) || n || 'erro'}).`;
+  }
+  let GRAV = null;
+  async function falarConversa() {
+    const ch = S.ch;
+    if (ch.fala === 'ouvindo') {  // Pronto: o que falou vira texto e vai
+      const g = GRAV;
+      GRAV = null; clearTimeout(falarConversa.t);
+      if (!g) { ch.fala = ''; return render(); }
+      const pcm = g.parar();
+      if (pcm.length < TAXA * 0.4) { ch.fala = ''; render(); return toast('Não ouvi nada. Toque no microfone e fale.'); }
+      ch.fala = 'entendendo'; render();
+      try {
+        const r = await fetch('api/fala', { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: pcm.buffer }).then(ok);
+        if (ch.fala !== 'entendendo') return;
+        ch.fala = '';
+        if (r && r.texto) return enviarConversa(r.texto);
+        render();
+      } catch (err) {
+        if (ch.fala === 'entendendo') { ch.fala = ''; render(); }
+        toast(err.message);
+      }
+      return;
+    }
+    if (ch.fala || ch.enviando) return;
+    const g = new Gravador(nv => { const b = $('#conv-pri'); if (b) b.style.setProperty('--nivel', nv.toFixed(2)); });
+    GRAV = g; ch.fala = 'abrindo'; render();
+    try {
+      await g.iniciar();
+    } catch (err) {
+      g.cancelar();
+      if (GRAV === g) { GRAV = null; ch.fala = ''; render(); toast(erroMicrofone(err)); }
+      return;
+    }
+    if (GRAV !== g) return g.cancelar();
+    ch.fala = 'ouvindo'; render();
+    falarConversa.t = setTimeout(() => S.ch.fala === 'ouvindo' && falarConversa(), MAX_FALA * 1000);
+  }
+  function pararFala() {  // Cancelar, fechar a Conversa ou sair do app: o que estava ouvindo some
+    clearTimeout(falarConversa.t);
+    if (GRAV) GRAV.cancelar();
+    GRAV = null;
+    if (S.ch.fala) S.ch.fala = '';
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden && S.ch.fala) { pararFala(); render(); } });
+
+  /* Configurações › Integrações: IA, Memória da IA, Falar e Uso da IA (os textos dos outros apps) */
+  const nomeIA = id => { const e = ((S.ia && S.ia.entidades) || []).find(x => x.id === id); return e ? e.nome : id || 'a padrão do Home Assistant'; };
+  function cardIA() {
+    const a = S.e.ajustes, i = S.ia, on = a.ia;
+    const chave = `<div class="linha-sw"><div><b>${ic('zap', 'ic-s')}Usar IA</b><span>${on ? 'Ligado: a Conversa, o Falar e as fotos na Conversa.' : 'Desligado: a Conversa e o Falar somem em todos os aparelhos.'}</span></div>
+      <button class="sw${on ? ' on' : ''}" data-a="aj" data-k="ia" role="switch" aria-checked="${on}" aria-label="Usar IA"></button></div>`;
+    if (!on) return card('ia', 'zap', 'IA', `<p class="lead">Usa a IA configurada no Home Assistant. O app não guarda chave.</p>${chave}`);
+    const st = !i ? ['manual', 'Verificando a IA do Home Assistant…'] : i.pronta ? ['', `Pronta. Usando ${esc(nomeIA(i.conversa))}.`] : ['erro', esc(i.motivo || 'A IA não está pronta.')];
+    const ents = (i && i.entidades) || [];
+    const op = (k, primeira, soImagem) => `<option value="">${primeira}</option>${ents.map(e => `<option value="${esc(e.id)}"${e.id === (a[k] || '') ? ' selected' : ''}${soImagem && !e.imagens ? ' disabled' : ''}>${esc(e.nome)}${soImagem && !e.imagens ? ' (só texto)' : ''}</option>`).join('')}`;
+    return card('ia', 'zap', 'IA', `<p class="lead">Usa a IA configurada no Home Assistant. O app não guarda chave.</p>${chave}
+      <div class="sub-box"><p class="status ${st[0]}">${st[1]}</p>
+        <div class="campo">${lbl('chat', 'Para conversar', 'ia-conversa')}<select id="ia-conversa" class="inp select" data-aj-sel="ia_conversa">${op('ia_conversa', 'Padrão do Home Assistant')}</select></div>
+        <div class="campo">${lbl('image', 'Para ler fotos', 'ia-fotos')}<select id="ia-fotos" class="inp select" data-aj-sel="ia_fotos">${op('ia_fotos', 'Igual à de conversar', true)}</select></div>
+        <div class="campo">${lbl('search', 'Para pesquisar na internet', 'ia-pesquisa')}<select id="ia-pesquisa" class="inp select" data-aj-sel="ia_pesquisa">${op('ia_pesquisa', 'Igual à de conversar')}</select></div>
+        <div class="acoes"><button class="btn out" data-a="ia-verificar">${ic('refresh', 'ic-s')}Verificar de novo</button></div>
+        <p class="nota">Para pesquisar, a IA precisa da busca na web ligada no Home Assistant.</p></div>`);
+  }
+  function cardMemoria() {
+    if (!S.mem && !S.memPedida) { S.memPedida = true; api.get('memoria-ia').then(r => { S.mem = r; render(); }).catch(() => { S.mem = { lista: [] }; render(); }); }
+    const lista = (S.mem && S.mem.lista) || [];
+    const quando = x => { const t = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)/.exec(x.em || ''); return [t ? `${t[3]}/${t[2]}/${t[1]} ${t[4]}:${t[5]}` : '', x.app, x.quem].filter(Boolean).join(' · '); };
+    return card('memoria-ia', 'nota', 'Memória da IA', `<p class="lead">Uma memória só, da casa, compartilhada por todos os apps: o que você escreve aqui a IA lembra em toda conversa, em qualquer um deles.</p>
+      <div class="campo">${lbl('texto', 'O que lembrar', 'mem-texto')}<textarea id="mem-texto" class="inp umalinha" rows="1" maxlength="240" placeholder="A Ana não gosta de filme de terror"></textarea></div>
+      <div class="acoes"><button class="btn pri" data-a="mem-add">${ic('check', 'ic-s')}Salvar</button></div>
+      ${!S.mem ? '<p class="lead mem-vazio">Carregando…</p>' : lista.length ? `<ul class="mem-lista">${lista.map(x => `<li><span><b>${esc(x.texto)}</b><small>${esc(quando(x))}</small></span>
+        <button class="icbtn" data-a="mem-del" data-v="${esc(x.id)}" aria-label="Apagar">${ic('trash')}</button></li>`).join('')}</ul>` : ''}`);
+  }
+  function cardFalar() {
+    const f = (S.ia && S.ia.fala) || null;
+    const st = !f ? ['manual', 'Verificando…', ''] : f.pronta && !S.ia.pronta ? ['manual', 'Sem fala para texto', 'Só com a IA pronta.']
+      : f.pronta ? ['', 'Pronto para ouvir', `Transcreve com ${esc(f.nome || 'a fala para texto do Home Assistant')}.`] : ['erro', 'Sem fala para texto', esc(f.motivo || '')];
+    return card('falar', 'mic', 'Falar', `<p class="lead">Quem transforma a fala em texto. Não muda o assistente de voz do Home Assistant.</p>
+      <p class="status ${st[0]}"><span><b>${st[1]}</b>${st[2] ? ` · ${st[2]}` : ''}</span></p>
+      <div class="acoes"><button class="btn out" data-a="ia-verificar">${ic('refresh', 'ic-s')}Verificar de novo</button></div>
+      ${f && !f.pronta ? `<div class="passos-box"><b>Como configurar</b><ol class="passos">
+        <li>Com o ${site('https://www.nabucasa.com/', 'Home Assistant Cloud')}, a fala para texto já vem pronta.</li>
+        <li>Sem ele, instale um motor de fala: o app Whisper (local, de graça) com a integração Wyoming, ou a fala para texto de uma IA como Google Gemini ou OpenAI.</li>
+        <li>Volte aqui e toque em Verificar de novo.</li></ol></div>` : ''}`);
+  }
+  const USO_TIPO = { conversa: 'Conversa', foto: 'Conversa com foto', pesquisa: 'Pesquisar na internet' };
+  const USO_RES = { ok: '', cota: 'Sem cota', formato: 'Fora do formato', erro: 'Com erro' };
+  const DIA_SEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  const milTokens = n => n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace('.', ',')} mil` : String(Math.round(n || 0));
+  function cardUso() {
+    if (!S.uso && !S.usoPedido) { S.usoPedido = true; api.get('uso').then(r => { S.uso = r; render(); }).catch(() => { S.uso = {}; render(); }); }
+    const u = S.uso;
+    let corpo;
+    if (!u) corpo = '<p class="status manual">Carregando…</p>';
+    else if (!u.hoje || !(u.dias || []).length || !u.dias.some(x => x.chamadas) && !(u.ultimas || []).length) corpo = '<p class="status manual">Sem dados de uso ainda.</p>';
+    else {
+      const sub = t => t.cota ? `<span class="s alerta">${t.cota} sem cota</span>` : t.erros ? `<span class="s alerta">${t.erros} com erro</span>` : `<span class="s">≈ ${milTokens(t.tokens)} tokens</span>`;
+      const tile = (k, t) => `<div class="uso-tile"><span class="uk">${k}</span><span class="v">${t.chamadas || 0}</span>${sub(t)}</div>`;
+      const max = Math.max(1, ...u.dias.map(x => x.chamadas || 0));
+      const barras = u.dias.map(x => `<span class="uso-bar" title="${esc(`${x.dia.slice(8, 10)}/${x.dia.slice(5, 7)}: ${plural(x.chamadas || 0, 'chamada', 'chamadas')}`)}"><i style="height:${x.chamadas ? Math.max(4, Math.round(x.chamadas / max * 100)) : 0}%"></i></span>`).join('');
+      const ult = (u.ultimas || []).map(c => `<li><b>${esc(USO_TIPO[c.tipo] || c.tipo)}</b><span>${esc(nomeIA(c.ia))}</span>${USO_RES[c.resultado] ? `<span class="r-erro">${esc(USO_RES[c.resultado])}</span>` : ''}
+        <span class="t">${esc(String(c.segundos).replace('.', ','))} s · ≈ ${milTokens(c.tokens)} tokens · ${esc((c.quando || '').slice(8, 10))}/${esc((c.quando || '').slice(5, 7))} ${esc((c.quando || '').slice(11, 16))}</span>${c.erro ? `<span class="uso-motivo">${esc(c.erro)}</span>` : ''}</li>`).join('');
+      corpo = `<div class="uso-tiles">${tile('Hoje', u.hoje)}${tile('7 dias', u.semana)}${tile('Este mês', u.mes)}</div>
+        <div class="uso-chart" aria-hidden="true">${barras}</div><div class="uso-dias" aria-hidden="true">${u.dias.map((x, k) => `<span>${k === u.dias.length - 1 ? 'hoje' : DIA_SEM[new Date(x.dia + 'T12:00:00').getDay()]}</span>`).join('')}</div>
+        <details class="uso-ult"><summary>${ic('chev', 'ic-s seta')}${ic('clock', 'ic-s')}Últimas chamadas (${(u.ultimas || []).length})</summary><ul>${ult || '<li>Nenhuma chamada ainda.</li>'}</ul></details>
+        <p class="nota">O consumo exato fica no painel do provedor da IA.</p>`;
+    }
+    return card('uso-ia', 'chart', 'Uso da IA', `<p class="lead">As chamadas do app para a IA. Os tokens são estimados.</p>${corpo}`);
+  }
+
   const ACOES = {
+    // 0.7.0: a IA
+    conversa: () => abrirConversa(),
+    'falar-top': () => abrirConversa(true),
+    'conv-ideia': el => enviarConversa(el.dataset.v),
+    'conv-enviar': () => enviarConversa(),
+    'conv-falar': () => falarConversa(),
+    'conv-falar-x': () => { pararFala(); render(); },
+    'conv-foto': () => $('#conv-foto-arquivo').click(),
+    'conv-tirar-foto': () => { S.ch.anexo = null; render(); },
+    'conv-nova': async () => { try { S.conv = await api.post('conversa/nova', {}); S.ch.texto = ''; S.ch.anexo = null; render(); } catch (err) { toast(err.message); } },
+    'conv-sim': async el => {
+      try { S.conv = await api.post('conversa/sim', { sim: el.dataset.v === '1' }); S.ch.rolar = true; render(); } catch (err) { toast(err.message); return; }
+      if (el.dataset.v === '1') { try { const r = await api.get('rev'); if (r.rev !== S.e.rev) await carregar(); } catch (e) { /* depois */ } }
+    },
+    'ia-verificar': () => { S.ia = null; render(); carregarIA(true); },
+    'mem-add': async () => {
+      const t = ($('#mem-texto') || {}).value || '';
+      if (!t.trim()) { const x = $('#mem-texto'); if (x) x.focus(); return; }
+      try { S.mem = await api.post('memoria-ia', { acao: 'nova', texto: t }); $('#mem-texto').value = ''; render(); toast('Guardado na Memória da IA'); } catch (err) { toast(err.message); }
+    },
+    'mem-del': async el => { try { S.mem = await api.post('memoria-ia', { acao: 'apagar', id: el.dataset.v }); render(); } catch (err) { toast(err.message); } },
     ir: el => ir(el.dataset.v),
     voltar: () => history.back(),
     // abre nas listas prontas, sem o foco no campo (o teclado não sobe por cima delas)
@@ -1028,6 +1331,7 @@
       try {
         S.e.ajustes = (await api.post('ajustes', { [k]: !S.e.ajustes[k] })).ajustes;
         if (k === 'correria') S.e.correria.ligado = S.e.ajustes.correria;
+        if (k === 'ia') { if (!S.e.ajustes.ia && S.folha && S.folha.tipo === 'conversa') { pararFala(); fecharFolha(); } carregarIA(); }
         aplicarCor();
         render();
       } catch (err) { toast(err.message); }
@@ -1108,6 +1412,9 @@
   document.addEventListener('keydown', ev => {
     if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('[data-dobra]')) { ev.preventDefault(); ev.target.click(); }
     if (ev.key === 'Escape' && S.folha && !(window.__selectSheet && window.__selectSheet.isOpen())) fecharFolha();
+    // a Conversa: com teclado de verdade, o Enter envia; no celular, é uma linha nova (o botão envia), como nos outros apps
+    if (ev.key === 'Enter' && !ev.shiftKey && ev.target.id === 'conv-texto' && !noCelular() && !ev.isComposing) { ev.preventDefault(); enviarConversa(); }
+    if (ev.key === 'Enter' && !ev.shiftKey && ev.target.id === 'mem-texto') { ev.preventDefault(); ACOES['mem-add'](); }
     if (ev.key === 'Enter' && ev.target.id === 'f-chave') { ev.preventDefault(); ACOES['chave-salvar']($('[data-a="chave-salvar"]')); }
     if (ev.key === 'Enter' && ev.target.id === 'f-igdb-segredo') { ev.preventDefault(); ACOES['igdb-salvar']($('[data-a="igdb-salvar"]')); }
     // o nome da categoria: um campo de uma linha só, o Enter salva
@@ -1120,6 +1427,11 @@
     if (id === 'add-q') { S.add.q = ev.target.value; buscarTMDB(); }
     if (id === 'cat-nome' && S.catf) S.catf.nome = ev.target.value;
     if (id === 'cat-nova-t') S.novaCat = ev.target.value;
+    if (id === 'conv-texto') {  // o botão troca entre o Falar e o Enviar quando o campo fica vazio ou não
+      const antes = !S.ch.texto.trim();
+      S.ch.texto = ev.target.value;
+      if (antes !== !S.ch.texto.trim()) pintarJanela();
+    }
   });
   document.addEventListener('change', ev => {
     const id = ev.target.id, t = S.folha && S.e.titulos.find(x => x.id === S.folha.id);
@@ -1143,6 +1455,11 @@
       salvarBusca();
       render();
     }
+    const k = ev.target.dataset && ev.target.dataset.ajSel;  // 0.7.0: a IA de cada uso
+    if (k) {
+      api.post('ajustes', { [k]: ev.target.value }).then(r => { S.e.ajustes = r.ajustes; S.ia = Object.assign({}, S.ia, { [k.slice(3)]: ev.target.value }); render(); }).catch(err => toast(err.message));
+    }
+    if (id === 'conv-foto-arquivo' && ev.target.files[0]) { lerFoto(ev.target.files[0]); ev.target.value = ''; }
     if (id === 'dados-arquivo' && ev.target.files[0]) {
       const f = ev.target.files[0], r = new FileReader();
       r.onload = () => { S.importar = { nome: f.name, b64: String(r.result).split(',')[1] || '' }; render(); };

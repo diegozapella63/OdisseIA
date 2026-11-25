@@ -75,6 +75,21 @@ Nos dois, em cima da lista:
 
 Em **Configurações › Opções › O que controlar**, ligue as séries, os filmes e os jogos (pelo menos um). O que fica desligado some da tela e do CorrerIA; nada é apagado, e volta ao ligar de novo.
 
+## A IA: Conversa e Falar
+
+Com uma IA no Home Assistant (uma tarefa de IA, como Google Gemini ou OpenAI, em **Configurações › Dispositivos e serviços**), o alto de toda tela tem a **Conversa** e o **Falar**:
+
+- **Conversa**: pergunte sobre a lista da casa (o que ver ou jogar, em que episódio vocês pararam, o que vai sair, onde assistir) ou peça para pôr, marcar, mudar a categoria ou apagar um título. A IA lê a lista na hora; para mudar, ela mostra o que vai fazer e espera você tocar em **Sim** (em **Não**, nada muda; outra mensagem também descarta). Ela também pesquisa na internet o que a lista não tem (críticas, se vale a pena, quando sai a próxima temporada) e guarda na **Memória da IA** o que você pedir para lembrar ("a Ana não gosta de terror"). **Nova conversa** recomeça; o Voltar do celular fecha.
+- **Escolher fotos** (o botão da foto, na Conversa): a foto de um pôster, de um print de um streaming, da capa de um jogo ou de uma lista escrita; a IA vê a foto e propõe pôr os títulos na lista.
+- **Falar** (o microfone): fale e toque em ✓; o que você falou vira texto pela fala para texto do Home Assistant e vai para a Conversa. Precisa do Home Assistant aberto por um endereço seguro (https).
+
+Em **Mais › Configurações › Integrações**:
+
+- **IA**: **Usar IA** (desligado, a Conversa e o Falar somem em todos os aparelhos) e a IA de cada uso: **Para conversar**, **Para ler fotos** e **Para pesquisar na internet** (a de fotos e a de pesquisar vazias são a de conversar; para pesquisar, a IA precisa da busca na web ligada no Home Assistant).
+- **Memória da IA**: uma memória só, da casa, compartilhada por todos os apps: o que você escreve aqui a IA lembra em toda conversa, em qualquer um deles.
+- **Falar**: quem transforma a fala em texto e, sem ninguém, como configurar.
+- **Uso da IA**: as chamadas do app para a IA (hoje, 7 dias e este mês) e as últimas, com o motivo de cada erro. Os tokens são estimados.
+
 ## Pelo CorrerIA
 
 Com **Configurações › Integrações › CorrerIA** ligado, o CorrerIA (WhatsApp, Claude e Gemini) pode perguntar o que a casa está vendo e jogando, adicionar um filme, uma série ou um jogo pelo nome (também uma série inteira já vista), uma coleção inteira (de filmes ou de jogos), marcar o próximo episódio, a categoria, a situação e quem vê (também de vários de uma vez), dizer onde assistir e em que plataformas jogar, mostrar as listas prontas e criar, renomear e apagar as categorias.

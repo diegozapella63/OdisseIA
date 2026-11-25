@@ -146,7 +146,11 @@ def limpar_dados(d):
         tipos = {k: True for k in TIPOS}
     ajustes = {"cor": aj.get("cor") if isinstance(aj.get("cor"), str) and re.match(r"^[a-z]{2,12}$", aj["cor"]) else "lilas",
                "cor_dia": aj.get("cor_dia") is not False, "quem": aj.get("quem") is not False, "correria": aj.get("correria") is True,
-               "tipos": tipos}
+               "tipos": tipos,
+               # 0.7.0: a IA (Configurações › Integrações › IA): ligada de início; a de cada uso, uma tarefa de IA do Home
+               # Assistant ("": a padrão de lá; a de fotos e a de pesquisar vazias são a de conversar)
+               "ia": aj.get("ia") is not False,
+               **{k: aj[k] if isinstance(aj.get(k), str) and IA_RE.match(aj[k]) else "" for k in ("ia_conversa", "ia_fotos", "ia_pesquisa")}}
     return {"versao": 1, "rev": _int(d.get("rev"), 0, 10 ** 12), "titulos": titulos[:MAX_TITULOS], "categorias": categorias, "ajustes": ajustes}
 
 
@@ -378,6 +382,9 @@ def data_br(iso):
     except ValueError:
         return str(iso or "")
     return d.strftime("%d/%m/%Y")
+
+
+IA_RE = re.compile(r"^(?:ai_task\.[a-z0-9_]{1,80})?$")
 
 
 def tipos_ligados(d):

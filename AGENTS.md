@@ -32,6 +32,9 @@ odisseia/app/tmdb.py          o TMDB: busca, detalhes em pt-BR, onde assistir no
 odisseia/app/igdb.py          o IGDB: o acesso pela Twitch (na memória), a busca (com as coleções), as listas (a popularidade do
                               IGDB), as coleções, os detalhes e as capas; consultas em Apicalypse (POST)
 odisseia/app/ferramentas.py   as ferramentas do CorrerIA (resumo, buscar, ver, adicionar, marcar, proximo_episodio, apagar)
+odisseia/app/ia.py            a Conversa: a IA do Home Assistant com as ferramentas daqui (lê na hora, muda depois do Sim)
+odisseia/app/fala.py          o Falar: a fala para texto do Home Assistant (o arquivo do CorrerIA)
+odisseia/app/uso.py           o Uso da IA (o do CorrerIA); memoria_ia.py: a Memória da IA de todos os apps (a dos outros apps em Python)
 odisseia/app/www/             a tela: index.html, app.js (JavaScript puro, sem build), styles.css, fontes; selectsheet.js,
                               hatema.js e textareas.js são cópias dos outros apps (ainda fora do tools/iguais.py da família)
 tests/                        testes (unittest; a tela com playwright); tests/apoio.py tem o TMDB e o IGDB de mentira (inventados)
@@ -148,6 +151,10 @@ verdade, com a sua chave em Configurações). `ODISSEIA_TMDB` e `ODISSEIA_TMDB_I
 - Os campos das janelas fecham pelo título (`pintarJanela`: `.dobra-campo`, `data-campo` com o título, `odisseia-campos`; `.campo.fechado`).
 
 0.6.0 (o dono, à lista do que a IA não fazia: "todas"): a ferramenta `categoria` (`acao`: nova, renomear com `novo_nome`, apagar; `tipo` e `nome`), pelo `R.mudar_categorias` da tela; um tipo desligado é erro. Teste: `TestNovidades060`.
+
+0.7.0 (o dono: "no topo das telas opções de chat e de falar igual os outros apps"; "toda a sorte de IA deve estar no OdisseIA"): a IA.
+- Servidor: `ia.py` (o `Agente`, com o modelo do CorrerIA: as ferramentas do `ferramentas.py` mais `pesquisar` e `lembrar`; as leituras rodam na hora, até 4 rodadas, e as mudanças viram o `pendente` que espera o Sim; `validar` confere os argumentos antes, e as guardas tiram o «já fiz» e o «Toque em Sim» escritos pela IA e o apagar que veio de uma foto ou pesquisa; `simulado` no computador e nos testes), `fala.py` (o do CorrerIA), `uso.py` (o do CorrerIA) e `memoria_ia.py` (o dos outros apps em Python). No `server.py`: `ia_chamar` (o `ai_task.generate_data` com a Memória da IA na frente e o `IA_SO_MATERIAL` no fim; a foto como anexo pela pasta media, `IA_TMP_REL`; o Uso da IA), `ia_ent` (a IA de cada uso: `ajustes.ia_conversa`, `ia_fotos`, `ia_pesquisa`; `R.IA_RE`), `ia_info` (`GET /api/ia`), `conversar`/`confirmar`/`nova_conversa` (`/data/conversa.json`, a da casa, as últimas 60; `POST /api/conversa`, `/api/conversa/sim {sim}`, `/api/conversa/nova`), `usar_na_conversa` (o `usar_ferramenta` com `cliente: OdisseIA`, que não conta como uso do CorrerIA: `de_fora`), `POST /api/fala` (PCM de 16 kHz), `GET /api/uso` e `GET`/`POST /api/memoria-ia`. `ajustes.ia` começa ligado; `IA_MOCK` (`ODISSEIA_IA_MOCK` ou o computador sem o Home Assistant). O `config.yaml` mapeia a pasta media.
+- Tela: `barraTopo()` no `topo()` de toda tela (a marca, o olá, `.chat-top` e `.mic-top`, só com `iaOn()`/`falaOn()`); a janela `conversa` (`folhaConversa`, `.folha.conversa`: as perguntas prontas `IDEIAS`, as mensagens com `md()`, o Sim e o Não, Nova conversa, `.conv-pe` com Escolher fotos, `lerFoto`/`encolher`, e o Falar ou o Enviar; no celular, o Enter é uma linha nova); o Falar (`Gravador`, `falarConversa`, `pararFala`); Integrações: `cardIA` (com o `.sub-box`), `cardMemoria`, `cardFalar` e `cardUso`. Testes: `tests/test_ia.py`, `tests/test_fala.py`, `tests/test_memoria_ia.py` e `test_a_ia_conversa_falar_e_integracoes` no `tests/test_tela.py`.
 
 ## Conversa com o dono
 
