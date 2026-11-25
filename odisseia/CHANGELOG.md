@@ -1,5 +1,9 @@
 # Mudanças
 
+## 0.6.0
+
+- **Pelo CorrerIA**: a IA agora cria, renomeia e apaga as **categorias** (de filmes, séries ou jogos), como em Mais › Categorias. Só depois do seu sim.
+
 ## 0.5.0
 
 - **Concluídos** no lugar de Vistos (o nome serve também para os jogos): o que está salvo como visto ou jogado.

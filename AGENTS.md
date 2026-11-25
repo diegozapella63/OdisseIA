@@ -147,6 +147,8 @@ verdade, com a sua chave em Configurações). `ODISSEIA_TMDB` e `ODISSEIA_TMDB_I
 - Coleção: `S.colCat` (Manter ou uma categoria, `col-cat`) → `adicionar_colecao {categoria}` (vale para tudo o que entra; `res.categoria` é o nome); a etiqueta de cada capa que já está na lista. A ferramenta `adicionar_colecao` aceita `categoria`.
 - Os campos das janelas fecham pelo título (`pintarJanela`: `.dobra-campo`, `data-campo` com o título, `odisseia-campos`; `.campo.fechado`).
 
+0.6.0 (o dono, à lista do que a IA não fazia: "todas"): a ferramenta `categoria` (`acao`: nova, renomear com `novo_nome`, apagar; `tipo` e `nome`), pelo `R.mudar_categorias` da tela; um tipo desligado é erro. Teste: `TestNovidades060`.
+
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado. Ele usa o app do Home

@@ -230,7 +230,7 @@ class TestCorrerIA(unittest.TestCase):
         self.assertEqual(oct(os.stat(arq).st_mode & 0o777), "0o600")
         self.assertEqual(self.ferr("GET", chave="errada")[0], 401)
         st, r = self.ferr("GET")
-        self.assertEqual([f["nome"] for f in r["ferramentas"]], ["resumo", "buscar", "ver", "lista_pronta", "adicionar", "adicionar_colecao", "marcar", "marcar_varios", "proximo_episodio", "apagar"])
+        self.assertEqual([f["nome"] for f in r["ferramentas"]], ["resumo", "buscar", "ver", "lista_pronta", "adicionar", "adicionar_colecao", "marcar", "marcar_varios", "proximo_episodio", "categoria", "apagar"])
         self.assertEqual(self.usar("resumo")[1]["texto"], "A lista da casa está vazia.")
         self.assertIn("Falta a chave do TMDB", self.usar("adicionar", {"nome": "Mar de Estrelas"})[1]["erro"])
         pedir(self.base, "POST", "/api/tmdb", {"chave": apoio.CHAVE})
@@ -752,3 +752,39 @@ class TestNovidades050(unittest.TestCase):
         self.assertEqual({t["categoria"] for t in S.ler()["titulos"]}, {""})
         with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "não é uma categoria"):
             S.usar_ferramenta({"nome": "adicionar_colecao", "argumentos": {"nome": "grande viagem", "categoria": "Nada"}})
+
+
+class TestNovidades060(unittest.TestCase):
+    """0.6.0: as categorias pelo CorrerIA (criar, renomear e apagar)."""
+
+    def setUp(self):
+        apoio.limpar()
+        apoio.fixar_hoje(self)
+        self.base = apoio.Servidor.subir()
+        S.guardar_chave(apoio.CHAVE)
+
+    def usar(self, **a):
+        return S.usar_ferramenta({"nome": "categoria", "argumentos": a})["texto"]
+
+    def test_criar_renomear_e_apagar(self):
+        self.assertEqual(self.usar(acao="nova", tipo="filme", nome="Para a família"), "Categoria criada nos filmes: Para a família.")
+        c = S.ler()["categorias"]["filme"][0]
+        self.assertIn(c["cor"], S.R.CORES)
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "já existe"):
+            self.usar(acao="nova", tipo="filme", nome="para a familia")
+        S.adicionar({"tipo": "filme", "tmdb": 101, "situacao": "visto"})
+        d = S.ler()
+        d["titulos"][0]["categoria"] = c["id"]
+        S.salvar(d)
+        self.assertEqual(self.usar(acao="renomear", tipo="filme", nome="para a família", novo_nome="Família"), "Categoria renomeada: Para a família → Família.")
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "novo_nome"):
+            self.usar(acao="renomear", tipo="filme", nome="Família")
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "não é uma categoria de séries"):
+            self.usar(acao="apagar", tipo="serie", nome="Família")
+        self.assertEqual(self.usar(acao="apagar", tipo="filme", nome="Família"), "Categoria apagada: Família. 1 título ficou sem categoria.")
+        self.assertEqual(S.ler()["titulos"][0]["categoria"], "")
+        d = S.ler()
+        d["ajustes"]["tipos"] = {"filme": True, "serie": True, "jogo": False}
+        S.salvar(d)
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "jogos estão desligados"):
+            self.usar(acao="nova", tipo="jogo", nome="Corrida")

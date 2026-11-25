@@ -65,6 +65,12 @@ FERRAMENTAS = [
         "categoria": _CAT, "quem": _QUEM}, ["titulos"], grava=True),
     _f("proximo_episodio", "Próximo episódio", "Marca como visto o episódio seguinte ao último visto de uma série.",
        {"titulo": _TIT}, ["titulo"], grava=True),
+    # 0.6.0 (o dono: "todas", das que faltavam): as categorias, como em Mais › Categorias
+    _f("categoria", "Criar, renomear ou apagar categoria", "As categorias da casa, de cada tipo (as de agora estão no resumo): "
+       "nova (com o nome), renomear (o nome e o novo_nome) ou apagar (os títulos dela ficam sem categoria). A cor da nova é a "
+       "menos usada.",
+       {"acao": {"type": "string", "enum": ["nova", "renomear", "apagar"]}, "tipo": {"type": "string", "enum": TIPOS},
+        "nome": {"type": "string"}, "novo_nome": {"type": "string"}}, ["acao", "tipo", "nome"], grava=True),
     _f("apagar", "Apagar", "Tira um título da lista da casa.", {"titulo": _TIT}, ["titulo"], grava=True, apaga=True),
 ]
 POR_NOME = {f["nome"]: f for f in FERRAMENTAS}
@@ -269,6 +275,23 @@ def chamar(nome, args, d, pessoas, pessoa=None, det=None, agora=None):
         if nome == "proximo_episodio":
             R.proximo_ep(t, agora)
             return f"Feito: {t['nome']} {R.ep_txt(t['temp'], t['ep'])} visto." + (" A série acabou: ficou como Visto." if t["situacao"] == "visto" else ""), True
+        if nome == "categoria":
+            tipo, acao = a["tipo"], a["acao"]
+            if tipo not in R.tipos_ligados(d):
+                raise ErroFerramenta(f"Os {R.PLURAIS[tipo]} estão desligados (Mais › Configurações › Opções › O que controlar).")
+            if acao == "nova":
+                c = R.mudar_categorias(d, {"acao": "nova", "tipo": tipo, "nome": a["nome"]})
+                return f"Categoria criada nos {R.PLURAIS[tipo]}: {c['nome']}.", True
+            cid = R.achar_categoria(d, tipo, a["nome"])
+            velho = R.nome_categoria(d, {"tipo": tipo, "categoria": cid})
+            if acao == "renomear":
+                if not str(a.get("novo_nome") or "").strip():
+                    raise ErroFerramenta("Falta: novo_nome.")
+                c = R.mudar_categorias(d, {"acao": "renomear", "id": cid, "nome": a["novo_nome"]})
+                return f"Categoria renomeada: {velho} → {c['nome']}.", True
+            n = sum(1 for t in d["titulos"] if t.get("categoria") == cid)
+            R.mudar_categorias(d, {"acao": "apagar", "id": cid})
+            return f"Categoria apagada: {velho}." + (f" {n} {'título ficou' if n == 1 else 'títulos ficaram'} sem categoria." if n else ""), True
         if nome == "apagar":  # a última: o nome já foi conferido
             d["titulos"] = [x for x in d["titulos"] if x["id"] != t["id"]]
             return f"Apagado: {t['nome']}.", True
