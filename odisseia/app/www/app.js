@@ -696,6 +696,24 @@
     return { titulo: d.nome, icone: 'layers', alta: true, pe, corpo: `${d.sinopse ? `<p class="sinopse">${esc(d.sinopse)}</p>` : ''}
       <div class="campo" style="margin-top:14px">${lbl(jg ? 'gamepad' : 'film', jg ? plural(d.itens.length, 'jogo', 'jogos') : plural(d.itens.length, 'filme', 'filmes'))}${grade(d.itens, 'col')}</div>${campoCat}` };
   }
+  /* O que um campo de janela tem escolhido ou escrito (para o campo fechado): os botões marcados, senão a caixa de
+     seleção, senão o texto */
+  const SUB_CAMPO = 'small, .sub, .badge, .n, .cont';
+  const textoBotao = b => [...b.childNodes].filter(n => n.nodeType === 3 || (n.nodeType === 1 && !n.matches(SUB_CAMPO) && n.tagName !== 'svg'))
+    .map(n => n.textContent).join(' ').replace(/\s+/g, ' ').trim();
+  function valorCampo(c) {
+    const meu = el => el.closest('.campo') === c && !el.closest('.lbl, .dobra-campo');
+    const v = [...c.querySelectorAll('.on, .sel, [aria-pressed="true"], [aria-checked="true"]')]
+      .filter(b => meu(b) && b.matches('button, .chip, .escolha, [role="radio"], [role="checkbox"]'))
+      .map(b => textoBotao(b) || b.getAttribute('title') || b.getAttribute('aria-label') || '').filter(Boolean);
+    let t = v.length ? [...new Set(v)].join(', ') : [...c.querySelectorAll('select, textarea, input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=hidden])')]
+      .filter(meu)
+      .map(x => (x.tagName === 'SELECT' ? (x.value !== '' ? (x.selectedOptions[0] || {}).textContent || '' : '') : (x.value || '').split('\n')[0]).replace(/\s+/g, ' ').trim())
+      .filter(Boolean).join(' · ');
+    if (t.length > 48) t = t.slice(0, 47) + '…';
+    return t;
+  }
+
   function pintarJanela() {
     const el = $('#janela');
     const f = S.folha;
@@ -728,7 +746,10 @@
       r.dataset.campo = k;
       r.setAttribute('role', 'button');
       r.setAttribute('aria-expanded', String(!F.has(k)));
-      r.insertAdjacentHTML('beforeend', ic('chev', 'ic-s seta'));
+      // 0.8.0 (o dono: "tem que mostrar o que foi selecionado do ladinho, quando eu retraio"): fechado, o escolhido ou o
+      // escrito ao lado do título, como nos outros apps
+      const v = valorCampo(c);
+      r.insertAdjacentHTML('beforeend', (v ? `<span class="fl-val">· ${esc(v)}</span>` : '') + ic('chev', 'ic-s seta'));
       c.classList.toggle('fechado', F.has(k));
     });
     if (rolou) corpo.scrollTop = rolou;

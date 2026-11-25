@@ -1322,6 +1322,16 @@ class Handler(BaseHTTPRequestHandler):
     def corpo(self, limite=MAX_CORPO):
         n = int(self.headers.get("Content-Length") or 0)
         if n > limite:
+            # 0.8.0: lê e joga fora o que veio (até 4 vezes o limite) antes de responder: sem isso, quem ainda está
+            # mandando recebe a conexão fechada no meio (no GitHub, um "Broken pipe" no lugar do 400)
+            falta = min(n, limite * 4)
+            while falta > 0:
+                pedaco = self.rfile.read(min(falta, 65536))
+                if not pedaco:
+                    break
+                falta -= len(pedaco)
+            if n > limite * 4:
+                self.close_connection = True
             raise ValueError("Arquivo grande demais.")
         return self.rfile.read(n) if n else b""
 

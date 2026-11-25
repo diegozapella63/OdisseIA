@@ -368,6 +368,11 @@ class TestTela(unittest.TestCase):
         pg.click("#resultado .tit >> nth=0")
         pg.click(".folha .dobra-campo >> text=Quem")
         self.assertTrue(pg.locator(".folha .campo:has(.dobra-campo:has-text('Quem'))").evaluate("c => c.classList.contains('fechado')"))
+        # 0.8.0: fechado, o escolhido ao lado do título (Quem · Ana); aberto, não
+        val = pg.locator(".folha .dobra-campo:has-text('Quem') .fl-val")
+        self.assertTrue(val.is_visible() and val.inner_text().startswith("· "), f"Quem fechado: o escolhido ao lado ({val.inner_text() if val.count() else ''})")
+        sit = pg.locator(".folha .dobra-campo:has-text('Situação') .fl-val")
+        self.assertFalse(sit.is_visible(), "aberto, sem o escolhido no título")
         self.padrao(pg, "o título com um campo fechado")
         pg.go_back()
         pg.click("#resultado .tit >> nth=1")

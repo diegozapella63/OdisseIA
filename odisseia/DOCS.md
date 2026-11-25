@@ -51,7 +51,7 @@ As sagas de filmes e as séries de jogos aparecem na busca com a etiqueta **Cole
 
 ## O título
 
-Cada campo da janela (Situação, Categoria, Quem, Onde assistir, Sinopse…) fecha e abre pelo título, com a seta no canto; o aparelho lembra os fechados, em todos os títulos.
+Cada campo da janela (Situação, Categoria, Quem, Onde assistir, Sinopse…) fecha e abre pelo título, com a seta no canto; fechado, o escolhido aparece ao lado do título (**Situação · Quero ver**, **Parou em · Temporada 1 · Episódio 3**), e o aparelho lembra os fechados, em todos os títulos.
 
 - **Situação**: Quero ver ou Visto (num jogo, Quero jogar ou Jogado). Visto numa série marca até o último episódio que saiu. A série em Quero ver com algum episódio visto aparece em **Continuar vendo**, no Agora.
 - **Parou em** (séries): a temporada e o último episódio visto. **Vi o T2 E6** marca o seguinte. No último episódio de uma série que acabou, ela vira **Visto** sozinha.

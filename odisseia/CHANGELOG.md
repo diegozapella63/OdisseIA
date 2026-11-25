@@ -1,5 +1,10 @@
 # Mudanças
 
+## 0.8.0
+
+- Na janela de um título, um campo fechado mostra ao lado do título o que está escolhido: **Situação · Quero ver**,
+  **Parou em · Temporada 1 · Episódio 3**, **Quem · Ana**, como nos outros apps.
+
 ## 0.7.0
 
 - **A IA no OdisseIA**, como nos outros apps: no alto de toda tela, a **Conversa** e o **Falar**.
