@@ -42,6 +42,7 @@
     phone: '<rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/>',
     toggle: '<rect x="2" y="6" width="20" height="12" rx="6"/><circle cx="16" cy="12" r="3"/>',
     chev: '<path d="m9 18 6-6-6-6"/>',
+    sparkles: '<path d="M11 3.5 12.8 9l5.7 1.8-5.7 1.8L11 18.3l-1.8-5.7-5.7-1.8L9.2 9z"/><path d="M19 3v4M17 5h4"/>',
     back: '<path d="m15 18-6-6 6-6"/>',
     'external-link': '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
     zap: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
@@ -84,7 +85,7 @@
     e: null, tela: 'agora', aba: guardada('odisseia-aba') || 'integracoes', tema: guardada('odisseia-tema') || 'auto',
     folha: null, folhas: [], col: null, hist: guardada('odisseia-vistos') || 'serie', vcat: lerJSON('odisseia-vistos-cat', {}), sel: null, lote: null, catf: null, busca: Object.assign({ texto: '', tipo: '', situacao: '', quem: '', categoria: '' }, lerJSON('odisseia-busca', {})),
     add: { q: '', tipo: '', res: null, erro: '', buscando: false, lista: 'alta', listas: {} }, aband: false, tempEsc: {}, conf: '', dados: null, trocarChave: false,
-    ia: null, conv: null, ch: { texto: '', anexo: null, enviando: false, fala: '', rolar: false }, mem: null, uso: null,
+    ia: null, conv: null, ch: { texto: '', anexo: null, enviando: false, fala: '', rolar: false, rapidas: false, editando: null }, mem: null, uso: null,
   };
   const api = {
     get: rota => fetch('api/' + rota, { cache: 'no-store' }).then(ok),
@@ -305,7 +306,8 @@
       const k = ag + ':' + g.k, F = new Set(lerJSON('odisseia-grupos', [])), fechado = F.has(k);
       return `<div class="grupo${fechado ? ' fechado' : ''}"><button class="grupo-h" data-a="grupo" data-v="${esc(k)}" aria-expanded="${!fechado}">${g.c ? `<span class="dot" style="${estiloCor(g.c.cor)}"></span>` : ic(ag === 'genero' ? 'texto' : 'tag', 'ic-s')}<b>${esc(g.nome)}</b><span class="cont">${g.ts.length}</span>${ic('chev', 'ic-s seta')}</button>${fechado ? '' : ul(g.ts)}</div>`;
     }).join('') : ul(ts))
-      + (sel ? `<div class="selbar"><button class="btn pri" data-a="sel-alterar"${n ? '' : ' disabled'}>${ic('nota', 'ic-s')}${n ? 'Alterar ' + plural(n, 'título', 'títulos') : 'Alterar'}</button></div>` : '');
+      // 0.10.0 (o padrão da família): o Apagar ao lado do Alterar, com o Desfazer
+      + (sel ? `<div class="selbar dois"><button class="btn perigo" data-a="sel-apagar"${n ? '' : ' disabled'}>${ic('trash', 'ic-s')}Apagar</button><button class="btn pri" data-a="sel-alterar"${n ? '' : ' disabled'}>${ic('nota', 'ic-s')}${n ? 'Alterar ' + plural(n, 'título', 'títulos') : 'Alterar'}</button></div>` : '');
   }
   const lista = (ts, opts) => `<ul class="titulos">${ts.map(t => linhaTit(t, opts)).join('')}</ul>`;
   const ordem = ts => ts.slice().sort((a, b) => String(b.atualizado).localeCompare(String(a.atualizado)));
@@ -825,7 +827,9 @@
     render();
   }
   function fecharFolha() {
-    if (history.state && history.state.folha) history.back();
+    // o X da Conversa com as perguntas prontas abertas fecha as duas (a entrada delas e a da janela)
+    if (history.state && history.state.painel && history.state.folha) { S.ch.rapidas = false; S.ch.editando = null; history.go(-2); }
+    else if (history.state && history.state.folha) history.back();
     else { S.folhas = []; S.folha = null; render(); }
   }
   window.addEventListener('popstate', ev => {
@@ -837,6 +841,7 @@
     S.conf = '';
     S.novaCat = null;
     if (S.sel && !st.sel) S.sel = null; // o Voltar do celular sai do Selecionar
+    if (!st.painel) { S.ch.rapidas = false; S.ch.editando = null; }  // e fecha as perguntas prontas
     if (st.t && st.t !== S.tela) { S.tela = st.t; window.scrollTo(0, 0); }
     render();
   });
@@ -944,7 +949,50 @@
     }
     return h + (lista ? '</ul>' : '');
   }
-  const IDEIAS = ['O que tem de novo para ver?', 'Em que episódio paramos?', 'Me sugira um filme da nossa lista', 'Quais jogos vão sair?'];
+  /* 0.10.0 (o padrão da família): as perguntas prontas: 6 à vista e, em Editar perguntas, as Mais perguntas (20 modelos; um
+     toque põe), guardadas no aparelho (odisseia-perguntas). Todas gerais, que valem em qualquer casa: nada de títulos,
+     pessoas ou categorias inventadas (o pedido com o detalhe é o que a pessoa escreve). */
+  const PERGUNTAS = ['O que tem de novo para ver?', 'Em que episódio paramos?', 'O que sai esta semana?', 'Me sugere um filme da nossa lista',
+    'Quais jogos vão sair?', 'O que está em alta para ver?',
+    'O que a casa viu este mês?', 'Quais séries estão em andamento?', 'O que tem em Quero ver?', 'Quais jogos estão em Quero jogar?',
+    'Onde assistir o que está na lista?', 'Me sugere uma série para começar', 'Me sugere um jogo da nossa lista', 'Quais coleções estão pela metade?',
+    'Qual série está mais perto do fim?', 'O que a casa viu por último?', 'Quantos títulos tem cada categoria?', 'Quais estreias valem a pena?',
+    'Quais séries vão ter episódio novo?', 'O que está nos cinemas agora?', 'Quais são os mais bem avaliados para ver?', 'Me sugere algo para ver em família',
+    'Quantos títulos a casa já concluiu?', 'Quais títulos estão sem categoria?', 'O que cada pessoa está vendo?', 'O que da lista está em algum streaming?'];
+  const PERG = 'odisseia-perguntas';
+  function perguntas() {
+    const pad = PERGUNTAS.slice(0, 6), modelos = PERGUNTAS.slice(6, 26), v = lerJSON(PERG, null);
+    return { lista: Array.isArray(v) ? v.filter(x => typeof x === 'string' && x.trim()) : pad, pad, modelos };
+  }
+  // em Editar perguntas, as Perguntas prontas e as Mais perguntas fecham num toque no título (o aparelho lembra)
+  const edCab = (k, icone, titulo, fechada) => `<button type="button" class="perg-h" data-a="perg-dobra" data-v="${k}" aria-expanded="${!fechada}">${ic(icone, 'ic-s')}<span>${esc(titulo)}</span>${ic('chev', 'ic-s seta')}</button>`;
+  function blocoPerguntas() {
+    const ed = S.ch.editando, F = lerJSON('odisseia-perguntas-fechadas', {});
+    if (ed) {
+      const mais = perguntas().modelos.filter(q => !ed.lista.includes(q));
+      return `<div class="perg-ed">${edCab('prontas', 'nota', `Perguntas prontas (${ed.lista.length})`, F.prontas)}
+        ${F.prontas ? '' : `${ed.lista.map((q, i) => `<div class="perg-lin"><textarea class="perg-txt" data-ed-i="${i}" rows="1" maxlength="120" data-size="off" aria-label="Mudar “${esc(q)}”">${esc(q)}</textarea><button class="perg-x" data-a="perg-tirar" data-v="${i}" aria-label="Tirar “${esc(q)}”" title="Tirar">${ic('x', 'ic-s')}</button></div>`).join('')}
+        <div class="perg-nova"><textarea id="perg-nova" class="inp umalinha" rows="1" maxlength="120" placeholder="Nova pergunta" aria-label="Nova pergunta">${esc(ed.rascunho || '')}</textarea><button class="btn out" data-a="perg-add">${ic('plus', 'ic-s')}Adicionar</button></div>`}
+        ${mais.length ? `${edCab('mais', 'sparkles', `Mais perguntas (${mais.length})`, F.mais)}
+          ${F.mais ? '' : mais.map(q => `<button class="perg-lin perg-modelo" data-a="perg-por" data-v="${esc(q)}" aria-label="Pôr “${esc(q)}”"><span>${esc(q)}</span>${ic('plus', 'ic-s')}</button>`).join('')}` : ''}
+        <div class="acoes dois"><button class="btn out" data-a="perg-padrao">${ic('refresh', 'ic-s')}Padrão</button><button class="btn pri" data-a="perg-pronto">${ic('check', 'ic-s')}Pronto</button></div></div>`;
+    }
+    const { lista } = perguntas();
+    return `${lista.length ? `<div class="conv-ideias">${lista.map(t => `<button class="btn" data-a="conv-ideia" data-v="${esc(t)}">${ic('sparkles', 'ic-s')}${esc(t)}</button>`).join('')}</div>` : ''}
+      <button class="perg-abrir" data-a="perg-editar">${ic('nota', 'ic-s')}Editar perguntas</button>`;
+  }
+  // as perguntas prontas por cima da caixa (o ✨) e o Editar perguntas ocupam uma entrada no histórico: o Voltar fecha
+  function abrirPerguntas(o) {
+    const ja = S.ch.rapidas || S.ch.editando;
+    Object.assign(S.ch, o);
+    if (!ja && (S.ch.rapidas || S.ch.editando)) history.pushState(Object.assign({}, history.state, { painel: 1 }), '');
+    pintarJanela();
+  }
+  function fecharPerguntas() {
+    if (!(S.ch.rapidas || S.ch.editando)) return;
+    if (history.state && history.state.painel) history.back();
+    else { S.ch.rapidas = false; S.ch.editando = null; pintarJanela(); }
+  }
   function folhaConversa() {
     const c = S.conv || { mensagens: [], pendente: null }, ch = S.ch, msgs = c.mensagens;
     const bolha = (m, i) => {
@@ -956,7 +1004,7 @@
     };
     const corpo = !msgs.length && !ch.enviando
       ? `<div class="conv-vazia"><p class="lead">Pergunte sobre a lista da casa, peça para pôr ou marcar um título, ou mande a foto de um pôster.</p>
-          <div class="conv-ideias">${IDEIAS.map(t => `<button class="btn" data-a="conv-ideia" data-v="${esc(t)}">${ic('chat', 'ic-s')}${esc(t)}</button>`).join('')}</div></div>`
+          ${blocoPerguntas()}</div>`
       : `<div class="conv-topo"><button class="btn fino" data-a="conv-nova"${ch.enviando ? ' disabled' : ''}>${ic('refresh', 'ic-s')}Nova conversa</button></div>
         <div class="msgs" aria-live="polite">${msgs.map(bolha).join('')}${ch.enviando ? `<div class="msg ia pensando"><span class="pontos"><i></i><i></i><i></i></span>Pensando…</div>` : ''}</div>`;
     const f = ch.fala, ouvindo = f === 'ouvindo' || f === 'abrindo';
@@ -965,14 +1013,16 @@
       : ouvindo ? `<button class="conv-bt pri gravando" id="conv-pri" data-a="conv-falar" aria-label="Pronto: enviar o que falei"${f === 'abrindo' ? ' disabled' : ''}>${ic('check')}</button>`
       : vazio && falaOn() ? `<button class="conv-bt pri" id="conv-pri" data-a="conv-falar" aria-label="Falar"${ch.enviando ? ' disabled' : ''}>${ic('mic')}</button>`
       : `<button class="conv-bt pri" id="conv-pri" data-a="conv-enviar" aria-label="Enviar"${ch.enviando || vazio ? ' disabled' : ''}>${ic('send')}</button>`;
-    const pe = `<div class="conv-pe">${ch.anexo ? `<div class="conv-anexo"><img src="${esc(ch.anexo.mini)}" alt=""><span>${esc(ch.anexo.nome || 'Foto')}</span><button class="conv-bt" data-a="conv-tirar-foto" aria-label="Tirar a foto">${ic('x')}</button></div>` : ''}
+    const rap = msgs.length && (ch.rapidas || ch.editando);
+    const pe = `<div class="conv-pe">${rap ? `<div class="conv-rapidas">${blocoPerguntas()}</div>` : ''}${ch.anexo ? `<div class="conv-anexo"><img src="${esc(ch.anexo.mini)}" alt=""><span>${esc(ch.anexo.nome || 'Foto')}</span><button class="conv-bt" data-a="conv-tirar-foto" aria-label="Tirar a foto">${ic('x')}</button></div>` : ''}
       <div class="conv-linha">${ouvindo ? `<button class="conv-bt" data-a="conv-falar-x" aria-label="Cancelar">${ic('x')}</button>`
         : `<button class="conv-bt" data-a="conv-foto" aria-label="Escolher fotos"${ch.enviando ? ' disabled' : ''}>${ic('image')}</button>`}
-        <textarea id="conv-texto" class="inp" rows="1" data-size="off" maxlength="2000" enterkeyhint="${noCelular() ? 'enter' : 'send'}" placeholder="${ouvindo ? 'Ouvindo… toque em ✓ quando terminar' : f === 'entendendo' ? 'Entendendo…' : 'Pergunte ou peça'}" aria-label="Mensagem"${ouvindo || f ? ' disabled' : ''}>${esc(ch.texto)}</textarea>${pri}</div></div>`;
+        <textarea id="conv-texto" class="inp" rows="1" data-size="off" maxlength="2000" enterkeyhint="${noCelular() ? 'enter' : 'send'}" placeholder="${ouvindo ? 'Ouvindo… toque em ✓ quando terminar' : f === 'entendendo' ? 'Entendendo…' : 'Pergunte ou peça'}" aria-label="Mensagem"${ouvindo || f ? ' disabled' : ''}>${esc(ch.texto)}</textarea>${msgs.length && !ouvindo ? `<button class="conv-bt${rap ? ' on' : ''}" data-a="perg-rapidas" aria-label="Perguntas prontas" title="Perguntas prontas" aria-expanded="${rap ? 'true' : 'false'}">${ic('sparkles')}</button>` : ''}${pri}</div></div>`;
     return { titulo: 'Conversa', icone: 'chat', alta: true, corpo, pe, conversa: true };
   }
   function abrirConversa(falar) {
     if (!iaOn()) return;
+    Object.assign(S.ch, { rapidas: false, editando: null });  // a Conversa abre sempre no chat (o padrão da família)
     if (!(S.folha && S.folha.tipo === 'conversa')) abrirFolha({ tipo: 'conversa' });
     S.ch.rolar = true;
     if (!S.conv) api.get('conversa').then(r => { S.conv = r; S.ch.rolar = true; render(); }).catch(err => toast(err.message));
@@ -1171,6 +1221,22 @@
   const USO_RES = { ok: '', cota: 'Sem cota', formato: 'Fora do formato', erro: 'Com erro' };
   const DIA_SEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
   const milTokens = n => n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace('.', ',')} mil` : String(Math.round(n || 0));
+  // 0.10.0 (o padrão da família): onde ver o consumo e o saldo de cada IA em uso, uma linha por provedor, com o site
+  const PROVEDORES_IA = [
+    [/google|gemini/, () => `Gemini: consumo e cota no ${site('https://aistudio.google.com/', 'Google AI Studio')}, em Dashboard › Usage; o saldo dos créditos, em Billing.`],
+    [/openai|chatgpt|gpt/, () => `OpenAI: consumo e custo em ${site('https://platform.openai.com/usage', 'platform.openai.com/usage')}.`],
+    [/anthropic|claude/, () => `Claude: consumo e custo no ${site('https://platform.claude.com/usage', 'Claude Console')}; o saldo dos créditos, em ${site('https://platform.claude.com/settings/billing', 'Billing')}.`],
+  ];
+  function provedoresIA(u) {
+    const ents = (S.ia && S.ia.entidades) || [], aj = S.e.ajustes, de = id => { const e = ents.find(x => x.id === id); return e ? `${e.id} ${e.nome}` : (id || ''); };
+    const acha = t => PROVEDORES_IA.filter(([re]) => re.test(String(t).toLowerCase()));
+    let achados = acha([aj.ia_conversa, aj.ia_fotos, aj.ia_pesquisa, ...((u && u.ultimas) || []).map(c => c.ia)].map(de).join(' '));
+    if (!achados.length) {  // na padrão do Home Assistant: o provedor das IAs de lá, se for um só
+      const todos = new Set(ents.flatMap(e => acha(`${e.id} ${e.nome}`)));
+      if (todos.size === 1) achados = [...todos];
+    }
+    return achados.length ? achados.map(([, nota]) => `<p class="nota">${nota()}</p>`).join('') : '<p class="nota">O consumo exato fica no painel do provedor da IA.</p>';
+  }
   function cardUso() {
     if (!S.uso && !S.usoPedido) { S.usoPedido = true; api.get('uso').then(r => { S.uso = r; render(); }).catch(() => { S.uso = {}; render(); }); }
     const u = S.uso;
@@ -1187,7 +1253,7 @@
       corpo = `<div class="uso-tiles">${tile('Hoje', u.hoje)}${tile('7 dias', u.semana)}${tile('Este mês', u.mes)}</div>
         <div class="uso-chart" aria-hidden="true">${barras}</div><div class="uso-dias" aria-hidden="true">${u.dias.map((x, k) => `<span>${k === u.dias.length - 1 ? 'hoje' : DIA_SEM[new Date(x.dia + 'T12:00:00').getDay()]}</span>`).join('')}</div>
         <details class="uso-ult"><summary>${ic('chev', 'ic-s seta')}${ic('clock', 'ic-s')}Últimas chamadas (${(u.ultimas || []).length})</summary><ul>${ult || '<li>Nenhuma chamada ainda.</li>'}</ul></details>
-        <p class="nota">O consumo exato fica no painel do provedor da IA.</p>`;
+        ${provedoresIA(u)}`;
     }
     return card('uso-ia', 'chart', 'Uso da IA', `<p class="lead">As chamadas do app para a IA. Os tokens são estimados.</p>${corpo}`);
   }
@@ -1196,7 +1262,24 @@
     // 0.7.0: a IA
     conversa: () => abrirConversa(),
     'falar-top': () => abrirConversa(true),
-    'conv-ideia': el => enviarConversa(el.dataset.v),
+    'conv-ideia': el => { const t = el.dataset.v; if (S.ch.rapidas || S.ch.editando) fecharPerguntas(); enviarConversa(t); },
+    'perg-rapidas': () => (S.ch.rapidas || S.ch.editando ? fecharPerguntas() : abrirPerguntas({ rapidas: true })),
+    'perg-editar': () => abrirPerguntas({ editando: { lista: perguntas().lista.slice(), rascunho: '' } }),
+    'perg-dobra': el => { const F = lerJSON('odisseia-perguntas-fechadas', {}); F[el.dataset.v] = !F[el.dataset.v]; guardar('odisseia-perguntas-fechadas', JSON.stringify(F)); pintarJanela(); },
+    'perg-por': el => { if (!S.ch.editando.lista.includes(el.dataset.v)) S.ch.editando.lista.push(el.dataset.v); pintarJanela(); },
+    'perg-tirar': el => { S.ch.editando.lista.splice(Number(el.dataset.v), 1); pintarJanela(); },
+    'perg-add': () => {
+      const ed = S.ch.editando, t = (ed.rascunho || '').trim();
+      if (!t) { const x = $('#perg-nova'); if (x) x.focus(); return; }
+      ed.lista.push(t); ed.rascunho = ''; pintarJanela();
+    },
+    'perg-padrao': () => { guardar(PERG, 'null'); S.ch.editando = { lista: perguntas().pad.slice(), rascunho: '' }; pintarJanela(); },
+    'perg-pronto': () => {
+      // uma pergunta mudada vale como ficou; uma apagada até ficar vazia sai; as do app (as 6 de início) seguem o app
+      const ed = S.ch.editando, t = (ed.rascunho || '').trim(), lista = ed.lista.map(q => String(q || '').trim()).filter(Boolean).concat(t ? [t] : []);
+      guardar(PERG, lista.join('\n') === perguntas().pad.join('\n') ? 'null' : JSON.stringify(lista));
+      fecharPerguntas();
+    },
     'conv-enviar': () => enviarConversa(),
     'conv-falar': () => falarConversa(),
     'conv-falar-x': () => { pararFala(); render(); },
@@ -1335,6 +1418,20 @@
     'sel-marcar': el => { const id = el.dataset.id; if (S.sel.has(id)) S.sel.delete(id); else S.sel.add(id); render(); },
     'sel-todos': () => { const todos = S.podem.length && S.podem.every(id => S.sel.has(id)); S.sel = new Set(todos ? [] : S.podem); render(); },
     'sel-alterar': () => { S.lote = { cat: MANTER, quem: null }; abrirFolha({ tipo: 'lote' }); },
+    'sel-apagar': async el => {
+      const ids = [...S.sel];
+      if (!ids.length) return;
+      el.disabled = true;
+      try {
+        const r = await api.post('titulo', { acao: 'apagar_varios', ids });
+        S.e.titulos = S.e.titulos.filter(t => !ids.includes(t.id));
+        S.e.rev = r.rev;
+        if (history.state && history.state.sel) history.back(); else { S.sel = null; render(); }
+        toast(plural(r.apagados.length, 'título apagado', 'títulos apagados'), { rotulo: 'Desfazer', fazer: async () => {
+          try { const v = await api.post('titulo', { acao: 'restaurar', titulos: r.apagados }); v.titulos.forEach(trocar); S.e.rev = v.rev; render(); toast('Desfeito.'); } catch (err) { toast(err.message); }
+        } });
+      } catch (err) { el.disabled = false; toast(err.message); }
+    },
     'lote-cat': el => { S.lote.cat = el.dataset.v; render(); },
     'lote-quem': el => {
       const v = el.dataset.v, L = S.lote, todos = S.e.pessoas.map(p => p.id);
@@ -1457,6 +1554,8 @@
     // a Conversa: com teclado de verdade, o Enter envia; no celular, é uma linha nova (o botão envia), como nos outros apps
     if (ev.key === 'Enter' && !ev.shiftKey && ev.target.id === 'conv-texto' && !noCelular() && !ev.isComposing) { ev.preventDefault(); enviarConversa(); }
     if (ev.key === 'Enter' && !ev.shiftKey && ev.target.id === 'mem-texto') { ev.preventDefault(); ACOES['mem-add'](); }
+    if (ev.key === 'Enter' && !ev.shiftKey && ev.target.id === 'perg-nova') { ev.preventDefault(); ACOES['perg-add'](); }
+    if (ev.key === 'Enter' && !ev.shiftKey && ev.target.classList && ev.target.classList.contains('perg-txt')) { ev.preventDefault(); ev.target.blur(); }
     if (ev.key === 'Enter' && ev.target.id === 'f-chave') { ev.preventDefault(); ACOES['chave-salvar']($('[data-a="chave-salvar"]')); }
     if (ev.key === 'Enter' && ev.target.id === 'f-igdb-segredo') { ev.preventDefault(); ACOES['igdb-salvar']($('[data-a="igdb-salvar"]')); }
     // o nome da categoria: um campo de uma linha só, o Enter salva
@@ -1469,6 +1568,8 @@
     if (id === 'add-q') { S.add.q = ev.target.value; buscarTMDB(); }
     if (id === 'cat-nome' && S.catf) S.catf.nome = ev.target.value;
     if (id === 'cat-nova-t') S.novaCat = ev.target.value;
+    if (id === 'perg-nova' && S.ch.editando) S.ch.editando.rascunho = ev.target.value;
+    if (ev.target.dataset && ev.target.dataset.edI != null && S.ch.editando) S.ch.editando.lista[Number(ev.target.dataset.edI)] = ev.target.value;
     if (id === 'conv-texto') {  // o botão troca entre o Falar e o Enviar quando o campo fica vazio ou não
       const antes = !S.ch.texto.trim();
       S.ch.texto = ev.target.value;

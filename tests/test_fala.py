@@ -186,11 +186,12 @@ class TestFala(unittest.TestCase):
             self.f.texto(bytes(32000), "wav")
 
     def test_simulada(self):
-        f = F.Fala("http://x/api", None, print, simulada=True)
+        f = F.Fala("http://x/api", None, print, simulada=True, exemplo="Quais séries estão em andamento?")  # 0.10.0: o exemplo do app (o fala.py é o do CorrerIA)
         self.assertTrue(f.status()["pronta"])
         self.assertEqual(f.texto(b"x"), "Quais séries estão em andamento?")
         self.assertTrue(f.status("wav")["pronta"])
         self.assertEqual(f.texto(bytes(32000), "wav"), "Quais séries estão em andamento?")
+        self.assertEqual(F.Fala("http://x/api", None, print, simulada=True).texto(bytes(32000), "wav"), "O que tem na agenda amanhã?", "sem o exemplo, o do CorrerIA")
 
 
 if __name__ == "__main__":

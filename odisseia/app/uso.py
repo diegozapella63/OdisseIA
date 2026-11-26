@@ -1,7 +1,8 @@
-"""Uso da IA (como nos outros apps da família; o mesmo do CorrerIA): o Home Assistant não devolve tokens nem custo, então o
-OdisseIA conta as próprias chamadas a ai_task.generate_data e estima os tokens pelo tamanho do texto (uns 4 caracteres por
-token). Fica em /data/uso_ia.json (os totais de 120 dias e as últimas 40 chamadas) e aparece em Configurações › Integrações ›
-Uso da IA. Tipos: conversa (a Conversa), foto (a Conversa com uma foto) e pesquisa (a pesquisa na internet da Conversa)."""
+"""Uso da IA (como nos outros apps da família; igual no CorrerIA e no OdisseIA, tools/iguais.py): o Home Assistant não
+devolve tokens nem custo, então o app conta as próprias chamadas a ai_task.generate_data e estima os tokens pelo tamanho do
+texto (uns 4 caracteres por token). Fica em /data/uso_ia.json (os totais de 120 dias e as últimas 40 chamadas) e aparece em
+Configurações › Integrações › Uso da IA. Os tipos são os de cada app: whatsapp (as mensagens do WhatsApp do CorrerIA),
+conversa (a Conversa da tela), foto (a Conversa com uma foto) e pesquisa (a pesquisa na internet da Conversa)."""
 import json
 import os
 import re

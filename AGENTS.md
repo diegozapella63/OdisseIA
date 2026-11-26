@@ -1,5 +1,7 @@
 # Instruções para quem for mexer neste repositório (pessoas ou IAs)
 
+> Leia também o `PADROES.md`: os padrões da família, iguais em todos os apps. Este arquivo diz o que é só deste app e como cada padrão é feito aqui.
+
 OdisseIA é um app (add-on) do Home Assistant para os filmes, as séries e os jogos da casa: o que cada pessoa quer ver (ou
 jogar) e já viu (ou jogou), o episódio em que parou, a categoria, os episódios e os jogos que vão sair e onde assistir no
 Brasil. Os filmes e as séries vêm do TMDB (com a chave grátis de cada casa; onde assistir é da JustWatch, pelo TMDB); os
@@ -36,12 +38,13 @@ odisseia/app/ia.py            a Conversa: a IA do Home Assistant com as ferramen
 odisseia/app/fala.py          o Falar: a fala para texto do Home Assistant (o arquivo do CorrerIA)
 odisseia/app/uso.py           o Uso da IA (o do CorrerIA); memoria_ia.py: a Memória da IA de todos os apps (a dos outros apps em Python)
 odisseia/app/www/             a tela: index.html, app.js (JavaScript puro, sem build), styles.css, fontes; selectsheet.js,
-                              hatema.js e textareas.js são cópias dos outros apps (ainda fora do tools/iguais.py da família)
+                              hatema.js e textareas.js são os dos outros apps (tools/iguais.py)
 tests/                        testes (unittest; a tela com playwright); tests/apoio.py tem o TMDB e o IGDB de mentira (inventados)
 dev/rodar.py                  o app no computador com o TMDB de mentira
 tools/cobertura.py            a cobertura de linhas do servidor (fica acima de 95%)
 tools/fazer_logo.py           desenha odisseia/icon.png e odisseia/logo.png
 tools/prints_readme.py        refaz as capturas do README (docs/*.png) com a casa do dev/rodar.py (o TMDB e o IGDB de mentira)
+tools/iguais.py               os arquivos iguais aos dos outros apps (o PADROES.md, as caixas de seleção, o fala.py, o uso.py…)
 ```
 
 Os dados ficam em `/data/odisseia.json` (`{versao, rev, titulos, categorias, ajustes}`; cada gravação soma 1 em `rev`, e a
@@ -81,6 +84,10 @@ verdade, com a sua chave em Configurações). `ODISSEIA_TMDB` e `ODISSEIA_TMDB_I
 7. Commit em `main` com mensagem em português ("OdisseIA 0.2.0: ..."), `git pull --rebase` e push. O GitHub roda os
    testes a cada push (aba Actions).
 
+## Arquivos iguais em todos os apps
+
+A lista fica em `tools/iguais.py` e as regras, em **Arquivos iguais** e **Os apps conversam** do `PADROES.md`.
+
 ## Como os apps conversam
 
 - **CorrerIA → OdisseIA** (o contrato de todos os apps da família; ver o AGENTS.md do CorrerIA): com **Mais ›
@@ -103,23 +110,9 @@ verdade, com a sua chave em Configurações). `ODISSEIA_TMDB` e `ODISSEIA_TMDB_I
 - **Caixas de seleção no visual do app** (`selectsheet.js`): a temporada e o episódio são `<select class="inp select">`.
 - Dados de exemplo e de testes sempre inventados (Ana, Beto, títulos inventados): nunca a lista real do dono.
 
-**Padrão da família (igual em todos os apps)**
-- Barra de baixo: a primeira aba é **Agora** (onde o app abre, com o ícone do relógio; nada de Início); o botão do meio é **Adicionar** (no EconomIA, a ação principal dele), só com o ícone, sem o texto embaixo (o nome fica no `aria-label`); **Buscar**, quando houver, é a 2ª aba; **Mais** é a última, com o ícone de três pontos.
-- **Ícones**: toda seção (cartão) começa com o cabeçalho, o ícone e o título; o título de cada tela, de cada grupo (como Imóveis e Veículos) e de cada janela (Novo cômodo, Nova despesa… e a lista de uma caixa de seleção) também tem o ícone; dentro de uma seção, toda linha com título (uma chave, uma escolha, um campo, um recolhido como **Últimas chamadas**) tem um ícone pequeno antes do título; e todo botão com texto tem ícone (Cancelar, Salvar, Voltar, Hoje…). Assim dá para ver onde cada parte começa. Aqui: `cab()` e `card()` (o cabeçalho com o ícone), `lbl()` (o ícone pequeno antes do título de cada campo) e `ICONE_TELA`; o `padrao()` do `tests/test_tela.py` confere os cartões e os botões.
-- **Seções**: cada seção principal é um cartão (o fundo, a borda e os cantos arredondados, como no GerencIA), sem linha no fim; entre as linhas de opções de uma seção não há linha (o ícone de cada uma marca onde começa); as listas de dados (mensagens, conversas, conexões) têm a linha fina entre as entradas, sem a do fim.
-- **Abas**: quando as abas não cabem na largura, a ponta de onde há mais some aos poucos, com uma seta.
-- **Contrair e expandir**: toda seção (cartão) fecha e abre num toque no cabeçalho, com a seta no canto; o aparelho lembra as que ficaram fechadas. Aqui: o `cab()` com `data-dobra` e `odisseia-fechadas` no localStorage.
-- **Sub-opções**: o que só vale com uma chave ligada (o Horário e o A cada do Conferir sozinho, o Quem recebe e o Testar do Avisar no celular, uma lista como Apps detectados) fica num quadro recuado logo abaixo dela, para ver de qual opção é.
-- Nada de avisos que só incham a tela: o que a própria tela já mostra, o que a pessoa confere de qualquer jeito ou um limite do app do celular ("a galeria manda uma foto por vez", "Você confere antes de criar", "a IA encontra…") fica de fora (a aba Documentação pode explicar).
-- Botões de ação (Novo…, Verificar de novo, Salvar e testar…) na largura do cartão no celular, dois lado a lado dividindo a linha; no computador, com a largura fixa do app (250 ou 280 px). Campos de texto livre que podem ficar longos (o que foi, títulos, descrições, nomes de tarefas, de cômodos, de blocos, de categorias) são caixas de texto que mostram tudo e aumentam puxando o canto (`textareas.js`), nunca uma linha que corta o texto; o Enter salva quando o campo é de uma linha só.
-- **Mais** é um menu: as funções do app, depois **Configurações** e por último **Sobre**. Os relatórios se chamam **Relatório de/do …**.
-- **Configurações** em 4 abas, nesta ordem: **Integrações › Dados › Aparência › Opções**; abre em Integrações. Nenhuma função do app vira aba.
-- **Integrações**, nesta ordem: os outros apps da família › CorrerIA › **IA** (o Usar IA e a IA de cada uso: **Para conversar**, **Para ler fotos e PDFs** e, onde há busca na web, **Para pesquisar na internet**; cada uma é uma tarefa de IA do Home Assistant, e a de fotos ou de pesquisa vazia é igual à de conversar) › Falar › Uso da IA › Sensores.
-- IA: as entradas se chamam **Colar mensagem**, **Escolher fotos** (ou **Escolher fotos ou PDF**, onde PDF vale) e **Digitalizar com IA**; a conversa recomeça em **Nova conversa**; o Voltar do celular fecha a Conversa.
-- Palavras: **Apagar** (nunca Excluir); **Testar no meu celular**; **Home Assistant Cloud** (não Nabu Casa); recolhidos como **Nome (n)**; o CHANGELOG começa com "# Mudanças".
-- Avisos no celular (todos chegam como Home Assistant): o título começa pelo nome do app, uma vez só ("ResolvIA · 📅 Vence hoje"), e o ícone pequeno é o do app (`notification_icon`); o canal e o grupo de cada aviso ficam como estão (o canal guarda o som e a importância que a pessoa escolheu no Android).
-- **Dados**: Exportar › Backup na pasta share › Importar › Versões anteriores › Onde ficam os dados › Começar do zero.
-- **Aparência**: o tema vale no aparelho (começa em Sistema); o fundo e os cartões são os do tema do Home Assistant (`hatema.js`, igual em todos os apps: publica `--ha-bg-light`, `--ha-card-light`, `--ha-bg-dark` e `--ha-card-dark`, as do modo de agora lidas do Home Assistant e as do outro, do tema padrão dele; os cinzas, como linhas e campos, saem do cartão misturado com o texto, `color-mix`, nunca uma cor fixa puxada para a cor do app); a cor do app vale para a casa toda; uma paleta só, de 12 cores (Vermelho, Coral, Laranja, Ouro, Verde, Menta, Turquesa, Azul, Índigo, Lilás, Rosa, Grafite); a Cor do dia é a mesma em todos os apps (as 11 sem o Grafite, pelo número do dia).
+**Padrão da família**: as regras de todos os apps estão no `PADROES.md` (igual nos 8 repositórios; leia antes de mexer). Como cada uma é feita aqui:
+- Ícones: `cab()` e `card()` (o cabeçalho com o ícone), `lbl()` (o ícone pequeno antes do título de cada campo) e `ICONE_TELA`; o `padrao()` do `tests/test_tela.py` confere os cartões e os botões.
+- Contrair e expandir: o `cab()` com `data-dobra` e `odisseia-fechadas` no localStorage.
 
 0.2.0 (o dono: "adicionar uma série inteira como vista"; "uma série inteira de filmes"; "os mais vistos, os mais bem avaliados... listas prontas onde eu clico e marco como visto"; "pensa num processo bem legal para ficar bonito e prático"; "Vistos? e se for jogos?"; "nas opções poder dizer o que quer controlar"):
 - O Adicionar (`folhaAdicionar`) abre nas listas prontas (`tmdb.LISTAS`, `TMDB.lista`, `GET /api/lista?nome&tipo&pagina` → `{resultados, mais}`; `zip_longest` intercala filmes e séries) e mostra as capas em grade (`cartaz`/`grade`, `.cartazes`): na capa, **Quero ver** (`cz-quero`) e **Já vi** (`cz-visto`; fora o que ainda não saiu, pela `data`); `cz-abrir` abre o título por cima (`abrirFolha(f, true)`). Sem o foco no campo ao abrir.
@@ -160,6 +153,8 @@ verdade, com a sua chave em Configurações). `ODISSEIA_TMDB` e `ODISSEIA_TMDB_I
 0.8.0 (o dono: "esse adicionar com essas opçõezinhas de retrair tem que mostrar o que foi selecionado do ladinho, quando eu retraio"; vale em todos os apps): no `pintarJanela`, cada `.dobra-campo` leva a `.fl-val` com o escolhido (`valorCampo`: os botões marcados, senão a caixa de seleção, senão o texto), que só aparece com o campo fechado. O `corpo()` lê e joga fora um pedido grande demais (até 4 vezes o limite) antes do 400: no GitHub, o `test_o_que_sobra` recebia um «Broken pipe». Teste: `test_categoria_na_linha_agrupar_e_campos` (o Quem fechado) no `tests/test_tela.py`.
 
 0.9.0 (o dono: "cadê a opção para alterar o falar igual os outros apps?"; "no OdisseIA criar também sensores do Home Assistant"): `ajustes.fala` (`R.STT_RE`, `stt.…` ou vazio = automático): `fala.py` com `todos(formato)` (a lista dos motores que aceitam o áudio, o automático primeiro; guardada 5 minutos), `motor(formato, escolha)`, `status(formato, escolha)` (`opcoes`, `automatico`, `escolha_sumiu`) e `texto(..., escolha)`; o `ia_info` leva `fala_escolha`; na tela, `#fala-motor` (`data-aj-sel="fala"`: depois de gravar, o `carregarIA()`). Sensores: `ajustes.sensores` (desligado de início), `SENSORES`, `estados_sensores(d, hoje)` (pelos tipos ligados), `publicar_sensores(forcar)` (o `POST /api/states/<sensor>`, só o que mudou ou a cada 15 minutos, pelo `laco_sensores`), `remover_sensores()` (desligar), `sensores_depois(d)` (no `salvar`, em segundo plano); na tela, `cardSensores()` no fim de Integrações (fora do Usar IA). O `resumo` do CorrerIA leva os jogos em Quero jogar que saem nos próximos 30 dias (a etapa Vão sair do CorrerIA 1.37.0). Testes: `TestNovidades090` no `tests/test_servidor.py`, `test_escolher_a_fala_para_texto` no `tests/test_fala.py` e o `test_a_ia_conversa_falar_e_integracoes`.
+
+0.10.0 (a revisão dos padrões da família, `PADROES.md`): as **perguntas prontas** da Conversa (`PERGUNTAS`, 26 gerais: as 6 primeiras à vista e 20 modelos; `perguntas()`, `odisseia-perguntas` no aparelho; `blocoPerguntas`: os chips e o **Editar perguntas**, `perg-*`; com mensagens, o ✨ `perg-rapidas` e o `.conv-rapidas` em cima da caixa; `abrirPerguntas`/`fecharPerguntas`: a entrada `{painel: 1}` no histórico, que o Voltar fecha; o X da Conversa com elas abertas volta as duas, `history.go(-2)`; o `abrirConversa` fecha as duas: a Conversa abre sempre no chat). O **Apagar** do Selecionar (`sel-apagar`, `.selbar.dois`): `POST /api/titulo {acao: apagar_varios, ids}` → `{apagados, rev}` (as capas vão para `capas/lixo`, um dia, `LIXO_DIAS`) e o Desfazer, `{acao: restaurar, titulos}` (`R.limpar_titulo`; a capa volta do lixo ou o laço baixa de novo). O **Uso da IA** termina com o site de cada provedor em uso (`PROVEDORES_IA`, `provedoresIA`, como no GerencIA). O `fala.py` e o `uso.py` são iguais aos do CorrerIA (`tools/iguais.py`; `Fala(..., exemplo=)` é o texto da fala simulada daqui). Testes: `test_apagar_varios_e_desfazer` no `tests/test_servidor.py` e os do Selecionar e da Conversa no `tests/test_tela.py`.
 
 ## Conversa com o dono
 

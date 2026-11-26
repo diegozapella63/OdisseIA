@@ -513,3 +513,26 @@ code { font-size: 14px; background: var(--card-2); padding: 1px 6px; border-radi
 .sensor-row { display: grid; gap: 2px; min-width: 0; }
 .sensor-row code { font-size: 13px; overflow-wrap: anywhere; }
 .sensor-row span { color: var(--muted); font-size: 14px; }
+
+/* 0.10.0: as perguntas prontas da Conversa (o ✨ ao lado da caixa e o Editar perguntas), como nos outros apps */
+.conv-bt.on { background: var(--accent-soft); color: var(--accent-text); }
+.conv-rapidas { max-height: 42vh; overflow-y: auto; padding: 10px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); }
+.perg-abrir { display: inline-flex; align-items: center; gap: 7px; margin-top: 12px; padding: 6px 4px; border: 0; background: none; color: var(--accent-text); font: 600 14px/1.2 var(--font); cursor: pointer; }
+.perg-ed { display: flex; flex-direction: column; gap: 8px; }
+.perg-h { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 0; border: 0; background: none; color: var(--text); font: 700 15px/1.2 var(--font); text-align: left; cursor: pointer; }
+.perg-h > span { flex: 1; min-width: 0; }
+.perg-h > .ic-s:first-child { color: var(--accent-text); }
+.perg-h .seta { color: var(--muted); transform: rotate(90deg); transition: transform .15s; }
+.perg-h[aria-expanded="false"] .seta { transform: none; }
+.perg-lin { display: flex; align-items: center; gap: 8px; padding: 4px 0 4px 12px; border-radius: 12px; background: var(--card-2); color: var(--text); }
+.perg-lin > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.perg-txt { flex: 1; min-width: 0; min-height: 24px; padding: 8px 0; border: 0; background: none; color: inherit; font: inherit; line-height: 1.35; resize: none; field-sizing: content; overflow-wrap: anywhere; }
+.perg-txt:focus { outline: none; }
+.perg-lin:has(.perg-txt:focus) { box-shadow: 0 0 0 1.5px var(--accent); }
+.perg-x { flex: none; width: 40px; height: 40px; border: 0; border-radius: 50%; background: none; display: grid; place-items: center; color: var(--muted); cursor: pointer; }
+.perg-modelo { width: 100%; min-height: 48px; padding-right: 12px; border: 1.5px dashed color-mix(in srgb, var(--card) 80%, var(--text)); background: none; font: inherit; text-align: left; cursor: pointer; }
+.perg-modelo .ic-s { color: var(--accent-text); }
+.perg-nova { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+/* 0.10.0: o Apagar e o Alterar lado a lado na seleção */
+.selbar.dois { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.selbar.dois .btn.perigo { background: var(--card); }

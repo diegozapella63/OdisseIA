@@ -3,6 +3,7 @@ import base64
 import io
 import json
 import os
+import time
 import unittest
 import zipfile
 from datetime import date
@@ -666,6 +667,38 @@ class TestNovidades040(unittest.TestCase):
         for itens in ([], "x", [{"id": "t00000000"}], ["x"]):
             self.assertEqual(self.post("/api/titulo", {"acao": "lote", "itens": itens})[0], 400, itens)
         self.assertEqual(self.post("/api/titulo", {"acao": "lote", "itens": [{"id": ids[0], "campos": {"quem": ["person.zeca"]}}]})[0], 400)
+
+    def test_apagar_varios_e_desfazer(self):
+        """0.10.0 (o padrão da família): o Apagar do Selecionar, com o Desfazer: os títulos voltam inteiros, com as capas."""
+        for n in (101, 103, 105):
+            S.adicionar({"tipo": "filme", "tmdb": n, "situacao": "visto"}, "person.ana")
+        ts = S.ler()["titulos"]
+        ids = [t["id"] for t in ts[:2]]
+        capa = ts[0]["capa"]
+        self.assertTrue(capa and os.path.exists(S.caminho_capa(capa)))
+        st, r = self.post("/api/titulo", {"acao": "apagar_varios", "ids": ids})
+        self.assertEqual((st, sorted(t["id"] for t in r["apagados"]), len(S.ler()["titulos"])), (200, sorted(ids), 1))
+        self.assertFalse(os.path.exists(S.caminho_capa(capa)), "a capa vai para a pasta lixo")
+        self.assertTrue(os.path.exists(os.path.join(S.CAPAS, "lixo", capa)))
+        st, v = self.post("/api/titulo", {"acao": "restaurar", "titulos": r["apagados"]})
+        self.assertEqual((st, len(v["titulos"]), len(S.ler()["titulos"])), (200, 2, 3))
+        self.assertTrue(os.path.exists(S.caminho_capa(capa)), "o Desfazer traz a capa de volta")
+        self.assertEqual(self.post("/api/titulo", {"acao": "restaurar", "titulos": r["apagados"]})[1]["titulos"], [], "o que já está na lista não entra duas vezes")
+        # sem a capa no lixo, o título volta sem ela (o laço baixa de novo); um que não está na lista é erro, e nada sai
+        st, r = self.post("/api/titulo", {"acao": "apagar_varios", "ids": ids[:1]})
+        os.remove(os.path.join(S.CAPAS, "lixo", capa))
+        self.assertEqual(self.post("/api/titulo", {"acao": "restaurar", "titulos": r["apagados"]})[1]["titulos"][0]["capa"], "")
+        self.assertEqual(self.post("/api/titulo", {"acao": "apagar_varios", "ids": [ids[0], "t00000000"]})[0], 400)
+        self.assertEqual(len(S.ler()["titulos"]), 3)
+        for ruim in ({"acao": "apagar_varios", "ids": []}, {"acao": "apagar_varios"}, {"acao": "restaurar", "titulos": "x"}):
+            self.assertEqual(self.post("/api/titulo", ruim)[0], 400, ruim)
+        # as capas no lixo há mais de um dia saem de vez no próximo Apagar
+        velha = os.path.join(S.CAPAS, "lixo", "t0000000a.jpg")
+        with open(velha, "wb") as f:
+            f.write(b"x")
+        os.utime(velha, (time.time() - 3 * 86400,) * 2)
+        self.post("/api/titulo", {"acao": "apagar_varios", "ids": ids[1:2]})
+        self.assertFalse(os.path.exists(velha))
 
     def test_cor_das_categorias(self):
         st, r = self.post("/api/categorias", {"acao": "nova", "tipo": "jogo", "nome": "Para jogar junto"})

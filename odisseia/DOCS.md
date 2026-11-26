@@ -69,7 +69,7 @@ Nos dois, em cima da lista:
 - **Capas** ou **Lista**: a lista menor, sem as capas, um título por linha. O aparelho lembra.
 - **Agrupar por**: Nada, **Categoria** (na ordem das categorias; Sem categoria no fim) ou **Gênero** (o primeiro gênero de cada título). Cada grupo fecha num toque; o aparelho lembra.
 - **A categoria em cada linha**, na cor dela, ou **+ Categoria**: o toque abre só a escolha da categoria daquele título.
-- **Selecionar**: toque nos títulos (ou segure o dedo num) e **Alterar** muda de uma vez a **Categoria** e **Quem**; cada campo começa em **Manter**. Depois, o aviso tem o **Desfazer**. Uma seleção é de um tipo só (as categorias são de cada tipo). O Voltar do celular sai do Selecionar.
+- **Selecionar**: toque nos títulos (ou segure o dedo num) e **Alterar** muda de uma vez a **Categoria** e **Quem**; cada campo começa em **Manter**. **Apagar** tira os títulos marcados da lista. Depois, o aviso tem o **Desfazer**. Uma seleção é de um tipo só (as categorias são de cada tipo). O Voltar do celular sai do Selecionar.
 
 ## O que controlar
 
@@ -79,7 +79,7 @@ Em **Configurações › Opções › O que controlar**, ligue as séries, os fi
 
 Com uma IA no Home Assistant (uma tarefa de IA, como Google Gemini ou OpenAI, em **Configurações › Dispositivos e serviços**), o alto de toda tela tem a **Conversa** e o **Falar**:
 
-- **Conversa**: pergunte sobre a lista da casa (o que ver ou jogar, em que episódio vocês pararam, o que vai sair, onde assistir) ou peça para pôr, marcar, mudar a categoria ou apagar um título. A IA lê a lista na hora; para mudar, ela mostra o que vai fazer e espera você tocar em **Sim** (em **Não**, nada muda; outra mensagem também descarta). Ela também pesquisa na internet o que a lista não tem (críticas, se vale a pena, quando sai a próxima temporada) e guarda na **Memória da IA** o que você pedir para lembrar ("a Ana não gosta de terror"). **Nova conversa** recomeça; o Voltar do celular fecha.
+- **Conversa**: pergunte sobre a lista da casa (o que ver ou jogar, em que episódio vocês pararam, o que vai sair, onde assistir) ou peça para pôr, marcar, mudar a categoria ou apagar um título. A IA lê a lista na hora; para mudar, ela mostra o que vai fazer e espera você tocar em **Sim** (em **Não**, nada muda; outra mensagem também descarta). Ela também pesquisa na internet o que a lista não tem (críticas, se vale a pena, quando sai a próxima temporada) e guarda na **Memória da IA** o que você pedir para lembrar ("a Ana não gosta de terror"). **Nova conversa** recomeça; o Voltar do celular fecha. Com a conversa vazia, aparecem 6 **perguntas prontas**: é só tocar; depois, o ✨ ao lado da caixa abre as mesmas. Em **Editar perguntas**, toque numa para mudar o texto, o ✕ tira e **Adicionar** põe outra; embaixo, as **Mais perguntas** trazem 20 modelos (um toque põe); **Padrão** volta às de início. Ficam guardadas no aparelho.
 - **Escolher fotos** (o botão da foto, na Conversa): a foto de um pôster, de um print de um streaming, da capa de um jogo ou de uma lista escrita; a IA vê a foto e propõe pôr os títulos na lista.
 - **Falar** (o microfone): fale e toque em ✓; o que você falou vira texto pela fala para texto do Home Assistant e vai para a Conversa. Precisa do Home Assistant aberto por um endereço seguro (https).
 
@@ -88,7 +88,7 @@ Em **Mais › Configurações › Integrações**:
 - **IA**: **Usar IA** (desligado, a Conversa e o Falar somem em todos os aparelhos) e a IA de cada uso: **Para conversar**, **Para ler fotos** e **Para pesquisar na internet** (a de fotos e a de pesquisar vazias são a de conversar; para pesquisar, a IA precisa da busca na web ligada no Home Assistant).
 - **Memória da IA**: uma memória só, da casa, compartilhada por todos os apps: o que você escreve aqui a IA lembra em toda conversa, em qualquer um deles.
 - **Falar**: quem transforma a fala em texto. Em **Fala para texto**, **Automático** (o do Home Assistant Cloud, senão o primeiro que entende o microfone) ou um dos motores do Home Assistant; se o escolhido sumir, o app usa o automático e avisa. Sem nenhum, como configurar.
-- **Uso da IA**: as chamadas do app para a IA (hoje, 7 dias e este mês) e as últimas, com o motivo de cada erro. Os tokens são estimados.
+- **Uso da IA**: as chamadas do app para a IA (hoje, 7 dias e este mês) e as últimas, com o motivo de cada erro. Os tokens são estimados. No fim, o site onde ver o consumo de cada IA em uso.
 - **Sensores no Home Assistant** (desligados de início; não dependem da IA): para usar em painéis e automações. `sensor.odisseia_quero_ver` (quantos em Quero ver, por tipo), `sensor.odisseia_em_andamento` (as séries em andamento e onde cada uma parou), `sensor.odisseia_proximo_episodio` (a data do próximo episódio, com a série e o episódio), `sensor.odisseia_proximo_jogo` (a data do próximo jogo em Quero jogar) e `sensor.odisseia_concluidos_no_mes` (quantos foram vistos ou jogados neste mês). Mudam a cada gravação; desligar tira os sensores do Home Assistant.
 
 ## Pelo CorrerIA

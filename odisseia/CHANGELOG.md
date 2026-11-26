@@ -1,5 +1,11 @@
 # Mudanças
 
+## 0.10.0
+
+- **Perguntas prontas** na Conversa, como nos outros apps: 6 à vista e, em **Editar perguntas**, mudar, tirar e pôr outras, com as **Mais perguntas** (20 modelos; um toque põe). Com a conversa andando, o ✨ ao lado da caixa abre as mesmas; o Voltar do celular fecha só elas. Ficam guardadas no aparelho; **Padrão** volta às de início.
+- **Selecionar**: o **Apagar** ao lado do **Alterar**, com o **Desfazer** (os títulos voltam inteiros, com as capas).
+- **Uso da IA**: no fim, onde ver o consumo e o saldo de cada IA em uso (Google AI Studio, OpenAI ou Claude Console), como nos outros apps.
+
 ## 0.9.0
 
 - **Configurações › Integrações › Falar**: escolha a **Fala para texto**, como nos outros apps: **Automático** ou um dos motores do Home Assistant.

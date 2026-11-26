@@ -1,6 +1,8 @@
-"""Áudio para texto, pela fala para texto do Home Assistant (a mesma do Falar dos outros apps; o arquivo é o do CorrerIA): o
-microfone da Conversa grava em PCM de 16 kHz, 16 bits, mono, como o Assist ("wav"). O motor do Home Assistant diz o que aceita
-(GET /api/stt/<motor>); o app usa o primeiro que aceita o formato, começando pelo do Home Assistant Cloud. Só biblioteca padrão.
+"""Áudio para texto, pela fala para texto do Home Assistant (a mesma do Falar dos outros apps). Igual no CorrerIA e no
+OdisseIA (tools/iguais.py): o microfone da Conversa grava em PCM de 16 kHz, 16 bits, mono, como o Assist ("wav"); o WhatsApp
+do CorrerIA, em OGG/Opus ("ogg"). O motor do Home Assistant diz o que aceita (GET /api/stt/<motor>); o app usa o escolhido em
+Integrações › Falar ou, sem escolha, o primeiro que aceita o formato, começando pelo do Home Assistant Cloud. Só biblioteca
+padrão.
 """
 import http.client
 import json
@@ -18,8 +20,10 @@ class ErroFala(Exception):
 
 
 class Fala:
-    def __init__(self, rest, token, log, simulada=False):
-        self.rest, self.token, self.log, self.simulada = rest.rstrip("/"), token, log, simulada
+    def __init__(self, rest, token, log, simulada=False, exemplo=None):
+        """simulada: fora do Home Assistant (no computador e nos testes), com dois motores de mentira; exemplo: o texto que
+        ela ouve (sem ele, uma pergunta do CorrerIA, uma para o WhatsApp e outra para o microfone)."""
+        self.rest, self.token, self.log, self.simulada, self.exemplo = rest.rstrip("/"), token, log, simulada, exemplo
         self.cache = {}
 
     def _pedir(self, metodo, caminho, corpo=None, cab=None, timeout=15):
@@ -43,8 +47,8 @@ class Fala:
 
     def motor(self, formato="ogg", escolha=""):
         """{id, nome, idioma, taxa} do motor que aceita o áudio ("ogg": o do WhatsApp; "wav": o do microfone da tela), ou
-        {motivo} quando nenhum aceita. escolha (0.9.0, a Fala para texto de Integrações › Falar): esse motor, se ele está no
-        Home Assistant e aceita o áudio; senão, o automático (o primeiro, começando pelo do Home Assistant Cloud)."""
+        {motivo} quando nenhum aceita. escolha (a Fala para texto de Integrações › Falar): esse motor, se ele está no Home
+        Assistant e aceita o áudio; senão, o automático (o primeiro, começando pelo do Home Assistant Cloud)."""
         r = self.todos(formato)
         if not r.get("lista"):
             return {"motivo": r["motivo"]}
@@ -119,7 +123,7 @@ class Fala:
         if not m.get("id"):
             raise ErroFala(m["motivo"])
         if self.simulada:
-            return "Quais séries estão em andamento?"
+            return self.exemplo or ("O que tem na agenda amanhã?" if formato == "wav" else "Quanto gastei com mercado este mês?")
         fmt = f"format=wav; codec=pcm; sample_rate={PCM_TAXA}" if formato == "wav" else f"format=ogg; codec=opus; sample_rate={m['taxa']}"
         cab = {"Content-Type": "application/octet-stream",
                "X-Speech-Content": f"{fmt}; bit_rate=16; channel=1; language={m['idioma']}"}
