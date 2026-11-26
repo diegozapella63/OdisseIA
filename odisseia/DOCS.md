@@ -63,11 +63,11 @@ Cada campo da janela (Situação, Categoria, Quem, Onde assistir, Sinopse…) fe
 
 ## Buscar e Concluídos
 
-**Buscar** filtra a lista pelo nome e, em **Filtros** (que fecha e abre), pelo tipo, pela situação, pela categoria (também **Sem categoria**; ativa depois de escolher Filmes, Séries ou Jogos, porque as categorias são de cada tipo) e pela pessoa. **Concluídos** mostra o que está salvo como visto (e jogado), o mais recente primeiro, numa aba para cada tipo, com o filtro da categoria em cima.
+**Buscar** filtra a lista pelo nome e, em **Filtros** (que fecha e abre), pelo tipo, pela situação, pela categoria (também **Sem categoria**; ativa depois de escolher Filmes, Séries ou Jogos, porque as categorias são de cada tipo) e pela pessoa. **Concluídos** mostra o que está salvo como visto (e jogado), o mais recente primeiro, numa aba para cada tipo, com a categoria em **Filtros** (que fecha e abre). Fechado, o **Filtros** mostra ao lado o que está escolhido.
 
 Nos dois, em cima da lista:
 - **Capas** ou **Lista**: a lista menor, sem as capas, um título por linha. O aparelho lembra.
-- **Agrupar por**: Nenhum, **Categoria** (na ordem das categorias; Sem categoria no fim) ou **Gênero** (o primeiro gênero de cada título). Cada grupo mostra quantos títulos tem e fecha num toque; o título Agrupar por fecha o bloco (com o escolhido ao lado). O aparelho lembra.
+- **Agrupar por** (logo embaixo do Filtros): **Categoria** (na ordem das categorias; Sem categoria no fim), **Gênero** (o primeiro gênero de cada título) ou **Nenhum** (de início). Cada grupo mostra quantos títulos tem e fecha num toque; o título Agrupar por fecha o bloco (com o escolhido ao lado). O aparelho lembra.
 - **A categoria em cada linha**, na cor dela, ou **+ Categoria**: o toque abre só a escolha da categoria daquele título.
 - **Selecionar**: toque nos títulos (ou segure o dedo num) e **Alterar** muda de uma vez a **Categoria** e **Quem**; cada campo começa em **Manter**. **Apagar** tira os títulos marcados da lista. Depois, o aviso tem o **Desfazer**. Uma seleção é de um tipo só (as categorias são de cada tipo). O Voltar do celular sai do Selecionar.
 

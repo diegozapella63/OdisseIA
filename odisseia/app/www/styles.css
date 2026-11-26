@@ -241,14 +241,19 @@ textarea.inp { resize: vertical; min-height: 96px; display: block; }
 .cz-col .ic-s { width: 14px; height: 14px; }
 
 /* Buscar (0.3.0): a busca, o Filtros que fecha e abre e as caixas lado a lado, como nos outros apps */
-.sbar { margin-bottom: 18px; }
+/* 0.12.0 (PADROES.md, "O alto das listas"): o Filtros e o Agrupar por, uma linha cada, iguais nos apps: 40 px, o ícone de 18 px
+   na cor do app, o nome em 15 px, peso 500, na cor do texto; fechado, o escolhido em cinza; um embaixo do outro, sem vão */
+.sbar { margin-bottom: 12px; }
 .sbar .busca { margin-bottom: 8px; }
-.filtros-h { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 0 2px; color: var(--text); font: 600 15px/1.2 var(--font); text-align: left; }
-.filtros-h > span { flex: 1; min-width: 0; }
-.filtros-h > svg:first-child { color: var(--accent-text); }
+.filtros-h { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 0 2px; color: var(--text); font: 500 15px/1.2 var(--font); text-align: left; -webkit-tap-highlight-color: transparent; }
+.filtros-h > span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.filtros-h > svg:first-child, .agrupar-l > svg:first-child { width: 18px; height: 18px; color: var(--accent-text); }
+.filtros-val { color: var(--muted); }
+.sbar > .chips.filtro-cat { margin: 4px 0 8px; }
+.sbar > .chips.filtro-cat[hidden] { display: none; }
 .filtros-h .seta { color: var(--muted); transform: rotate(90deg); transition: transform .2s; }
 .filtros-h[aria-expanded="false"] .seta { transform: none; }
-.sfiltros { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 6px; }
+.sfiltros { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 4px 0 8px; }
 .sfiltros[hidden] { display: none; }
 .sfiltros.n1 { grid-template-columns: 1fr; }
 .sfiltros.n3 > :first-child { grid-column: 1 / -1; }
@@ -389,6 +394,8 @@ code { font-size: 14px; background: var(--card-2); padding: 1px 6px; border-radi
 .selbar { position: sticky; z-index: 5; bottom: calc(var(--nav-h) + 14px + env(safe-area-inset-bottom, 0px)); margin-top: 12px; }
 .selbar .btn { width: 100%; box-shadow: 0 10px 28px -10px rgba(0, 0, 0, .55); }
 .chips.filtro-cat { margin: 0 0 14px; padding: 0; }
+/* 0.12.0: a contagem fica no título do cartão; à esquerda, Capas ou Lista, e o Selecionar à direita, em 15 px */
+.ssum > .btn.fino { font-size: 15px; }
 .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
 .chip.cor.on, .escolha.cor.on { background: color-mix(in srgb, var(--c) 18%, transparent); border-color: var(--c); color: var(--text); }
 .chip.cor.on { font-weight: 600; }
@@ -409,19 +416,21 @@ code { font-size: 14px; background: var(--card-2); padding: 1px 6px; border-radi
 .cz > .cat-tag { margin: 4px 0 0; justify-self: start; }
 /* 0.11.0: o Agrupar por no padrão da família (o dos Consumíveis do InventarIA): o título que fecha o bloco, as escolhas numa
    barra só, do mesmo tamanho, e cada grupo com o ícone num quadrinho, o nome, quantos e a seta */
-.agrupar { display: grid; gap: 8px; margin: 0 0 10px; }
+.agrupar { display: grid; gap: 4px; margin: 0; }
+.agrupar:not(.fechado) { margin-bottom: 8px; }
 .agrupar.fechado { gap: 0; }
-.agrupar-l { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 32px; color: var(--muted); font: 500 14px/1.2 var(--font); text-align: left; }
-.agrupar-l > .seta { margin-left: auto; transition: transform .2s; transform: rotate(90deg); }
+.agrupar-l { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 0 2px; color: var(--text); font: 500 15px/1.2 var(--font); text-align: left; -webkit-tap-highlight-color: transparent; }
+.agrupar-l > .seta { margin-left: auto; color: var(--muted); transition: transform .2s; transform: rotate(90deg); }
 .agrupar.fechado > .agrupar-l > .seta { transform: none; }
-.agrupar-l > .agrupar-val { color: var(--text); font-weight: 600; }
+.agrupar-l > .agrupar-val { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--muted); font-weight: 500; }
 .modo.agrupar-seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
 .modo.agrupar-seg[hidden] { display: none; }
 .modo.agrupar-seg button { justify-content: center; min-width: 0; min-height: 40px; padding: 0 6px; }
 .modo.agrupar-seg button > span { display: inline; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .grupo { margin-top: 18px; }
 .grupo-h { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 2px 8px; border-bottom: 1px solid var(--line); color: var(--text); text-align: left; }
-.grupo-ic { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-text); }
+.grupo-ic { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 11px; background: var(--accent-soft); color: var(--accent-text); }
+.grupo-h { -webkit-tap-highlight-color: transparent; }
 .grupo-ic.cor { background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--ci); }
 .grupo-h b { flex: 1; min-width: 0; font: 600 20px/1.2 var(--font-d); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .grupo-h .cont { color: var(--muted); font: 400 14px var(--font); white-space: nowrap; }
@@ -512,8 +521,8 @@ code { font-size: 14px; background: var(--card-2); padding: 1px 6px; border-radi
 .uso-ult { margin-top: 12px; }
 .uso-ult summary { display: flex; align-items: center; gap: 7px; cursor: pointer; list-style: none; font-weight: 600; color: var(--text-2); }
 .uso-ult summary::-webkit-details-marker { display: none; }
-.uso-ult summary .seta { transform: rotate(-90deg); transition: transform .15s; }
-.uso-ult[open] summary .seta { transform: none; }
+.uso-ult summary .seta { transition: transform .15s; } /* a chev aponta para o lado: fechado, assim; aberto, para baixo (PADROES.md) */
+.uso-ult[open] summary .seta { transform: rotate(90deg); }
 .uso-ult ul { list-style: none; margin: 8px 0 0; padding: 0; }
 .uso-ult li { display: grid; gap: 2px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
 .uso-ult li:first-child { border-top: 0; }

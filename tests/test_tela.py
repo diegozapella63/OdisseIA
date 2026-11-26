@@ -345,7 +345,10 @@ class TestTela(unittest.TestCase):
         pg.wait_for_selector(".folha", state="detached")
         self.assertEqual(next(t for t in S.ler()["titulos"] if t["nome"] == "Farol Distante")["categoria"], c["id"])
         self.assertIn("Favoritos", pg.inner_text("#vistos .linha-tit:has-text('Farol Distante') .cat-tag"))
-        self.assertEqual([t.strip() for t in pg.locator(".agrupar-seg button").all_inner_texts()], ["Nenhum", "Categoria", "Gênero"], "0.11.0: Nenhum, Categoria e Gênero")
+        self.assertEqual([t.strip() for t in pg.locator(".agrupar-seg button").all_inner_texts()], ["Categoria", "Gênero", "Nenhum"], "0.12.0: Categoria, Gênero e o Nenhum por último")
+        # 0.12.0 (PADROES.md, "O alto das listas"): fora do cartão, logo embaixo do Filtros, as duas linhas do mesmo tamanho
+        fh, ah = pg.locator(".sbar .filtros-h").bounding_box(), pg.locator(".sbar .agrupar-l").bounding_box()
+        self.assertTrue(abs(fh["height"] - ah["height"]) < 1 and pg.evaluate("getComputedStyle(document.querySelector('.agrupar-l')).fontSize") == "15px", f"Filtros e Agrupar por iguais ({fh}, {ah})")
         larg = pg.evaluate("[...document.querySelectorAll('.agrupar-seg button')].map(b => Math.round(b.getBoundingClientRect().width))")
         self.assertEqual(len(set(larg)), 1, f"as escolhas do mesmo tamanho ({larg})")
         pg.click("[data-a=agrupar][data-v=categoria]")

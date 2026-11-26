@@ -301,17 +301,22 @@
         <button class="btn fino" data-a="sel-comecar">${ic('list-checks', 'ic-s')}Selecionar</button></div>`;
     const o = { mais1: opts.mais1, sel, lado, curta: modo === 'lista', catToque: true };
     const ag = guardada('odisseia-agrupar') || '', ul = l => `<ul class="titulos${modo === 'lista' ? ' curtas' : ''}">${l.map(t => linhaTit(t, o)).join('')}</ul>`;
-    // 0.11.0 (o dono: "deixa tudo bem bonito nesse padrão", o dos Consumíveis do InventarIA): o título fecha o bloco (fechado,
-    // o escolhido ao lado), as escolhas numa barra só, do mesmo tamanho, e cada grupo com o ícone, o nome, quantos e a seta
-    const AG = [['', 'Nenhum', 'list'], ['categoria', 'Categoria', 'tag'], ['genero', 'Gênero', 'texto']], agF = guardada('odisseia-agrupar-fechado') === '1';
-    const agrupar = `<div class="agrupar${agF ? ' fechado' : ''}"><button class="agrupar-l" id="agrupar-l" data-a="agrupar-dobra" aria-expanded="${!agF}">${ic('layers', 'ic-s')}<span>Agrupar por</span>${agF ? `<span class="agrupar-val">· ${(AG.find(([k]) => k === ag) || AG[0])[1]}</span>` : ''}${ic('chev', 'ic-s seta')}</button>
-      <div class="modo agrupar-seg" role="group" aria-labelledby="agrupar-l"${agF ? ' hidden' : ''}>${AG.map(([k, n, i]) => `<button class="${ag === k ? 'on' : ''}" data-a="agrupar" data-v="${k}" aria-pressed="${ag === k}">${ic(i, 'ic-s')}<span>${n}</span></button>`).join('')}</div></div>`;
-    return barra + (sel ? '' : agrupar) + (ag ? grupos(ts, ag).map(g => {
+    return barra + (ag ? grupos(ts, ag).map(g => {
       const k = ag + ':' + g.k, F = new Set(lerJSON('odisseia-grupos', [])), fechado = F.has(k);
       return `<div class="grupo${fechado ? ' fechado' : ''}"><button class="grupo-h" data-a="grupo" data-v="${esc(k)}" aria-expanded="${!fechado}"><span class="grupo-ic${g.c ? ' cor' : ''}"${g.c ? ` style="${estiloCor(g.c.cor)}"` : ''}>${ic(ag === 'genero' ? 'texto' : 'tag', 'ic-s')}</span><b>${esc(g.nome)}</b><span class="cont">${plural(g.ts.length, 'título', 'títulos')}</span>${ic('chev', 'ic-s seta')}</button>${fechado ? '' : ul(g.ts)}</div>`;
     }).join('') : ul(ts))
       // 0.10.0 (o padrão da família): o Apagar ao lado do Alterar, com o Desfazer
       + (sel ? `<div class="selbar dois"><button class="btn perigo" data-a="sel-apagar"${n ? '' : ' disabled'}>${ic('trash', 'ic-s')}Apagar</button><button class="btn pri" data-a="sel-alterar"${n ? '' : ' disabled'}>${ic('nota', 'ic-s')}${n ? 'Alterar ' + plural(n, 'título', 'títulos') : 'Alterar'}</button></div>` : '');
+  }
+  // 0.11.0 (o dono: "deixa tudo bem bonito nesse padrão", o dos Consumíveis do InventarIA): o título fecha o bloco (fechado,
+  // o escolhido ao lado), as escolhas numa barra só, do mesmo tamanho, e cada grupo com o ícone, o nome, quantos e a seta.
+  // 0.12.0 (PADROES.md, "O alto das listas"): fora do cartão, logo embaixo do Filtros; o Nenhum por último
+  const AG = [['categoria', 'Categoria', 'tag'], ['genero', 'Gênero', 'texto'], ['', 'Nenhum', 'list']];
+  function agruparBloco() {
+    if (S.sel) return '';
+    const ag = guardada('odisseia-agrupar') || '', agF = guardada('odisseia-agrupar-fechado') === '1';
+    return `<div class="agrupar${agF ? ' fechado' : ''}"><button class="agrupar-l" id="agrupar-l" data-a="agrupar-dobra" aria-expanded="${!agF}">${ic('layers', 'ic-s')}<span>Agrupar por</span>${agF ? `<span class="agrupar-val">· ${(AG.find(([k]) => k === ag) || AG[2])[1]}</span>` : ''}${ic('chev', 'ic-s seta')}</button>
+      <div class="modo agrupar-seg" role="group" aria-labelledby="agrupar-l"${agF ? ' hidden' : ''}>${AG.map(([k, n, i]) => `<button class="${ag === k ? 'on' : ''}" data-a="agrupar" data-v="${k}" aria-pressed="${ag === k}">${ic(i, 'ic-s')}<span>${n}</span></button>`).join('')}</div></div>`;
   }
   const lista = (ts, opts) => `<ul class="titulos">${ts.map(t => linhaTit(t, opts)).join('')}</ul>`;
   const ordem = ts => ts.slice().sort((a, b) => String(b.atualizado).localeCompare(String(a.atualizado)));
@@ -369,6 +374,11 @@
   }
   // 0.3.0 (o dono: "a parte de filtros deixa no mesmo padrão dos outros apps"): a busca, o Filtros que fecha e abre (o
   // aparelho lembra) e as caixas de seleção lado a lado, como no InventarIA e no ResolvIA
+  // 0.12.0 (PADROES.md): o Filtros fechado diz o que está escolhido em cada caixa (fora o «todos» do começo)
+  function filtrosVal(caixas) {
+    const v = caixas.map(h => { const m = /<option value="([^"]*)" selected>([^<]*)</.exec(h); return m && m[1] && !/^__/.test(m[1]) ? m[2] : ''; }).filter(Boolean);
+    return v.length ? `<span class="filtros-val"> · ${v.join(', ')}</span>` : '';
+  }
   function telaBuscar() {
     const b = S.busca, e = S.e, tipos = ligados(), aberto = guardada('odisseia-filtros') !== 'fechado';
     const caixa = (id, ic_, rot, opcoes, atual) => `<select class="inp select" id="${id}" data-ic="${ic_}" aria-label="${rot}">${opcoes}</select>`;
@@ -390,8 +400,8 @@
     if (e.ajustes.quem && e.pessoas.length > 1) sel.push(caixa('f-quem', 'users', 'Quem', opt('', 'Todas as pessoas', b.quem) + e.pessoas.map(p => opt(p.id, p.nome.split(' ')[0], b.quem)).join('')));
     const ts = filtrados();
     let h = topo('Buscar') + `<section class="sbar"><label class="busca">${ic('search')}<input id="b-texto" type="search" placeholder="${oQue()}" value="${esc(b.texto)}" enterkeyhint="search" autocomplete="off">${b.texto ? `<button class="limpar" data-a="b-limpar" aria-label="Limpar">${ic('x', 'ic-s')}</button>` : ''}</label>
-      <button class="filtros-h" data-a="filtros" aria-expanded="${aberto}">${ic('sliders', 'ic-s')}<span>Filtros</span>${ic('chev', 'ic-s seta')}</button>
-      <div class="sfiltros n${sel.length}"${aberto ? '' : ' hidden'}>${sel.join('')}</div></section>`;
+      <button class="filtros-h" data-a="filtros" aria-expanded="${aberto}">${ic('sliders', 'ic-s')}<span>Filtros${aberto ? '' : filtrosVal(sel)}</span>${ic('chev', 'ic-s seta')}</button>
+      <div class="sfiltros n${sel.length}"${aberto ? '' : ' hidden'}>${sel.join('')}</div>${ts.length ? agruparBloco() : ''}</section>`;
     const corpo = ts.length ? listaSel(ts, { mais1: true }) : `<p class="vazio">${e.titulos.length ? 'Nenhum título com esses filtros.' : 'A lista está vazia.'}</p>`;
     return h + card('resultado', 'list', `Títulos <span class="cont">${ts.length}</span>`, corpo, 'Títulos');
   }
@@ -411,8 +421,13 @@
     if (!todos.length) return h + card('nada-visto', icone, vazio, `<p class="lead">O que a casa ${aba === 'jogo' ? 'jogou' : 'viu'} aparece aqui.</p>`, 'nada-visto');
     const chip = (v, nome, icone_) => `<button class="chip${f === v ? ' on' : ''}" data-a="v-cat" data-v="${v}" aria-pressed="${f === v}">${icone_}${esc(nome)}</button>`;
     const chipCat = c => `<button class="chip cor${f === c.id ? ' on' : ''}" style="${estiloCor(c.cor)}" data-a="v-cat" data-v="${c.id}" aria-pressed="${f === c.id}"><span class="dot"></span>${esc(c.nome)}</button>`;
-    h += `<div class="chips filtro-cat" role="group" aria-label="Categoria">${chip('', 'Todas', ic('layers', 'ic-s'))}${cats.map(chipCat).join('')}${cats.length && semCat ? chip('sem', 'Sem categoria', ic('x', 'ic-s')) : ''}
-      ${cats.length ? '' : `<button class="chip" data-a="ir-categorias">${ic('plus', 'ic-s')}Criar categorias</button>`}</div>`;
+    // 0.12.0 (PADROES.md, "O alto das listas"): a categoria dentro do Filtros, que fecha (o aparelho lembra; fechado, a escolhida
+    // ao lado), e o Agrupar por logo embaixo
+    const vf = guardada('odisseia-vistos-filtros') === 'fechado';
+    const fNome = f === 'sem' ? 'Sem categoria' : f ? (cats.find(c => c.id === f) || {}).nome : 'Todas';
+    h += `<section class="sbar"><button class="filtros-h" id="vistos-filtros" data-a="vistos-filtros" aria-expanded="${!vf}">${ic('sliders', 'ic-s')}<span>Filtros${vf ? `<span class="filtros-val"> · ${esc(fNome)}</span>` : ''}</span>${ic('chev', 'ic-s seta')}</button>
+      <div class="chips filtro-cat" role="group" aria-label="Categoria"${vf ? ' hidden' : ''}>${chip('', 'Todas', ic('layers', 'ic-s'))}${cats.map(chipCat).join('')}${cats.length && semCat ? chip('sem', 'Sem categoria', ic('x', 'ic-s')) : ''}
+      ${cats.length ? '' : `<button class="chip" data-a="ir-categorias">${ic('plus', 'ic-s')}Criar categorias</button>`}</div>${ts.length ? agruparBloco() : ''}</section>`;
     return h + card('vistos', icone, `${titulo} <span class="cont">${ts.length}</span>`, ts.length ? listaSel(ts) : '<p class="vazio">Nenhum com essa categoria.</p>', 'vistos-' + aba);
   }
 
@@ -1410,6 +1425,7 @@
       } catch (err) { toast(err.message); }
     },
     filtros: () => { guardar('odisseia-filtros', guardada('odisseia-filtros') === 'fechado' ? 'aberto' : 'fechado'); render(); },
+    'vistos-filtros': () => { guardar('odisseia-vistos-filtros', guardada('odisseia-vistos-filtros') === 'fechado' ? 'aberto' : 'fechado'); render(); },
     'b-limpar': () => { S.busca.texto = ''; render(); },
     'ver-quero': el => { S.busca.situacao = 'quero'; S.busca.texto = ''; S.busca.tipo = el.dataset.v || ''; salvarBusca(); ir('buscar'); },
     'lado-sit': el => { S.busca.texto = ''; S.busca.situacao = el.dataset.v; salvarBusca(); S.tela === 'buscar' ? render() : ir('buscar'); },

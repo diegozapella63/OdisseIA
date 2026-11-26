@@ -1,5 +1,10 @@
 # Mudanças
 
+## 0.12.0
+
+- **O alto das listas igual em todos os apps**: o **Filtros** e o **Agrupar por** são linhas do mesmo tamanho, uma embaixo da outra, com o ícone na cor do app; fechado, cada um mostra ao lado o que está escolhido. O **Agrupar por** saiu de dentro do cartão e fica logo embaixo do Filtros; o **Nenhum** vem por último.
+- **Concluídos**: a categoria fica dentro do **Filtros**, que fecha e abre como o do Buscar.
+
 ## 0.11.0
 
 - **Agrupar por** (Buscar e Concluídos) no mesmo jeito dos outros apps da família.

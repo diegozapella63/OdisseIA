@@ -158,6 +158,8 @@ A lista fica em `tools/iguais.py` e as regras, em **Arquivos iguais** e **Os app
 
 0.11.0 (o dono: "do mesmo jeito que criamos esse agrupar por… [nos Consumíveis do InventarIA]… se tiver alguma já fora do padrão, deixa nesse padrão"): no `listaSel`, o `.agrupar` com o título `.agrupar-l` (`agrupar-dobra`, `odisseia-agrupar-fechado` no aparelho; fechado, a `.agrupar-val`) e o `.modo.agrupar-seg` (`AG`: Nenhum, Categoria e Gênero, com ícone, do mesmo tamanho); cada `.grupo-h` com o `.grupo-ic` (na cor da categoria, `.cor`), o nome e o `.cont` («N títulos»). Teste: `test_categoria_na_linha_agrupar_e_campos`.
 
+0.12.0 (o dono: "cada tela tem tamanho de fonte diferente… documenta nos padrões.md e aplica ele em todos os apps"; "os filtros lá de cima devem poder ser retraídos igual os outros filtros"): `agruparBloco()` (o `AG` com o Nenhum por último) sai do `listaSel` e vai na `.sbar`, logo embaixo do Filtros, no Buscar e no Concluídos; no Concluídos, a categoria dentro do `#vistos-filtros` (`odisseia-vistos-filtros`); fechado, o `.filtros-val` (`filtrosVal(caixas)` no Buscar: o escolhido de cada caixa). O `.filtros-h` e o `.agrupar-l` no padrão do **O alto das listas** do `PADROES.md` (40 px, 15 px, peso 500, o ícone de 18 px na cor do app, o escolhido em cinza); o `.grupo-ic` com 36 px. Teste: `test_categoria_na_linha_agrupar_e_campos`.
+
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado. Ele usa o app do Home
