@@ -160,6 +160,8 @@ A lista fica em `tools/iguais.py` e as regras, em **Arquivos iguais** e **Os app
 
 0.12.0 (o dono: "cada tela tem tamanho de fonte diferente… documenta nos padrões.md e aplica ele em todos os apps"; "os filtros lá de cima devem poder ser retraídos igual os outros filtros"): `agruparBloco()` (o `AG` com o Nenhum por último) sai do `listaSel` e vai na `.sbar`, logo embaixo do Filtros, no Buscar e no Concluídos; no Concluídos, a categoria dentro do `#vistos-filtros` (`odisseia-vistos-filtros`); fechado, o `.filtros-val` (`filtrosVal(caixas)` no Buscar: o escolhido de cada caixa). O `.filtros-h` e o `.agrupar-l` no padrão do **O alto das listas** do `PADROES.md` (40 px, 15 px, peso 500, o ícone de 18 px na cor do app, o escolhido em cinza); o `.grupo-ic` com 36 px. Teste: `test_categoria_na_linha_agrupar_e_campos`.
 
+0.12.1 (o dono: "faz também nos outros de mostrar o que foi selecionado ao retrair"): o `filtrosVal` sem nada escolhido diz o que vale na primeira caixa.
+
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado. Ele usa o app do Home

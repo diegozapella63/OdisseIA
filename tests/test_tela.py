@@ -347,6 +347,13 @@ class TestTela(unittest.TestCase):
         self.assertIn("Favoritos", pg.inner_text("#vistos .linha-tit:has-text('Farol Distante') .cat-tag"))
         self.assertEqual([t.strip() for t in pg.locator(".agrupar-seg button").all_inner_texts()], ["Categoria", "Gênero", "Nenhum"], "0.12.0: Categoria, Gênero e o Nenhum por último")
         # 0.12.0 (PADROES.md, "O alto das listas"): fora do cartão, logo embaixo do Filtros, as duas linhas do mesmo tamanho
+        # 0.12.1: o Filtros fechado sempre diz o que vale (sem nada escolhido, a primeira caixa)
+        aberto = pg.get_attribute(".sbar .filtros-h", "aria-expanded") == "true"
+        if aberto:
+            pg.click(".sbar .filtros-h")
+        self.assertRegex(" ".join(pg.inner_text(".sbar .filtros-h").split()), r"^Filtros · .+", "fechado, o que vale ao lado")
+        if aberto:
+            pg.click(".sbar .filtros-h")
         fh, ah = pg.locator(".sbar .filtros-h").bounding_box(), pg.locator(".sbar .agrupar-l").bounding_box()
         self.assertTrue(abs(fh["height"] - ah["height"]) < 1 and pg.evaluate("getComputedStyle(document.querySelector('.agrupar-l')).fontSize") == "15px", f"Filtros e Agrupar por iguais ({fh}, {ah})")
         larg = pg.evaluate("[...document.querySelectorAll('.agrupar-seg button')].map(b => Math.round(b.getBoundingClientRect().width))")

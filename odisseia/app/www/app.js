@@ -376,8 +376,12 @@
   // aparelho lembra) e as caixas de seleção lado a lado, como no InventarIA e no ResolvIA
   // 0.12.0 (PADROES.md): o Filtros fechado diz o que está escolhido em cada caixa (fora o «todos» do começo)
   function filtrosVal(caixas) {
-    const v = caixas.map(h => { const m = /<option value="([^"]*)" selected>([^<]*)</.exec(h); return m && m[1] && !/^__/.test(m[1]) ? m[2] : ''; }).filter(Boolean);
-    return v.length ? `<span class="filtros-val"> · ${v.join(', ')}</span>` : '';
+    const sel = h => /<option value="([^"]*)" selected>([^<]*)</.exec(h) || /<option value="([^"]*)">([^<]*)</.exec(h);
+    const v = caixas.map(h => { const m = sel(h); return m && m[1] && !/^__/.test(m[1]) ? m[2] : ''; }).filter(Boolean);
+    // sem nada escolhido, o que vale na primeira caixa («Filmes, séries e jogos», «Todas as situações»)
+    const m0 = caixas.length ? sel(caixas[0]) : null;
+    const t = v.length ? v.join(', ') : m0 ? m0[2] : '';
+    return t ? `<span class="filtros-val"> · ${t}</span>` : '';
   }
   function telaBuscar() {
     const b = S.busca, e = S.e, tipos = ligados(), aberto = guardada('odisseia-filtros') !== 'fechado';

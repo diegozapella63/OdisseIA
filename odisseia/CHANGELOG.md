@@ -1,5 +1,9 @@
 # Mudanças
 
+## 0.12.1
+
+- **Filtros** fechado: sempre diz ao lado o que está valendo (sem nada escolhido, «Filmes, séries e jogos»), numa linha só; o que não cabe termina em «…».
+
 ## 0.12.0
 
 - **O alto das listas igual em todos os apps**: o **Filtros** e o **Agrupar por** são linhas do mesmo tamanho, uma embaixo da outra, com o ícone na cor do app; fechado, cada um mostra ao lado o que está escolhido. O **Agrupar por** saiu de dentro do cartão e fica logo embaixo do Filtros; o **Nenhum** vem por último.
