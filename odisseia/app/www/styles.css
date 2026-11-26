@@ -507,3 +507,9 @@ code { font-size: 14px; background: var(--card-2); padding: 1px 6px; border-radi
 .uso-ult li:first-child { border-top: 0; }
 .uso-ult .t, .uso-ult li > span { color: var(--muted); font-size: 13px; }
 .uso-ult .r-erro, .uso-motivo { color: var(--danger) !important; }
+
+/* 0.9.0: os sensores no Home Assistant (Integrações › Sensores) */
+.sensor-list { display: grid; gap: 10px; }
+.sensor-row { display: grid; gap: 2px; min-width: 0; }
+.sensor-row code { font-size: 13px; overflow-wrap: anywhere; }
+.sensor-row span { color: var(--muted); font-size: 14px; }

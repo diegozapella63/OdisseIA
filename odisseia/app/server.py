@@ -112,6 +112,7 @@ def salvar(d, motivo=""):
     if os.path.exists(DADOS_ARQ) and not any(v["motivo"] == "do dia" and v["em"][:10] == agora_iso()[:10] for v in versoes()):
         guardar_versao("do dia")
     _gravar(DADOS_ARQ, json.dumps(d, ensure_ascii=False, indent=1))
+    sensores_depois(d)
     return d
 
 
@@ -660,6 +661,102 @@ def uma_volta(agora=None):
         time.sleep(0.5)
 
 
+# ---------------------------------------------------------------- 0.9.0: sensores no Home Assistant (o dono: "no OdisseIA
+# criar também sensores do Home Assistant"): com Integrações › Sensores ligado, publicados pela API REST a cada mudança
+# (e a cada 15 minutos, para voltarem depois de o Home Assistant reiniciar); desligado, saem uma vez.
+SENSORES = ("sensor.odisseia_quero_ver", "sensor.odisseia_em_andamento", "sensor.odisseia_proximo_episodio",
+            "sensor.odisseia_proximo_jogo", "sensor.odisseia_concluidos_no_mes")
+_sensores = {"sig": None, "em": 0.0}
+_sensores_trava = threading.Lock()
+
+
+def estados_sensores(d, hoje=None):
+    """O estado de cada sensor, pelos tipos ligados (um tipo desligado não entra nas contas)."""
+    hoje = (hoje or datetime.now().date()).isoformat()
+    lig = R.tipos_ligados(d)
+    ts = [t for t in d["titulos"] if t["tipo"] in lig]
+    quero = [t for t in ts if t["situacao"] == "quero"]
+    vendo = [t for t in ts if R.em_andamento(t)]
+    eps = sorted((t for t in ts if t["tipo"] == "serie" and t["situacao"] == "quero" and t.get("proximo") and t["proximo"]["data"] >= hoje),
+                 key=lambda t: t["proximo"]["data"])
+    jogos = sorted((t for t in ts if t["tipo"] == "jogo" and t["situacao"] == "quero" and t.get("data") and t["data"] >= hoje), key=lambda t: t["data"])
+    mes = [t for t in ts if t["situacao"] == "visto" and (t.get("visto_em") or "")[:7] == hoje[:7]]
+    por_tipo = lambda xs: {R.PLURAIS[k]: sum(1 for t in xs if t["tipo"] == k) for k in R.TIPOS if k in lig}  # noqa: E731
+    e = eps[0] if eps else None
+    j = jogos[0] if jogos else None
+    return {
+        "sensor.odisseia_quero_ver": {"state": len(quero), "attributes": {
+            "friendly_name": "OdisseIA: quero ver", "icon": "mdi:playlist-play", "unit_of_measurement": "títulos", "state_class": "measurement",
+            **por_tipo(quero), "titulos": [t["nome"] for t in quero[:20]]}},
+        "sensor.odisseia_em_andamento": {"state": len(vendo), "attributes": {
+            "friendly_name": "OdisseIA: séries em andamento", "icon": "mdi:television-play", "unit_of_measurement": "séries", "state_class": "measurement",
+            "series": [{"nome": t["nome"], "parou": R.ep_txt(t["temp"], t["ep"])} for t in vendo[:20]]}},
+        "sensor.odisseia_proximo_episodio": {"state": e["proximo"]["data"] if e else "unknown", "attributes": {
+            "friendly_name": "OdisseIA: próximo episódio", "icon": "mdi:calendar-star", "device_class": "date",
+            "serie": e["nome"] if e else None, "episodio": R.ep_txt(e["proximo"]["temp"], e["proximo"]["ep"]) if e else None,
+            "titulo": (e["proximo"].get("nome") or None) if e else None,
+            "proximos": [{"serie": t["nome"], "episodio": R.ep_txt(t["proximo"]["temp"], t["proximo"]["ep"]), "data": t["proximo"]["data"]} for t in eps[:10]]}},
+        "sensor.odisseia_proximo_jogo": {"state": j["data"] if j else "unknown", "attributes": {
+            "friendly_name": "OdisseIA: próximo jogo", "icon": "mdi:gamepad-variant", "device_class": "date",
+            "jogo": j["nome"] if j else None, "plataformas": (j.get("plataformas") or [])[:6] if j else [],
+            "proximos": [{"jogo": t["nome"], "data": t["data"]} for t in jogos[:10]]}},
+        "sensor.odisseia_concluidos_no_mes": {"state": len(mes), "attributes": {
+            "friendly_name": "OdisseIA: concluídos no mês", "icon": "mdi:check-decagram", "unit_of_measurement": "títulos", "state_class": "measurement",
+            **por_tipo(mes), "titulos": [t["nome"] for t in mes[:20]]}},
+    }
+
+
+def publicar_sensores(forcar=False):
+    """Manda os sensores que mudaram (ligado e dentro do Home Assistant). Devolve quantos foram."""
+    if not TOKEN:
+        return 0
+    with _sensores_trava:
+        d = ler()
+        if not d["ajustes"]["sensores"]:
+            return 0
+        corpos = estados_sensores(d)
+        sig = json.dumps(corpos, sort_keys=True, ensure_ascii=False)
+        if not forcar and sig == _sensores["sig"] and time.time() - _sensores["em"] < 900:
+            return 0
+        try:
+            for ent, corpo in corpos.items():
+                ha_post("/states/" + ent, corpo, timeout=10)
+            _sensores.update(sig=sig, em=time.time())
+            return len(corpos)
+        except IA.ErroIA as e:
+            log("Sensores:", e)
+            _sensores.update(sig=None)
+            return 0
+
+
+def remover_sensores():
+    if not TOKEN:
+        return
+    with _sensores_trava:
+        _sensores.update(sig=None, em=0.0)
+        for ent in SENSORES:
+            req = urllib.request.Request(HA_API + "/states/" + ent, method="DELETE", headers={"Authorization": f"Bearer {TOKEN}"})
+            try:
+                urllib.request.urlopen(req, timeout=10).read()
+            except (urllib.error.URLError, OSError):
+                pass  # já não existia, ou o Home Assistant está fora
+
+
+def sensores_depois(d):
+    """Depois de gravar: publica em segundo plano (a resposta da tela não espera o Home Assistant)."""
+    if TOKEN and (d.get("ajustes") or {}).get("sensores") is True:
+        threading.Thread(target=publicar_sensores, daemon=True).start()
+
+
+def laco_sensores():
+    while True:
+        time.sleep(60)
+        try:
+            publicar_sensores()
+        except Exception as e:  # noqa: BLE001 (o laço nunca para)
+            log("Sensores:", e)
+
+
 def laco():
     time.sleep(60)
     while True:
@@ -1075,7 +1172,7 @@ def ia_info(novo=False):
         motivo = ("Fora do Home Assistant não há IA." if not TOKEN else
                   "O Home Assistant não tem uma tarefa de IA: ponha uma IA (como Google Gemini ou OpenAI) em Configurações › Dispositivos e serviços.")
     return {"ligada": a["ia"], "pronta": bool(ents), "motivo": motivo, "entidades": ents, "conversa": a["ia_conversa"],
-            "fotos": a["ia_fotos"], "pesquisa": a["ia_pesquisa"], "fala": FALA.status("wav")}
+            "fotos": a["ia_fotos"], "pesquisa": a["ia_pesquisa"], "fala": FALA.status("wav", a["fala"]), "fala_escolha": a["fala"]}
 
 
 def pesquisar_internet(q):
@@ -1227,7 +1324,7 @@ def mudar_ajustes(corpo):
             if not isinstance(corpo["cor"], str) or not re.match(r"^[a-z]{2,12}$", corpo["cor"]):
                 raise ValueError("Cor desconhecida.")
             a["cor"], a["cor_dia"] = corpo["cor"], False
-        for k in ("cor_dia", "quem", "correria", "ia"):
+        for k in ("cor_dia", "quem", "correria", "ia", "sensores"):
             if k in corpo:
                 if not isinstance(corpo[k], bool):
                     raise ValueError(f"{k}: ligado ou desligado.")
@@ -1237,6 +1334,10 @@ def mudar_ajustes(corpo):
                 if not isinstance(corpo[k], str) or not R.IA_RE.match(corpo[k]):
                     raise ValueError(f"{k}: uma tarefa de IA do Home Assistant (ai_task.…) ou vazio.")
                 a[k] = corpo[k]
+        if "fala" in corpo:  # 0.9.0: a Fala para texto
+            if not isinstance(corpo["fala"], str) or not R.STT_RE.match(corpo["fala"]):
+                raise ValueError("fala: uma fala para texto do Home Assistant (stt.…) ou vazio.")
+            a["fala"] = corpo["fala"]
         if "tipos" in corpo:
             t = corpo["tipos"]
             if not isinstance(t, dict) or any(k not in R.TIPOS or not isinstance(v, bool) for k, v in t.items()):
@@ -1248,6 +1349,8 @@ def mudar_ajustes(corpo):
         salvar(d)
     if "correria" in corpo:
         publicar_correria()
+    if "sensores" in corpo:  # 0.9.0: ligou, publica já; desligou, tira do Home Assistant
+        threading.Thread(target=publicar_sensores if a["sensores"] else remover_sensores, kwargs={"forcar": True} if a["sensores"] else {}, daemon=True).start()
     return a
 
 
@@ -1434,7 +1537,7 @@ class Handler(BaseHTTPRequestHandler):
             if c == "/api/fala":  # 0.7.0: o microfone da Conversa (PCM de 16 kHz) vira texto
                 precisa_ia()
                 try:
-                    return self.enviar(200, {"texto": FALA.texto(self.corpo(int(FALA_M.PCM_MAX) + 1024), "wav")})
+                    return self.enviar(200, {"texto": FALA.texto(self.corpo(int(FALA_M.PCM_MAX) + 1024), "wav", ler()["ajustes"]["fala"])})
                 except FALA_M.ErroFala as e:
                     return self.enviar(400, {"erro": str(e)})
             if c == "/api/conversa":
@@ -1495,6 +1598,7 @@ def main():
     os.makedirs(DATA_DIR, exist_ok=True)
     publicar_correria()
     threading.Thread(target=laco, daemon=True).start()
+    threading.Thread(target=laco_sensores, daemon=True).start()
     srv = ThreadingHTTPServer(("0.0.0.0", PORTA), Handler)
     log(f"OdisseIA {VERSAO} na porta {PORTA}")
     srv.serve_forever()

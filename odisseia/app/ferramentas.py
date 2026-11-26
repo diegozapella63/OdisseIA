@@ -32,7 +32,7 @@ _CAT = {"type": "string", "description": "O nome de uma categoria da casa (as do
 _SIT = {"type": "string", "enum": SIT, "description": "quero (Quero ver; num jogo, Quero jogar) ou visto (num jogo, Jogado)."}
 FERRAMENTAS = [
     _f("resumo", "Resumo", "Quantos títulos há em cada situação, as séries em andamento (com o episódio e quantos faltam), "
-       "os episódios que vão sair nos próximos 14 dias e as categorias da casa."),
+       "os episódios que vão sair nos próximos 14 dias, os jogos em Quero jogar que saem nos próximos 30 dias e as categorias da casa."),
     _f("buscar", "Buscar na lista", "Os títulos da lista da casa, com filtros. Sem filtro, os mais recentes.",
        {"texto": {"type": "string", "description": "Parte do nome."}, "tipo": {"type": "string", "enum": TIPOS},
         "situacao": _SIT, "pessoa": {"type": "string", "description": "O nome de quem vê ou viu."},
@@ -168,6 +168,13 @@ def resumo(d, pessoas, hoje=None):
     if prox:
         out.append("Episódios que saem nos próximos 14 dias:")
         out += [f"- {R.data_br(t['proximo']['data'])}: {t['nome']} {R.ep_txt(t['proximo']['temp'], t['proximo']['ep'])}" for t in prox[:12]]
+    # 0.9.0: os jogos em Quero jogar que saem nos próximos 30 dias (a etapa Vão sair das rondas do CorrerIA 1.37.0)
+    ate_j = (hoje + timedelta(days=30)).isoformat()
+    jogos = sorted((t for t in ts if t["tipo"] == "jogo" and t["situacao"] == "quero" and t.get("data") and hoje.isoformat() <= t["data"] <= ate_j),
+                   key=lambda t: t["data"])
+    if jogos:
+        out.append("Jogos que saem nos próximos 30 dias:")
+        out += [f"- {R.data_br(t['data'])}: {t['nome']}" + (f" ({', '.join(t['plataformas'][:3])})" if t.get("plataformas") else "") for t in jogos[:12]]
     cats = [f"{R.PLURAIS[k]}: {', '.join(c['nome'] for c in d['categorias'][k])}" for k in R.TIPOS if d.get("categorias", {}).get(k)]
     if cats:
         out.append("Categorias da casa: " + "; ".join(cats) + ".")

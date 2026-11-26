@@ -8,6 +8,7 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const IC = {
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    gauge: '<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     mais: '<circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/><circle cx="5" cy="12" r="1.6" fill="currentColor"/>',
@@ -489,6 +490,21 @@
       <button class="sw${c.ligado ? ' on' : ''}" data-a="aj" data-k="correria" role="switch" aria-checked="${c.ligado}" aria-label="Usar pelo CorrerIA"></button></div>
       ${c.ligado && u ? `<p class="lead" style="margin:12px 0 0">Último uso: ${esc(u.app)}, ${esc(dia(u.em.slice(0, 10)))} às ${esc(u.em.slice(11, 16))}.</p>` : ''}`);
   }
+  // 0.9.0 (o dono: "no OdisseIA criar também sensores do Home Assistant"): o cartão dos outros apps
+  function cardSensores() {
+    const on = !!S.e.ajustes.sensores, l = ligados();
+    const lista = [
+      ['sensor.odisseia_quero_ver', 'quantos em Quero ver, por tipo'],
+      l.includes('serie') && ['sensor.odisseia_em_andamento', 'as séries em andamento e onde cada uma parou'],
+      l.includes('serie') && ['sensor.odisseia_proximo_episodio', 'a data do próximo episódio, com a série'],
+      l.includes('jogo') && ['sensor.odisseia_proximo_jogo', 'a data do próximo jogo que vai sair'],
+      ['sensor.odisseia_concluidos_no_mes', 'quantos foram vistos ou jogados neste mês'],
+    ].filter(Boolean);
+    return card('sensores', 'gauge', 'Sensores no Home Assistant', `<p class="lead">Para usar em painéis e automações do Home Assistant.</p>
+      <div class="linha-sw"><div><b>${ic('gauge', 'ic-s')}Criar sensores</b><span>${on ? 'Ligado.' : 'Desligado: nenhum sensor no Home Assistant.'}</span></div>
+        <button class="sw${on ? ' on' : ''}" data-a="aj" data-k="sensores" role="switch" aria-checked="${on}" aria-label="Criar sensores"></button></div>
+      ${on ? `<div class="sub-box sensor-list">${lista.map(([id, o]) => `<div class="sensor-row"><code>${id}</code><span>${o}</span></div>`).join('')}</div>` : ''}`);
+  }
   const tamanho = n => n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
   const quando = iso => `${dia(iso.slice(0, 10))} às ${iso.slice(11, 16)}`;
   const confirma = (texto, a, icone, rotulo, extra = '') => `<div class="conf-box"><p>${esc(texto)}</p><div class="acoes dois"><button class="btn out" data-a="conf-nao">${ic('x', 'ic-s')}Cancelar</button><button class="btn pri" data-a="${a}" ${extra}>${ic(icone, 'ic-s')}${rotulo}</button></div></div>`;
@@ -539,7 +555,7 @@
     const l = ligados();
     const corpo = S.aba === 'dados' ? abaDados() : S.aba === 'aparencia' ? abaAparencia() : S.aba === 'opcoes' ? abaOpcoes()
       : (l.some(k => k !== 'jogo') ? cardTMDB() : '') + (l.includes('jogo') ? cardIGDB() : '') + cardCorrerIA() + cardIA()
-        + (S.e.ajustes.ia ? cardMemoria() + cardFalar() + cardUso() : '');
+        + (S.e.ajustes.ia ? cardMemoria() + cardFalar() + cardUso() : '') + cardSensores();
     return topo('Configurações', 'Mais') + abas + corpo;
   }
   const GITHUB = 'https://github.com/diegozapella63';
@@ -1135,16 +1151,21 @@
         <button class="icbtn" data-a="mem-del" data-v="${esc(x.id)}" aria-label="Apagar">${ic('trash')}</button></li>`).join('')}</ul>` : ''}`);
   }
   function cardFalar() {
-    const f = (S.ia && S.ia.fala) || null;
+    // 0.9.0 (o dono: "cadê a opção para alterar o falar igual os outros apps?"): a Fala para texto, Automático ou um motor
+    const f = (S.ia && S.ia.fala) || null, escolha = S.e.ajustes.fala || '', ops = (f && f.opcoes) || [];
     const st = !f ? ['manual', 'Verificando…', ''] : f.pronta && !S.ia.pronta ? ['manual', 'Sem fala para texto', 'Só com a IA pronta.']
-      : f.pronta ? ['', 'Pronto para ouvir', `Transcreve com ${esc(f.nome || 'a fala para texto do Home Assistant')}.`] : ['erro', 'Sem fala para texto', esc(f.motivo || '')];
+      : f.pronta ? ['', 'Pronto para ouvir', `Transcreve com ${esc(f.nome || 'a fala para texto do Home Assistant')}.${f.escolha_sumiu ? ' O escolhido não foi encontrado: usando o automático.' : ''}`]
+      : ['erro', 'Sem fala para texto', esc(f.motivo || '')];
+    const auto = f && f.automatico ? `: ${esc(f.automatico)}` : '';
     return card('falar', 'mic', 'Falar', `<p class="lead">Quem transforma a fala em texto. Não muda o assistente de voz do Home Assistant.</p>
       <p class="status ${st[0]}"><span><b>${st[1]}</b>${st[2] ? ` · ${st[2]}` : ''}</span></p>
+      ${ops.length ? `<div class="campo">${lbl('mic', 'Fala para texto', 'fala-motor')}<select id="fala-motor" class="inp select" data-aj-sel="fala" aria-label="Fala para texto">
+        <option value="">Automático${auto}</option>${ops.map(o => `<option value="${esc(o.id)}"${o.id === escolha ? ' selected' : ''}>${esc(o.nome)}</option>`).join('')}</select></div>` : ''}
       <div class="acoes"><button class="btn out" data-a="ia-verificar">${ic('refresh', 'ic-s')}Verificar de novo</button></div>
       ${f && !f.pronta ? `<div class="passos-box"><b>Como configurar</b><ol class="passos">
         <li>Com o ${site('https://www.nabucasa.com/', 'Home Assistant Cloud')}, a fala para texto já vem pronta.</li>
         <li>Sem ele, instale um motor de fala: o app Whisper (local, de graça) com a integração Wyoming, ou a fala para texto de uma IA como Google Gemini ou OpenAI.</li>
-        <li>Volte aqui e toque em Verificar de novo.</li></ol></div>` : ''}`);
+        <li>Volte aqui, toque em Verificar de novo e escolha o motor na lista.</li></ol></div>` : ''}`);
   }
   const USO_TIPO = { conversa: 'Conversa', foto: 'Conversa com foto', pesquisa: 'Pesquisar na internet' };
   const USO_RES = { ok: '', cota: 'Sem cota', formato: 'Fora do formato', erro: 'Com erro' };
@@ -1478,7 +1499,11 @@
     }
     const k = ev.target.dataset && ev.target.dataset.ajSel;  // 0.7.0: a IA de cada uso
     if (k) {
-      api.post('ajustes', { [k]: ev.target.value }).then(r => { S.e.ajustes = r.ajustes; S.ia = Object.assign({}, S.ia, { [k.slice(3)]: ev.target.value }); render(); }).catch(err => toast(err.message));
+      api.post('ajustes', { [k]: ev.target.value }).then(r => {
+        S.e.ajustes = r.ajustes;
+        if (k === 'fala') carregarIA(); else S.ia = Object.assign({}, S.ia, { [k.slice(3)]: ev.target.value });  // o Falar diz com qual vai transcrever
+        render();
+      }).catch(err => toast(err.message));
     }
     if (id === 'conv-foto-arquivo' && ev.target.files[0]) { lerFoto(ev.target.files[0]); ev.target.value = ''; }
     if (id === 'dados-arquivo' && ev.target.files[0]) {

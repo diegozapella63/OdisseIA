@@ -85,10 +85,30 @@ class TestFala(unittest.TestCase):
 
     def test_escolhe_o_motor_que_aceita_ogg(self):
         self.assertEqual(self.f.motor(), {"id": "stt.home_assistant_cloud", "nome": "Home Assistant Cloud", "idioma": "pt-BR", "taxa": 16000})
-        self.assertEqual(self.f.status(), {"pronta": True, "nome": "Home Assistant Cloud"})
+        self.assertEqual({k: v for k, v in self.f.status().items() if k in ("pronta", "nome")}, {"pronta": True, "nome": "Home Assistant Cloud"})
         n = len(self.ha.pedidos)
         self.f.motor()
         self.assertEqual(len(self.ha.pedidos), n, "guardado por 5 minutos")
+
+    def test_escolher_a_fala_para_texto(self):
+        """0.9.0 (o dono: "cadê a opção para alterar o falar igual os outros apps?"): a lista para escolher, o automático
+        e a escolhida; a que sumiu do Home Assistant volta para o automático e avisa."""
+        CLOUD_WAV = dict(CLOUD, formats=["ogg", "wav"], codecs=["opus", "pcm"], sample_rates=[16000])
+        self.ha.rotas["/api/stt/stt.home_assistant_cloud"] = lambda h, c: (200, CLOUD_WAV) if h.command == "GET" else (200, {"result": "success", "text": "oi"})
+        self.ha.rotas["/api/stt/stt.faster_whisper"] = lambda h, c: (200, WHISPER) if h.command == "GET" else (200, {"result": "success", "text": "olá"})
+        st = self.f.status("wav")
+        self.assertEqual((st["nome"], st["automatico"], st["opcoes"], st["escolha_sumiu"]),
+                         ("Home Assistant Cloud", "Home Assistant Cloud", [{"id": "stt.home_assistant_cloud", "nome": "Home Assistant Cloud"},
+                                                                          {"id": "stt.faster_whisper", "nome": "faster-whisper"}], False))
+        st = self.f.status("wav", "stt.faster_whisper")
+        self.assertEqual((st["nome"], st["automatico"], st["escolha_sumiu"]), ("faster-whisper", "Home Assistant Cloud", False))
+        self.assertEqual(self.f.status("wav", "stt.sumiu")["escolha_sumiu"], True)
+        self.f.texto(b"\0" * 32000, "wav", "stt.faster_whisper")
+        self.assertEqual(self.ha.pedidos[-1][1], "/api/stt/stt.faster_whisper", "transcreve com a escolhida")
+        self.f.texto(b"\0" * 32000, "wav")
+        self.assertEqual(self.ha.pedidos[-1][1], "/api/stt/stt.home_assistant_cloud")
+        self.assertEqual(self.f.status("wav", "")["opcoes"][0]["id"], "stt.home_assistant_cloud")
+        self.assertEqual(F.Fala("http://x/api", None, print, simulada=True).status("wav", "stt.outra_simulada")["nome"], "Outra fala simulada")
 
     def test_audio_para_texto(self):
         self.assertEqual(self.f.texto(b"OggS-audio"), "Quanto gastei este mês?")
@@ -133,7 +153,7 @@ class TestFala(unittest.TestCase):
         """O microfone da conversa: PCM de 16 kHz, 16 bits, mono, como o Assist; qualquer motor com wav/pcm em 16 kHz."""
         self.ha.rotas["/api/stt/stt.home_assistant_cloud"] = (200, dict(CLOUD, formats=["ogg"], codecs=["opus"]))
         self.ha.rotas["/api/stt/stt.faster_whisper"] = lambda h, c: (200, WHISPER) if h.command == "GET" else (200, {"result": "success", "text": "O que vence esta semana?"})
-        self.assertEqual(self.f.status("wav"), {"pronta": True, "nome": "faster-whisper"})
+        self.assertEqual({k: v for k, v in self.f.status("wav").items() if k in ("pronta", "nome")}, {"pronta": True, "nome": "faster-whisper"})
         self.assertEqual(self.f.status()["nome"], "Home Assistant Cloud", "o do WhatsApp continua no Cloud: cada formato tem o seu")
         pcm = bytes(16000 * 2)
         self.assertEqual(self.f.texto(pcm, "wav"), "O que vence esta semana?")
@@ -152,7 +172,7 @@ class TestFala(unittest.TestCase):
         """Um motor que responde algo que não é JSON fica de fora; o áudio que não chega ou volta quebrado vira um erro claro."""
         self.ha.rotas["/api/stt/stt.home_assistant_cloud"] = lambda h, c: (200, "isto não é JSON") if h.command == "GET" else (200, "")
         self.ha.rotas["/api/stt/stt.faster_whisper"] = lambda h, c: (200, WHISPER) if h.command == "GET" else (200, "quebrado")
-        self.assertEqual(self.f.status("wav"), {"pronta": True, "nome": "faster-whisper"}, "o Cloud quebrado fica de fora")
+        self.assertEqual({k: v for k, v in self.f.status("wav").items() if k in ("pronta", "nome")}, {"pronta": True, "nome": "faster-whisper"}, "o Cloud quebrado fica de fora")
         with self.assertRaisesRegex(F.ErroFala, "Não entendi o áudio."):
             self.f.texto(bytes(32000), "wav")
         antes = self.f._pedir

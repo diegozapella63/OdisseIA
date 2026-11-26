@@ -1,5 +1,11 @@
 # Mudanças
 
+## 0.9.0
+
+- **Configurações › Integrações › Falar**: escolha a **Fala para texto**, como nos outros apps: **Automático** ou um dos motores do Home Assistant.
+- **Sensores no Home Assistant** (Configurações › Integrações, desligados de início): quantos em Quero ver, as séries em andamento, o próximo episódio, o próximo jogo e o que foi concluído no mês, para usar em painéis e automações.
+- O CorrerIA também sabe os jogos em Quero jogar que saem nos próximos 30 dias (e a **Ronda do lazer** do CorrerIA pergunta se quer um lembrete na agenda).
+
 ## 0.8.0
 
 - Na janela de um título, um campo fechado mostra ao lado do título o que está escolhido: **Situação · Quero ver**,

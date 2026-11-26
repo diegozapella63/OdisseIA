@@ -5,6 +5,7 @@ import json
 import os
 import unittest
 import zipfile
+from datetime import date
 from unittest import mock
 
 from tests import apoio
@@ -369,7 +370,7 @@ class TestBordas(unittest.TestCase):
         with mock.patch.object(S, "ThreadingHTTPServer", return_value=srv) as cls, mock.patch.object(S.threading, "Thread") as th:
             S.main()
         cls.assert_called_once()
-        th.return_value.start.assert_called_once()
+        self.assertEqual(th.return_value.start.call_count, 2, "o laço dos títulos e o dos sensores")
         srv.serve_forever.assert_called_once()
 
 
@@ -788,3 +789,90 @@ class TestNovidades060(unittest.TestCase):
         S.salvar(d)
         with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "jogos estão desligados"):
             self.usar(acao="nova", tipo="jogo", nome="Corrida")
+
+
+class TestNovidades090(unittest.TestCase):
+    """0.9.0: a Fala para texto escolhida, os sensores no Home Assistant e os jogos que vão sair no resumo."""
+
+    def setUp(self):
+        apoio.limpar()
+        apoio.fixar_hoje(self)
+        self.base = apoio.Servidor.subir()
+
+    def casa(self):
+        d = S.ler()
+        d["titulos"] = [S.R.limpar_titulo(t) for t in (
+            {"id": "t00000001", "tipo": "serie", "nome": "Mar de Estrelas", "situacao": "quero", "temp": 1, "ep": 3,
+             "temporadas": [{"n": 1, "episodios": 8}], "proximo": {"data": "2026-12-02", "temp": 1, "ep": 5, "nome": "O farol"}},
+            {"id": "t00000002", "tipo": "jogo", "nome": "Corrida no Vale", "situacao": "quero", "data": "2026-12-10", "plataformas": ["PC", "Console"]},
+            {"id": "t00000003", "tipo": "jogo", "nome": "Ilha Antiga", "situacao": "quero", "data": "2027-03-01"},
+            {"id": "t00000004", "tipo": "filme", "nome": "Farol Distante", "situacao": "visto", "visto_em": "2026-11-20"},
+            {"id": "t00000005", "tipo": "filme", "nome": "Casa no Morro", "situacao": "quero"})]
+        S.salvar(d)
+        return S.ler()
+
+    def test_fala_e_sensores_nos_ajustes(self):
+        st, r = pedir(self.base, "POST", "/api/ajustes", {"fala": "stt.faster_whisper"})
+        self.assertEqual((st, r["ajustes"]["fala"], r["ajustes"]["sensores"]), (200, "stt.faster_whisper", False))
+        self.assertEqual(pedir(self.base, "POST", "/api/ajustes", {"fala": "light.sala"})[0], 400)
+        self.assertEqual(pedir(self.base, "POST", "/api/ajustes", {"sensores": "sim"})[0], 400)
+        st, ia = pedir(self.base, "GET", "/api/ia")
+        self.assertEqual((ia["fala_escolha"], ia["fala"]["escolha_sumiu"], ia["fala"]["automatico"]), ("stt.faster_whisper", True, "Fala simulada (teste)"))
+        pedir(self.base, "POST", "/api/ajustes", {"fala": "stt.outra_simulada"})
+        self.assertEqual(pedir(self.base, "GET", "/api/ia")[1]["fala"]["nome"], "Outra fala simulada")
+        self.assertEqual(S.R.limpar_dados({"ajustes": {"fala": "x", "sensores": 1}})["ajustes"]["fala"], "", "o que não é stt.… fica vazio")
+
+    def test_os_sensores(self):
+        d = self.casa()
+        e = S.estados_sensores(d, date(2026, 11, 24))
+        self.assertEqual(e["sensor.odisseia_quero_ver"]["state"], 4)
+        self.assertEqual({k: e["sensor.odisseia_quero_ver"]["attributes"][k] for k in ("filmes", "séries", "jogos")}, {"filmes": 1, "séries": 1, "jogos": 2})
+        self.assertEqual((e["sensor.odisseia_em_andamento"]["state"], e["sensor.odisseia_em_andamento"]["attributes"]["series"]),
+                         (1, [{"nome": "Mar de Estrelas", "parou": "T1 E3"}]))
+        ep = e["sensor.odisseia_proximo_episodio"]
+        self.assertEqual((ep["state"], ep["attributes"]["serie"], ep["attributes"]["episodio"], ep["attributes"]["device_class"]),
+                         ("2026-12-02", "Mar de Estrelas", "T1 E5", "date"))
+        jg = e["sensor.odisseia_proximo_jogo"]
+        self.assertEqual((jg["state"], jg["attributes"]["jogo"], len(jg["attributes"]["proximos"])), ("2026-12-10", "Corrida no Vale", 2))
+        self.assertEqual((e["sensor.odisseia_concluidos_no_mes"]["state"], e["sensor.odisseia_concluidos_no_mes"]["attributes"]["titulos"]), (1, ["Farol Distante"]))
+        d["ajustes"]["tipos"]["jogo"] = False
+        e = S.estados_sensores(d, date(2026, 11, 24))
+        self.assertEqual((e["sensor.odisseia_quero_ver"]["state"], e["sensor.odisseia_proximo_jogo"]["state"]), (2, "unknown"), "um tipo desligado sai das contas")
+        # publicar: desligado, nada; ligado, os cinco; o mesmo de novo, nada; forçado, de novo
+        enviados = []
+        with mock.patch.object(S, "TOKEN", "x"), mock.patch.object(S, "ha_post", lambda c, corpo, timeout=0: enviados.append(c)), \
+                mock.patch.object(S, "sensores_depois", lambda d: None):
+            self.assertEqual(S.publicar_sensores(), 0)
+            d = S.ler()
+            d["ajustes"]["sensores"] = True
+            S.salvar(d)
+            S._sensores.update(sig=None)
+            self.assertEqual(S.publicar_sensores(), 5)
+            self.assertEqual(enviados[-5:], ["/states/" + x for x in S.SENSORES])
+            self.assertEqual(S.publicar_sensores(), 0, "nada mudou")
+            self.assertEqual(S.publicar_sensores(forcar=True), 5)
+        with mock.patch.object(S, "TOKEN", "x"), mock.patch.object(S, "ha_post", side_effect=S.IA.ErroIA("fora")):
+            self.assertEqual(S.publicar_sensores(forcar=True), 0)
+        self.assertEqual(S.publicar_sensores(), 0, "fora do Home Assistant")
+        apagados = []
+        with mock.patch.object(S, "TOKEN", "x"), mock.patch.object(S.urllib.request, "urlopen", lambda req, timeout=0: apagados.append(req.get_method()) or io.BytesIO(b"")):
+            S.remover_sensores()
+        self.assertEqual(apagados, ["DELETE"] * 5)
+        S.remover_sensores()  # sem o token, nada
+        corridas = []
+        with mock.patch.object(S, "TOKEN", "x"), mock.patch.object(S.threading, "Thread", lambda target, **k: mock.Mock(start=lambda: corridas.append(target))):
+            S.sensores_depois({"ajustes": {"sensores": True}})
+            S.sensores_depois({"ajustes": {"sensores": False}})
+        self.assertEqual(corridas, [S.publicar_sensores])
+        # ligar e desligar na tela: publica já, ou tira do Home Assistant
+        corridas = []
+        with mock.patch.object(S.threading, "Thread", lambda target, **k: mock.Mock(start=lambda: corridas.append(target))):
+            S.mudar_ajustes({"sensores": False})
+            S.mudar_ajustes({"sensores": True})
+        self.assertEqual(corridas, [S.remover_sensores, S.publicar_sensores])
+
+    def test_o_resumo_com_os_jogos_que_vao_sair(self):
+        d = self.casa()
+        t = S.ferramentas.resumo(d, [], date(2026, 11, 24))
+        self.assertIn("Jogos que saem nos próximos 30 dias:\n- 10/12/2026: Corrida no Vale (PC, Console)", t)
+        self.assertNotIn("Ilha Antiga", t, "só os próximos 30 dias")

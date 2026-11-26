@@ -87,12 +87,13 @@ Em **Mais › Configurações › Integrações**:
 
 - **IA**: **Usar IA** (desligado, a Conversa e o Falar somem em todos os aparelhos) e a IA de cada uso: **Para conversar**, **Para ler fotos** e **Para pesquisar na internet** (a de fotos e a de pesquisar vazias são a de conversar; para pesquisar, a IA precisa da busca na web ligada no Home Assistant).
 - **Memória da IA**: uma memória só, da casa, compartilhada por todos os apps: o que você escreve aqui a IA lembra em toda conversa, em qualquer um deles.
-- **Falar**: quem transforma a fala em texto e, sem ninguém, como configurar.
+- **Falar**: quem transforma a fala em texto. Em **Fala para texto**, **Automático** (o do Home Assistant Cloud, senão o primeiro que entende o microfone) ou um dos motores do Home Assistant; se o escolhido sumir, o app usa o automático e avisa. Sem nenhum, como configurar.
 - **Uso da IA**: as chamadas do app para a IA (hoje, 7 dias e este mês) e as últimas, com o motivo de cada erro. Os tokens são estimados.
+- **Sensores no Home Assistant** (desligados de início; não dependem da IA): para usar em painéis e automações. `sensor.odisseia_quero_ver` (quantos em Quero ver, por tipo), `sensor.odisseia_em_andamento` (as séries em andamento e onde cada uma parou), `sensor.odisseia_proximo_episodio` (a data do próximo episódio, com a série e o episódio), `sensor.odisseia_proximo_jogo` (a data do próximo jogo em Quero jogar) e `sensor.odisseia_concluidos_no_mes` (quantos foram vistos ou jogados neste mês). Mudam a cada gravação; desligar tira os sensores do Home Assistant.
 
 ## Pelo CorrerIA
 
-Com **Configurações › Integrações › CorrerIA** ligado, o CorrerIA (WhatsApp, Claude e Gemini) pode perguntar o que a casa está vendo e jogando, adicionar um filme, uma série ou um jogo pelo nome (também uma série inteira já vista), uma coleção inteira (de filmes ou de jogos), marcar o próximo episódio, a categoria, a situação e quem vê (também de vários de uma vez), dizer onde assistir e em que plataformas jogar, mostrar as listas prontas e criar, renomear e apagar as categorias.
+Com **Configurações › Integrações › CorrerIA** ligado, o CorrerIA (WhatsApp, Claude e Gemini) pode perguntar o que a casa está vendo e jogando, adicionar um filme, uma série ou um jogo pelo nome (também uma série inteira já vista), uma coleção inteira (de filmes ou de jogos), marcar o próximo episódio, a categoria, a situação e quem vê (também de vários de uma vez), dizer onde assistir e em que plataformas jogar, mostrar as listas prontas, dizer os episódios e os jogos que vão sair e criar, renomear e apagar as categorias.
 
 ## Dados
 

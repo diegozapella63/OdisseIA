@@ -44,7 +44,7 @@ class TestRegras(unittest.TestCase):
                          "o Vendo e o Abandonado viram Quero ver; a categoria de filme numa série sai")
         self.assertEqual(d["categorias"], {"filme": [{"id": "c000001", "nome": "Família", "cor": "vermelho"}], "serie": [], "jogo": []}, "sem cor, a primeira livre")
         self.assertEqual(d["ajustes"], {"cor": "lilas", "cor_dia": False, "quem": True, "correria": False, "tipos": {"filme": True, "serie": True, "jogo": True},
-                                        "ia": True, "ia_conversa": "", "ia_fotos": "", "ia_pesquisa": ""})
+                                        "ia": True, "ia_conversa": "", "ia_fotos": "", "ia_pesquisa": "", "fala": "", "sensores": False})
         # 0.7.0: a IA de cada uso só aceita uma tarefa de IA; Usar IA começa ligado
         aj = R.limpar_dados({"ajustes": {"ia": False, "ia_conversa": "ai_task.gemini", "ia_fotos": "camera.x", "ia_pesquisa": 3}})["ajustes"]
         self.assertEqual((aj["ia"], aj["ia_conversa"], aj["ia_fotos"], aj["ia_pesquisa"]), (False, "ai_task.gemini", "", ""))

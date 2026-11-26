@@ -150,7 +150,10 @@ def limpar_dados(d):
                # 0.7.0: a IA (Configurações › Integrações › IA): ligada de início; a de cada uso, uma tarefa de IA do Home
                # Assistant ("": a padrão de lá; a de fotos e a de pesquisar vazias são a de conversar)
                "ia": aj.get("ia") is not False,
-               **{k: aj[k] if isinstance(aj.get(k), str) and IA_RE.match(aj[k]) else "" for k in ("ia_conversa", "ia_fotos", "ia_pesquisa")}}
+               **{k: aj[k] if isinstance(aj.get(k), str) and IA_RE.match(aj[k]) else "" for k in ("ia_conversa", "ia_fotos", "ia_pesquisa")},
+               # 0.9.0: a Fala para texto (Integrações › Falar; "": o automático) e os sensores no Home Assistant (desligados de início)
+               "fala": aj["fala"] if isinstance(aj.get("fala"), str) and STT_RE.match(aj["fala"]) else "",
+               "sensores": aj.get("sensores") is True}
     return {"versao": 1, "rev": _int(d.get("rev"), 0, 10 ** 12), "titulos": titulos[:MAX_TITULOS], "categorias": categorias, "ajustes": ajustes}
 
 
@@ -385,6 +388,7 @@ def data_br(iso):
 
 
 IA_RE = re.compile(r"^(?:ai_task\.[a-z0-9_]{1,80})?$")
+STT_RE = re.compile(r"^(?:stt\.[a-z0-9_]{1,80})?$")
 
 
 def tipos_ligados(d):
