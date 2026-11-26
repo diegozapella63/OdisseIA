@@ -1,5 +1,12 @@
 # Mudanças
 
+## 0.11.0
+
+- **Agrupar por** (Buscar e Concluídos) no mesmo jeito dos outros apps da família.
+  - **Nenhum**, **Categoria** e **Gênero** ficam numa barra só, do mesmo tamanho e com ícone.
+  - O título **Agrupar por** fecha e abre o bloco; fechado, mostra ao lado o que está escolhido.
+  - Cada grupo começa com o ícone (na cor da categoria), o nome e quantos títulos tem, e fecha num toque.
+
 ## 0.10.0
 
 - **Perguntas prontas** na Conversa, como nos outros apps: 6 à vista e, em **Editar perguntas**, mudar, tirar e pôr outras, com as **Mais perguntas** (20 modelos; um toque põe). Com a conversa andando, o ✨ ao lado da caixa abre as mesmas; o Voltar do celular fecha só elas. Ficam guardadas no aparelho; **Padrão** volta às de início.

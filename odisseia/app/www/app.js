@@ -301,10 +301,14 @@
         <button class="btn fino" data-a="sel-comecar">${ic('list-checks', 'ic-s')}Selecionar</button></div>`;
     const o = { mais1: opts.mais1, sel, lado, curta: modo === 'lista', catToque: true };
     const ag = guardada('odisseia-agrupar') || '', ul = l => `<ul class="titulos${modo === 'lista' ? ' curtas' : ''}">${l.map(t => linhaTit(t, o)).join('')}</ul>`;
-    const agrupar = `<div class="agrupar"><span class="lbl">${ic('layers', 'ic-s')}Agrupar por</span><div class="modo" role="group" aria-label="Agrupar por">${[['', 'Nada'], ['categoria', 'Categoria'], ['genero', 'Gênero']].map(([k, n]) => `<button class="${ag === k ? 'on' : ''}" data-a="agrupar" data-v="${k}" aria-pressed="${ag === k}">${n}</button>`).join('')}</div></div>`;
+    // 0.11.0 (o dono: "deixa tudo bem bonito nesse padrão", o dos Consumíveis do InventarIA): o título fecha o bloco (fechado,
+    // o escolhido ao lado), as escolhas numa barra só, do mesmo tamanho, e cada grupo com o ícone, o nome, quantos e a seta
+    const AG = [['', 'Nenhum', 'list'], ['categoria', 'Categoria', 'tag'], ['genero', 'Gênero', 'texto']], agF = guardada('odisseia-agrupar-fechado') === '1';
+    const agrupar = `<div class="agrupar${agF ? ' fechado' : ''}"><button class="agrupar-l" id="agrupar-l" data-a="agrupar-dobra" aria-expanded="${!agF}">${ic('layers', 'ic-s')}<span>Agrupar por</span>${agF ? `<span class="agrupar-val">· ${(AG.find(([k]) => k === ag) || AG[0])[1]}</span>` : ''}${ic('chev', 'ic-s seta')}</button>
+      <div class="modo agrupar-seg" role="group" aria-labelledby="agrupar-l"${agF ? ' hidden' : ''}>${AG.map(([k, n, i]) => `<button class="${ag === k ? 'on' : ''}" data-a="agrupar" data-v="${k}" aria-pressed="${ag === k}">${ic(i, 'ic-s')}<span>${n}</span></button>`).join('')}</div></div>`;
     return barra + (sel ? '' : agrupar) + (ag ? grupos(ts, ag).map(g => {
       const k = ag + ':' + g.k, F = new Set(lerJSON('odisseia-grupos', [])), fechado = F.has(k);
-      return `<div class="grupo${fechado ? ' fechado' : ''}"><button class="grupo-h" data-a="grupo" data-v="${esc(k)}" aria-expanded="${!fechado}">${g.c ? `<span class="dot" style="${estiloCor(g.c.cor)}"></span>` : ic(ag === 'genero' ? 'texto' : 'tag', 'ic-s')}<b>${esc(g.nome)}</b><span class="cont">${g.ts.length}</span>${ic('chev', 'ic-s seta')}</button>${fechado ? '' : ul(g.ts)}</div>`;
+      return `<div class="grupo${fechado ? ' fechado' : ''}"><button class="grupo-h" data-a="grupo" data-v="${esc(k)}" aria-expanded="${!fechado}"><span class="grupo-ic${g.c ? ' cor' : ''}"${g.c ? ` style="${estiloCor(g.c.cor)}"` : ''}>${ic(ag === 'genero' ? 'texto' : 'tag', 'ic-s')}</span><b>${esc(g.nome)}</b><span class="cont">${plural(g.ts.length, 'título', 'títulos')}</span>${ic('chev', 'ic-s seta')}</button>${fechado ? '' : ul(g.ts)}</div>`;
     }).join('') : ul(ts))
       // 0.10.0 (o padrão da família): o Apagar ao lado do Alterar, com o Desfazer
       + (sel ? `<div class="selbar dois"><button class="btn perigo" data-a="sel-apagar"${n ? '' : ' disabled'}>${ic('trash', 'ic-s')}Apagar</button><button class="btn pri" data-a="sel-alterar"${n ? '' : ' disabled'}>${ic('nota', 'ic-s')}${n ? 'Alterar ' + plural(n, 'título', 'títulos') : 'Alterar'}</button></div>` : '');
@@ -1361,6 +1365,7 @@
     'cat-rapida': el => abrirFolha({ tipo: 'cat-titulo', id: el.dataset.id }, true),
     'col-cat': el => { S.colCat = el.dataset.v; render(); },
     agrupar: el => { guardar('odisseia-agrupar', el.dataset.v); render(); },
+    'agrupar-dobra': () => { guardar('odisseia-agrupar-fechado', guardada('odisseia-agrupar-fechado') === '1' ? '' : '1'); render(); },
     grupo: el => { const F = new Set(lerJSON('odisseia-grupos', [])), k = el.dataset.v; if (F.has(k)) F.delete(k); else F.add(k); guardar('odisseia-grupos', JSON.stringify([...F])); render(); },
     'cat-nova-t': () => { S.novaCat = S.novaCat == null ? '' : null; render(); if (S.novaCat != null) { const c = $('#cat-nova-t'); if (c) c.focus(); } },
     'cat-nova-criar': async el => {

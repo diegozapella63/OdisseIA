@@ -67,7 +67,7 @@ Cada campo da janela (Situação, Categoria, Quem, Onde assistir, Sinopse…) fe
 
 Nos dois, em cima da lista:
 - **Capas** ou **Lista**: a lista menor, sem as capas, um título por linha. O aparelho lembra.
-- **Agrupar por**: Nada, **Categoria** (na ordem das categorias; Sem categoria no fim) ou **Gênero** (o primeiro gênero de cada título). Cada grupo fecha num toque; o aparelho lembra.
+- **Agrupar por**: Nenhum, **Categoria** (na ordem das categorias; Sem categoria no fim) ou **Gênero** (o primeiro gênero de cada título). Cada grupo mostra quantos títulos tem e fecha num toque; o título Agrupar por fecha o bloco (com o escolhido ao lado). O aparelho lembra.
 - **A categoria em cada linha**, na cor dela, ou **+ Categoria**: o toque abre só a escolha da categoria daquele título.
 - **Selecionar**: toque nos títulos (ou segure o dedo num) e **Alterar** muda de uma vez a **Categoria** e **Quem**; cada campo começa em **Manter**. **Apagar** tira os títulos marcados da lista. Depois, o aviso tem o **Desfazer**. Uma seleção é de um tipo só (as categorias são de cada tipo). O Voltar do celular sai do Selecionar.
 
