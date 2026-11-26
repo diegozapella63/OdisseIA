@@ -41,6 +41,7 @@ tests/                        testes (unittest; a tela com playwright); tests/ap
 dev/rodar.py                  o app no computador com o TMDB de mentira
 tools/cobertura.py            a cobertura de linhas do servidor (fica acima de 95%)
 tools/fazer_logo.py           desenha odisseia/icon.png e odisseia/logo.png
+tools/prints_readme.py        refaz as capturas do README (docs/*.png) com a casa do dev/rodar.py (o TMDB e o IGDB de mentira)
 ```
 
 Os dados ficam em `/data/odisseia.json` (`{versao, rev, titulos, categorias, ajustes}`; cada gravação soma 1 em `rev`, e a
