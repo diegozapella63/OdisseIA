@@ -1,5 +1,9 @@
 # Mudanças
 
+## 0.13.0
+
+- **Pelo CorrerIA**: agora dá para perguntar o que a lista tem em cada serviço ("o que temos para ver na Netflix?") e quantos títulos de cada assinatura a casa quer ver, para saber qual serviço sobra.
+
 ## 0.12.2
 
 - Nas janelas, um campo fechado **sem nada escolhido nem escrito** diz ao lado **Nenhum** (ou **Nenhuma**, **Ninguém**, **Sem categoria**), como nos outros apps.

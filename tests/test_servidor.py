@@ -260,6 +260,15 @@ class TestCorrerIA(unittest.TestCase):
         v = self.usar("ver", {"titulo": "grande viagem"})[1]["texto"]
         self.assertIn("Onde assistir no Brasil (JustWatch): assinatura: Cine Lumen; alugar: Loja Pipoca.", v)
         self.assertIn("Duração: 132 min.", v)
+        # 0.13.0: onde (o serviço) e por_servico (quantos de cada assinatura)
+        r = self.usar("buscar", {"onde": "lumen", "tipo": "filme"})[1]["texto"]
+        self.assertIn("A Grande Viagem", r)
+        self.assertIn("Onde assistir no Brasil (JustWatch): assinatura: Cine Lumen", r)
+        self.assertEqual(self.usar("buscar", {"onde": "pipoca"})[1]["texto"], "Nenhum título com esses filtros.", "alugar não conta")
+        r = self.usar("buscar", {"situacao": "quero", "por_servico": True})[1]["texto"]
+        self.assertIn(", por assinatura (pelo que a JustWatch sabe):", r)
+        self.assertIn("- Cine Lumen: ", r)
+        self.assertEqual(self.usar("buscar", {"texto": "zzz", "por_servico": True})[1]["texto"], "Nenhum título com esses filtros.")
         v = self.usar("ver", {"titulo": "mar"})[1]["texto"]
         self.assertIn("Temporadas: T1 (3 ep.), T2 (4 ep.).", v)
         self.assertIn("Próximo: T2 E3 em 27/11/2026.", v)
@@ -909,3 +918,17 @@ class TestNovidades090(unittest.TestCase):
         t = S.ferramentas.resumo(d, [], date(2026, 11, 24))
         self.assertIn("Jogos que saem nos próximos 30 dias:\n- 10/12/2026: Corrida no Vale (PC, Console)", t)
         self.assertNotIn("Ilha Antiga", t, "só os próximos 30 dias")
+
+
+class TestPorServico(unittest.TestCase):
+    """0.13.0: o por_servico do buscar (a etapa Assinaturas em uso das rondas do CorrerIA 1.39.0)."""
+
+    def test_conta_cada_assinatura_e_os_de_fora(self):
+        import ferramentas as F
+        ts = [{"nome": f"T{i}", "onde": {"assinatura": ["Cine Lumen"] + (["Tela Azul"] if i < 2 else [])}} for i in range(6)]
+        ts.append({"nome": "Sem", "onde": {"alugar": ["Loja Pipoca"]}})
+        r = F.texto_servicos(ts, {"tipo": "filme", "situacao": "quero"})
+        self.assertEqual(r.splitlines(), ["7 títulos (quero ver), por assinatura (pelo que a JustWatch sabe):",
+                                          "- Cine Lumen: 6 títulos (T0, T1, T2, T3, …)", "- Tela Azul: 2 títulos (T0, T1)",
+                                          "- Em nenhuma assinatura: 1"])
+        self.assertEqual(F.texto_servicos([], {}), "Nenhum título com esses filtros.")

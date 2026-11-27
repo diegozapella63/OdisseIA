@@ -164,6 +164,8 @@ A lista fica em `tools/iguais.py` e as regras, em **Arquivos iguais** e **Os app
 
 0.12.2 (o dono: "quando retraído sem selecionar nada deve estar como nenhum… em todos os apps"): o `pintarJanela` põe o `vazioDe(titulo)` quando o `valorCampo` não acha nada (a mesma regra do `campovalor.js` dos apps em Lit).
 
+0.13.0 (o dono, às ferramentas que faltavam para o CorrerIA: "pode colocar todas"): o `buscar` do CorrerIA com `onde` (os títulos num serviço, por assinatura ou de graça, pelo `t.onde`; a linha leva o `_onde`) e `por_servico` (`texto_servicos`: quantos títulos de cada assinatura, o que mais tem primeiro, e os que não estão em nenhuma). Para a etapa Assinaturas em uso das rondas do CorrerIA 1.39.0. Testes: o `test_ligar_e_usar` e o `TestPorServico` no `tests/test_servidor.py`.
+
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado. Ele usa o app do Home

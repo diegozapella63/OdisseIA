@@ -93,7 +93,7 @@ Em **Mais › Configurações › Integrações**:
 
 ## Pelo CorrerIA
 
-Com **Configurações › Integrações › CorrerIA** ligado, o CorrerIA (WhatsApp, Claude e Gemini) pode perguntar o que a casa está vendo e jogando, adicionar um filme, uma série ou um jogo pelo nome (também uma série inteira já vista), uma coleção inteira (de filmes ou de jogos), marcar o próximo episódio, a categoria, a situação e quem vê (também de vários de uma vez), dizer onde assistir e em que plataformas jogar, mostrar as listas prontas, dizer os episódios e os jogos que vão sair e criar, renomear e apagar as categorias.
+Com **Configurações › Integrações › CorrerIA** ligado, o CorrerIA (WhatsApp, Claude e Gemini) pode perguntar o que a casa está vendo e jogando, adicionar um filme, uma série ou um jogo pelo nome (também uma série inteira já vista), uma coleção inteira (de filmes ou de jogos), marcar o próximo episódio, a categoria, a situação e quem vê (também de vários de uma vez), dizer onde assistir e em que plataformas jogar, achar o que a lista tem num serviço (Netflix, Max…) e contar quantos títulos de cada assinatura, mostrar as listas prontas, dizer os episódios e os jogos que vão sair e criar, renomear e apagar as categorias.
 
 ## Dados
 

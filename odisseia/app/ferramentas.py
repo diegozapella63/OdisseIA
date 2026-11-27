@@ -33,10 +33,14 @@ _SIT = {"type": "string", "enum": SIT, "description": "quero (Quero ver; num jog
 FERRAMENTAS = [
     _f("resumo", "Resumo", "Quantos títulos há em cada situação, as séries em andamento (com o episódio e quantos faltam), "
        "os episódios que vão sair nos próximos 14 dias, os jogos em Quero jogar que saem nos próximos 30 dias e as categorias da casa."),
-    _f("buscar", "Buscar na lista", "Os títulos da lista da casa, com filtros. Sem filtro, os mais recentes.",
+    _f("buscar", "Buscar na lista", "Os títulos da lista da casa, com filtros. Sem filtro, os mais recentes. Com onde, só os que estão "
+       "num serviço (Netflix, Max, Prime Video…) por assinatura ou de graça, pelo que a JustWatch sabe; com por_servico, em vez da "
+       "lista, quantos títulos de cada assinatura (dos filtrados): para saber que serviço a casa usa e qual sobra.",
        {"texto": {"type": "string", "description": "Parte do nome."}, "tipo": {"type": "string", "enum": TIPOS},
         "situacao": _SIT, "pessoa": {"type": "string", "description": "O nome de quem vê ou viu."},
         "categoria": {"type": "string", "description": "O nome de uma categoria da casa."},
+        "onde": {"type": "string", "description": "O nome de um serviço (parte do nome vale: netflix, prime)."},
+        "por_servico": {"type": "boolean", "description": "true: quantos títulos de cada assinatura, no lugar da lista."},
         "limite": {"type": "integer", "minimum": 1, "maximum": 50}}),
     _f("ver", "Ver um título", "Tudo de um título: a sinopse, os gêneros, as temporadas, o episódio, a categoria, as notas, "
        "onde assistir no Brasil e, num jogo, as plataformas.", {"titulo": _TIT}, ["titulo"]),
@@ -150,6 +154,28 @@ def _onde(t):
     return ("Onde assistir no Brasil (JustWatch): " + "; ".join(partes) + ".") if partes else "Onde assistir: nada no Brasil, pelo que a JustWatch sabe."
 
 
+def texto_servicos(ts, a):
+    """0.13.0: quantos títulos de cada assinatura (por_servico do buscar), o que mais tem primeiro, e os que não estão em nenhuma."""
+    conta, exemplos = {}, {}
+    fora = 0
+    for t in ts:
+        nomes = list(dict.fromkeys((t.get("onde") or {}).get("assinatura") or []))
+        if not nomes:
+            fora += 1
+        for n in nomes:
+            conta[n] = conta.get(n, 0) + 1
+            exemplos.setdefault(n, []).append(t["nome"])
+    if not ts:
+        return "Nenhum título com esses filtros."
+    filtro = R.nome_sit(a["tipo"], a["situacao"]).lower() if a.get("tipo") and a.get("situacao") else ""
+    out = [f"{len(ts)} títulos" + (f" ({filtro})" if filtro else "") + ", por assinatura (pelo que a JustWatch sabe):"]
+    for n, k in sorted(conta.items(), key=lambda x: (-x[1], R.sem_acento(x[0]))):
+        out.append(f"- {n}: {k} " + ("título" if k == 1 else "títulos") + " (" + ", ".join(exemplos[n][:4]) + (", …" if k > 4 else "") + ")")
+    if fora:
+        out.append(f"- Em nenhuma assinatura: {fora}")
+    return "\n".join(out)
+
+
 def resumo(d, pessoas, hoje=None):
     hoje = hoje or date.today()
     ts = d["titulos"]
@@ -205,11 +231,18 @@ def chamar(nome, args, d, pessoas, pessoa=None, det=None, agora=None):
             if a.get("categoria"):
                 alvo = R.sem_acento(a["categoria"])
                 ts = [t for t in ts if R.sem_acento(R.nome_categoria(d, t)) == alvo]
+            if a.get("onde"):  # 0.13.0: por assinatura ou de graça, num serviço
+                alvo = R.sem_acento(a["onde"])
+                ts = [t for t in ts if any(alvo in R.sem_acento(n) for k in ("assinatura", "gratis") for n in (t.get("onde") or {}).get(k) or [])]
+            if a.get("por_servico") is True:
+                return texto_servicos(ts, a), False
             ts = sorted(ts, key=lambda t: t["atualizado"], reverse=True)
             lim = a.get("limite") or 20
             if not ts:
                 return "Nenhum título com esses filtros.", False
-            return "\n".join([f"{len(ts)} títulos" + (f" (os {lim} mais recentes)" if len(ts) > lim else "") + ":"] + ["- " + linha(t, pessoas, d) for t in ts[:lim]]), False
+            com_onde = bool(a.get("onde"))
+            return "\n".join([f"{len(ts)} títulos" + (f" (os {lim} mais recentes)" if len(ts) > lim else "") + ":"]
+                              + ["- " + linha(t, pessoas, d) + (" · " + _onde(t) if com_onde else "") for t in ts[:lim]]), False
         t = R.achar(d, a.get("titulo")) if "titulo" in a else None
         if nome == "ver":
             out = [linha(t, pessoas, d)]
