@@ -401,6 +401,9 @@ class TestTela(unittest.TestCase):
         self.assertTrue(val.is_visible() and val.inner_text().startswith("· "), f"Quem fechado: o escolhido ao lado ({val.inner_text() if val.count() else ''})")
         sit = pg.locator(".folha .dobra-campo:has-text('Situação') .fl-val")
         self.assertFalse(sit.is_visible(), "aberto, sem o escolhido no título")
+        # 0.12.2: fechado sem nada escrito, «Nenhuma» (as Notas, a Observação) ou «Nenhum»
+        vazios = pg.evaluate("[...document.querySelectorAll('.folha .dobra-campo')].map(r => [r.dataset.campo, (r.querySelector('.fl-val') || {}).textContent || ''])")
+        self.assertTrue(all(v.startswith("· ") for _, v in vazios), f"todo campo tem o que vale, também o vazio ({vazios})")
         self.padrao(pg, "o título com um campo fechado")
         pg.go_back()
         pg.click("#resultado .tit >> nth=1")

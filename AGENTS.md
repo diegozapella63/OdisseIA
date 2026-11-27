@@ -162,6 +162,8 @@ A lista fica em `tools/iguais.py` e as regras, em **Arquivos iguais** e **Os app
 
 0.12.1 (o dono: "faz também nos outros de mostrar o que foi selecionado ao retrair"): o `filtrosVal` sem nada escolhido diz o que vale na primeira caixa.
 
+0.12.2 (o dono: "quando retraído sem selecionar nada deve estar como nenhum… em todos os apps"): o `pintarJanela` põe o `vazioDe(titulo)` quando o `valorCampo` não acha nada (a mesma regra do `campovalor.js` dos apps em Lit).
+
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado. Ele usa o app do Home

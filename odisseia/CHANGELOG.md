@@ -1,5 +1,9 @@
 # Mudanças
 
+## 0.12.2
+
+- Nas janelas, um campo fechado **sem nada escolhido nem escrito** diz ao lado **Nenhum** (ou **Nenhuma**, **Ninguém**, **Sem categoria**), como nos outros apps.
+
 ## 0.12.1
 
 - **Filtros** fechado: sempre diz ao lado o que está valendo (sem nada escolhido, «Filmes, séries e jogos»), numa linha só; o que não cabe termina em «…».

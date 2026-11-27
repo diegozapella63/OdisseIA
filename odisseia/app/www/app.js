@@ -742,6 +742,13 @@
   const SUB_CAMPO = 'small, .sub, .badge, .n, .cont';
   const textoBotao = b => [...b.childNodes].filter(n => n.nodeType === 3 || (n.nodeType === 1 && !n.matches(SUB_CAMPO) && n.tagName !== 'svg'))
     .map(n => n.textContent).join(' ').replace(/\s+/g, ' ').trim();
+  // sem nada escolhido nem escrito: «Sem categoria», «Ninguém» (Quem…), «Nenhuma» (uma palavra feminina) ou «Nenhum»
+  function vazioDe(titulo) {
+    const t = String(titulo || '').trim();
+    if (/^categoria/i.test(t)) return 'Sem categoria';
+    if (/^quem\b/i.test(t)) return 'Ninguém';
+    return /^(notas?|observaç|lista|cor\b|fotos?|descriç|data|hora|temporada|plataforma|situaç|coleç)/i.test(t) ? 'Nenhuma' : 'Nenhum';
+  }
   function valorCampo(c) {
     const meu = el => el.closest('.campo') === c && !el.closest('.lbl, .dobra-campo');
     const v = [...c.querySelectorAll('.on, .sel, [aria-pressed="true"], [aria-checked="true"]')]
@@ -789,8 +796,9 @@
       r.setAttribute('aria-expanded', String(!F.has(k)));
       // 0.8.0 (o dono: "tem que mostrar o que foi selecionado do ladinho, quando eu retraio"): fechado, o escolhido ou o
       // escrito ao lado do título, como nos outros apps
-      const v = valorCampo(c);
-      r.insertAdjacentHTML('beforeend', (v ? `<span class="fl-val">· ${esc(v)}</span>` : '') + ic('chev', 'ic-s seta'));
+      // 0.12.2 (o dono: "quando retraído sem selecionar nada deve estar como nenhum… em todos os apps")
+      const v = valorCampo(c) || vazioDe(k);
+      r.insertAdjacentHTML('beforeend', `<span class="fl-val">· ${esc(v)}</span>` + ic('chev', 'ic-s seta'));
       c.classList.toggle('fechado', F.has(k));
     });
     if (rolou) corpo.scrollTop = rolou;
