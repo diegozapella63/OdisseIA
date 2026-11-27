@@ -566,6 +566,7 @@ class TestTela(unittest.TestCase):
         pg.click("#nav [data-v=mais]")
         pg.click("[data-a=ir-config]")
         pg.wait_for_selector("#uso-ia .status")
+        pg.wait_for_function("() => !/Carregando/.test(document.querySelector('#uso-ia').innerText)")  # no GitHub, às vezes ainda carregando
         self.assertIn("Sem dados de uso ainda.", pg.inner_text("#uso-ia"), "a IA simulada não conta")
         ids = pg.evaluate("[...document.querySelectorAll('#app .card')].map(c => c.id)")
         self.assertEqual(ids[ids.index("correria"):], ["correria", "ia", "memoria-ia", "falar", "uso-ia", "sensores"])
