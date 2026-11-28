@@ -45,6 +45,10 @@ O que já está na lista mostra a situação no canto da capa.
 
 Em **Mais › Categorias** ficam as categorias da casa, uma lista para cada tipo (até 40 em cada), cada uma com uma cor. **Nova categoria** abre o nome e a cor (começa numa cor que nenhuma usa); tocar numa categoria muda o nome e a cor, ou apaga (os títulos ficam sem categoria). No título, a categoria aparece na cor dela; **Nova** cria uma ali mesmo. O Buscar e o Vistos filtram pela categoria.
 
+### Categorias únicas
+
+Em **Configurações › Opções › Categorias**, a chave **Categorias únicas** troca as listas de cada tipo por uma só, que vale para tudo. Ao ligar, as categorias de mesmo nome se juntam (os títulos vão junto); ao desligar, cada tipo fica com uma cópia.
+
 ## Coleções
 
 As sagas de filmes e as séries de jogos aparecem na busca com a etiqueta **Coleção**, na lista pronta **Coleções** (as sagas dos filmes mais populares e mais bem avaliados) e no botão **Coleção** embaixo da capa de um filme que faz parte de uma. Na capa da coleção, o ✓ marca todos os já lançados como Visto (Jogado), e o marcador, todos como Quero ver (jogar), sem abrir. A coleção abre com todos, na ordem em que saíram: **Quero ver todos** (**Quero jogar todos**) põe os que faltam na lista; **Já vi todos** (**Já joguei todos**) põe os que já saíram como Visto (e marca como Visto os que já estavam na lista). Numa série de jogos entram os jogos de verdade: as remasterizações, os pacotes e os conteúdos extras ficam de fora. Antes, a **Categoria de todos** escolhe a categoria que todos ganham (os novos e os que já estavam na lista); cada capa que já está na lista mostra a categoria dela, para mudar uma a uma.

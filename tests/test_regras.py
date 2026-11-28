@@ -43,7 +43,7 @@ class TestRegras(unittest.TestCase):
         self.assertEqual(([x["n"] for x in s["temporadas"]], s["temp"], s["ep"], s["situacao"], s["categoria"]), ([1, 2], 0, 0, "quero", ""),
                          "o Vendo e o Abandonado viram Quero ver; a categoria de filme numa série sai")
         self.assertEqual(d["categorias"], {"filme": [{"id": "c000001", "nome": "Família", "cor": "vermelho"}], "serie": [], "jogo": [], "livro": []}, "sem cor, a primeira livre")
-        self.assertEqual(d["ajustes"], {"cor": "lilas", "cor_dia": False, "quem": True, "correria": False, "tipos": {"filme": True, "serie": True, "jogo": True, "livro": False},
+        self.assertEqual(d["ajustes"], {"cor": "lilas", "cor_dia": False, "quem": True, "correria": False, "tipos": {"filme": True, "serie": True, "jogo": True, "livro": False}, "cat_unicas": False,
                                         "ia": True, "ia_conversa": "", "ia_fotos": "", "ia_pesquisa": "", "fala": "", "sensores": False})
         # 0.7.0: a IA de cada uso só aceita uma tarefa de IA; Usar IA começa ligado
         aj = R.limpar_dados({"ajustes": {"ia": False, "ia_conversa": "ai_task.gemini", "ia_fotos": "camera.x", "ia_pesquisa": 3}})["ajustes"]
@@ -147,6 +147,51 @@ class TestRegras(unittest.TestCase):
         self.assertEqual(R.seguinte(fora), (7, 1))
         self.assertIsNone(R.seguinte(dict(fora, temp=9)))
         self.assertTrue(R.ja_saiu(dict(c, ultimo=None), 9, 9))
+
+    def test_categorias_unicas(self):
+        """0.17.0: uma lista só para todos os tipos: ao ligar, as de mesmo nome viram uma e os títulos vão junto; o que muda
+        vale em todos; ao desligar, cada tipo fica com a sua cópia."""
+        d = R.limpar_dados({"titulos": [{"id": "t00000001", "tipo": "filme", "nome": "Farol", "categoria": "c000001"},
+                                        {"id": "t00000002", "tipo": "serie", "nome": "Mar", "categoria": "c000002"},
+                                        {"id": "t00000003", "tipo": "jogo", "nome": "Ilha", "categoria": "c000003"}],
+                            "categorias": {"filme": [{"id": "c000001", "nome": "Favoritos", "cor": "azul"}],
+                                           "serie": [{"id": "c000002", "nome": "favoritos", "cor": "rosa"}, {"id": "c000004", "nome": "A dois", "cor": "verde"}],
+                                           "jogo": [{"id": "c000003", "nome": "Em família", "cor": "ouro"}]}})
+        self.assertFalse(d["ajustes"]["cat_unicas"])
+        R.categorias_unicas(d, True)
+        nomes = [c["nome"] for c in d["categorias"]["filme"]]
+        self.assertEqual(nomes, ["Favoritos", "A dois", "Em família"])
+        for k in R.TIPOS:
+            self.assertEqual(d["categorias"][k], d["categorias"]["filme"], k)
+        self.assertEqual([t["categoria"] for t in d["titulos"]], ["c000001", "c000001", "c000003"], "a série foi para a Favoritos que ficou")
+        R.categorias_unicas(d, True)  # de novo, nada muda
+        # nova (sem tipo), editar e apagar valem em todos
+        c = R.mudar_categorias(d, {"acao": "nova", "nome": "Clássicos"})
+        self.assertTrue(all(any(x["id"] == c["id"] for x in d["categorias"][k]) for k in R.TIPOS))
+        with self.assertRaisesRegex(R.ErroRegra, "já existe"):
+            R.mudar_categorias(d, {"acao": "nova", "tipo": "livro", "nome": "a dois"})
+        R.mudar_categorias(d, {"acao": "editar", "id": "c000003", "nome": "Família", "cor": "lilas"})
+        self.assertTrue(all(next(x for x in d["categorias"][k] if x["id"] == "c000003") == {"id": "c000003", "nome": "Família", "cor": "lilas"} for k in R.TIPOS))
+        self.assertEqual(R.achar_categoria(d, "livro", "família"), "c000003")
+        with self.assertRaisesRegex(R.ErroRegra, "não é uma categoria da casa"):
+            R.achar_categoria(d, "filme", "Nada")
+        R.mudar_categorias(d, {"acao": "apagar", "id": "c000001"})
+        self.assertTrue(all(not any(x["id"] == "c000001" for x in d["categorias"][k]) for k in R.TIPOS))
+        self.assertEqual([t["categoria"] for t in d["titulos"]], ["", "", "c000003"])
+        # gravado e lido de novo, continua uma lista só
+        d2 = R.limpar_dados(d)
+        self.assertTrue(d2["ajustes"]["cat_unicas"])
+        self.assertEqual(d2["categorias"]["serie"], d2["categorias"]["jogo"])
+        # desligar: cada tipo com a sua cópia e ids diferentes; o título segue a do tipo dele
+        R.categorias_unicas(d2, False)
+        ids = [c["id"] for k in R.TIPOS for c in d2["categorias"][k]]
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertEqual([c["nome"] for c in d2["categorias"]["jogo"]], [c["nome"] for c in d2["categorias"]["filme"]])
+        jogo = next(t for t in d2["titulos"] if t["tipo"] == "jogo")
+        self.assertEqual(R.nome_categoria(d2, jogo), "Família")
+        R.mudar_categorias(d2, {"acao": "editar", "id": jogo["categoria"], "nome": "Só dos jogos"})
+        self.assertEqual([c["nome"] for c in d2["categorias"]["filme"] if c["nome"] == "Só dos jogos"], [], "separadas de novo")
+        self.assertEqual(R.limpar_dados(d2)["titulos"][2]["categoria"], jogo["categoria"])
 
     def test_categorias(self):
         d = self.dados()

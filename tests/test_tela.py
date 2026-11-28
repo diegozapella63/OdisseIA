@@ -542,6 +542,45 @@ class TestTela(unittest.TestCase):
         self.padrao(pg, "Adicionar só com os livros, em 320 px")
         self.assertEqual(self.erros, [])
 
+    def test_categorias_unicas(self):
+        """0.17.0: Opções › Categorias únicas: uma lista só em Mais › Categorias, e o filtro do Buscar vale com todos os tipos."""
+        S.adicionar({"tipo": "filme", "tmdb": 101, "situacao": "quero"})
+        S.adicionar({"tipo": "serie", "tmdb": 202, "situacao": "quero"})
+        d = S.ler()
+        for tipo in ("filme", "serie"):
+            S.R.mudar_categorias(d, {"acao": "nova", "tipo": tipo, "nome": "Favoritos"})
+        for t in d["titulos"]:
+            t["categoria"] = d["categorias"][t["tipo"]][0]["id"]
+        S.salvar(d)
+        pg = self.abrir()
+        pg.click("#nav [data-v=buscar]")
+        self.assertTrue(pg.is_disabled("#f-cat"), "cada tipo com as suas: sem o tipo, a categoria fica inativa")
+        pg.click("#nav [data-v=mais]")
+        pg.click("[data-a=ir-config]")
+        pg.click("[data-a=aba][data-v=opcoes]")
+        self.assertIn("Cada tipo tem as suas.", pg.inner_text("#cat-unicas"))
+        pg.click("[data-a=aj-cat]")
+        pg.wait_for_selector("[data-a=aj-cat][aria-checked=true]")
+        self.assertIn("Uma lista só, para todos os tipos.", pg.inner_text("#cat-unicas"))
+        self.padrao(pg, "Opções com as Categorias únicas")
+        pg.go_back()
+        pg.click("[data-a=ir-categorias]")
+        pg.wait_for_selector("#cat-todas")
+        self.assertEqual(pg.locator(".card").count(), 1, "uma lista só")
+        self.assertEqual(pg.locator("#cat-todas .cat-linha:not(.nova)").count(), 1, "as duas Favoritos viraram uma")
+        self.assertIn("2 títulos", pg.inner_text("#cat-todas"))
+        pg.click("#cat-todas .cat-linha.nova")
+        pg.fill("#cat-nome", "Clássicos")
+        pg.click("[data-a=cat-salvar]")
+        pg.wait_for_function("document.querySelectorAll('#cat-todas .cat-linha:not(.nova)').length === 2")
+        self.padrao(pg, "Categorias únicas")
+        self.assertEqual([c["nome"] for c in S.ler()["categorias"]["jogo"]], ["Favoritos", "Clássicos"])
+        pg.click("#nav [data-v=buscar]")
+        self.assertFalse(pg.is_disabled("#f-cat"), "uma lista só: a categoria vale com todos os tipos")
+        pg.select_option("#f-cat", label="Favoritos")
+        pg.wait_for_function("document.querySelectorAll('#resultado .linha-tit, #resultado .cz').length === 2")
+        self.assertEqual(self.erros, [])
+
     def test_o_que_controlar(self):
         S.adicionar({"tipo": "filme", "tmdb": 101, "situacao": "quero"})
         S.adicionar({"tipo": "serie", "tmdb": 202, "situacao": "quero"})

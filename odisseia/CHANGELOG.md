@@ -1,5 +1,10 @@
 # Mudanças
 
+## 0.17.0
+
+- **Categorias únicas**: em **Configurações › Opções › Categorias**, ligue para ter uma lista só de categorias, que vale para séries, filmes, jogos e livros. Ao ligar, as de mesmo nome viram uma e os títulos continuam nelas. Com ela, o filtro de categoria do Buscar vale com todos os tipos.
+- Desligando, cada tipo fica com a sua cópia das categorias.
+
 ## 0.16.0
 
 - **Livros**: um tipo novo, com **Quero ler** e **Lido**. Ligue em **Configurações › Opções › O que controlar › Livros** (começa desligado).

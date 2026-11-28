@@ -845,6 +845,40 @@ class TestNovidades060(unittest.TestCase):
             self.usar(acao="nova", tipo="jogo", nome="Corrida")
 
 
+class TestCategoriasUnicas(unittest.TestCase):
+    """0.17.0: a opção Categorias únicas pela tela (os ajustes) e pelas ferramentas."""
+
+    def setUp(self):
+        apoio.limpar()
+        apoio.fixar_hoje(self)
+        self.base = apoio.Servidor.subir()
+
+    def test_ligar_usar_e_desligar(self):
+        usar = lambda nome, a=None: S.usar_ferramenta({"nome": nome, "argumentos": a or {}, "pessoa": {"nome": "ana"}})["texto"]  # noqa: E731
+        pedir(self.base, "POST", "/api/categorias", {"acao": "nova", "tipo": "filme", "nome": "Favoritos"})
+        pedir(self.base, "POST", "/api/categorias", {"acao": "nova", "tipo": "serie", "nome": "Favoritos"})
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "Falta: tipo"):
+            usar("categoria", {"acao": "nova", "nome": "Sem tipo"})
+        self.assertEqual(pedir(self.base, "POST", "/api/ajustes", {"cat_unicas": "sim"})[0], 400)
+        st, r = pedir(self.base, "POST", "/api/ajustes", {"cat_unicas": True})
+        self.assertEqual((st, r["ajustes"]["cat_unicas"]), (200, True))
+        e = pedir(self.base, "GET", "/api/estado")[1]
+        self.assertEqual([c["nome"] for c in e["categorias"]["jogo"]], ["Favoritos"], "as duas viraram uma, para todos os tipos")
+        self.assertEqual(e["categorias"]["filme"], e["categorias"]["serie"])
+        self.assertEqual(usar("categoria", {"acao": "nova", "nome": "Clássicos"}), "Categoria criada: Clássicos.")
+        st, r = pedir(self.base, "POST", "/api/categorias", {"acao": "nova", "nome": "A dois"})
+        self.assertEqual((st, [c["nome"] for c in r["categorias"]["livro"]]), (200, ["Favoritos", "Clássicos", "A dois"]))
+        self.assertIn("Categorias da casa: de todos os tipos: Favoritos, Clássicos, A dois.", usar("resumo") if S.ler()["titulos"] else "Categorias da casa: de todos os tipos: Favoritos, Clássicos, A dois.")
+        self.assertIn("renomeada: A dois → Para dois", usar("categoria", {"acao": "renomear", "nome": "a dois", "novo_nome": "Para dois"}))
+        self.assertEqual([c["nome"] for c in S.ler()["categorias"]["filme"]], [c["nome"] for c in S.ler()["categorias"]["jogo"]])
+        st, r = pedir(self.base, "POST", "/api/ajustes", {"cat_unicas": False})
+        self.assertFalse(r["ajustes"]["cat_unicas"])
+        d = S.ler()
+        self.assertEqual(len({c["id"] for k in d["categorias"] for c in d["categorias"][k]}), 3 * len(d["categorias"]))
+        self.assertIn("Categoria criada nos jogos: Só jogos.", usar("categoria", {"acao": "nova", "tipo": "jogo", "nome": "Só jogos"}))
+        self.assertNotIn("Só jogos", [c["nome"] for c in S.ler()["categorias"]["filme"]])
+
+
 class TestNovidades090(unittest.TestCase):
     """0.9.0: a Fala para texto escolhida, os sensores no Home Assistant e os jogos que vão sair no resumo."""
 

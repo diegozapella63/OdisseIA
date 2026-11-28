@@ -1435,6 +1435,10 @@ def mudar_ajustes(corpo):
             if not isinstance(corpo["fala"], str) or not R.STT_RE.match(corpo["fala"]):
                 raise ValueError("fala: uma fala para texto do Home Assistant (stt.…) ou vazio.")
             a["fala"] = corpo["fala"]
+        if "cat_unicas" in corpo:  # 0.17.0: uma lista de categorias para todos os tipos
+            if not isinstance(corpo["cat_unicas"], bool):
+                raise ValueError("cat_unicas: ligado ou desligado.")
+            R.categorias_unicas(d, corpo["cat_unicas"])
         if "tipos" in corpo:
             t = corpo["tipos"]
             if not isinstance(t, dict) or any(k not in R.TIPOS or not isinstance(v, bool) for k, v in t.items()):

@@ -377,9 +377,11 @@
       && (!b.situacao || t.situacao === b.situacao) && (!cat || (cat === 'sem' ? !catDe(t) : t.categoria === cat))));
   }
   // a categoria só vale com um tipo escolhido (ou um tipo só ligado)
+  // 0.17.0: com as Categorias únicas, uma lista só vale para todos os tipos
+  const unicas = () => !!S.e.ajustes.cat_unicas;
   function catDaBusca() {
     const l = ligados();
-    return l.length === 1 || l.includes(S.busca.tipo) ? S.busca.categoria : '';
+    return unicas() || l.length === 1 || l.includes(S.busca.tipo) ? S.busca.categoria : '';
   }
   // 0.3.0 (o dono: "a parte de filtros deixa no mesmo padrão dos outros apps"): a busca, o Filtros que fecha e abre (o
   // aparelho lembra) e as caixas de seleção lado a lado, como no InventarIA e no ResolvIA
@@ -398,7 +400,7 @@
     const opt = (v, n, atual) => `<option value="${esc(v)}"${v === atual ? ' selected' : ''}>${esc(n)}</option>`;
     // 0.5.0 (o dono: "só deve habilitar o filtro de categorias se eu selecionar só filmes, séries ou jogos"): as categorias
     // são de cada tipo; com todos os tipos, a caixa fica inativa
-    const tipoUm = tipos.length === 1 ? tipos[0] : tipos.includes(b.tipo) ? b.tipo : '';
+    const tipoUm = unicas() ? tipos[0] : tipos.length === 1 ? tipos[0] : tipos.includes(b.tipo) ? b.tipo : '';
     const cats = tipoUm ? e.categorias[tipoUm] || [] : [];
     const sel = [];
     const todos = tipos.map((k, i) => i ? NOMES[k].toLowerCase() : NOMES[k]), tipo = tipos.includes(b.tipo) ? b.tipo : '';
@@ -456,6 +458,16 @@
   const EXEMPLO_CAT = { filme: 'Ex.: Para ver em família', serie: 'Ex.: Para ver a dois', jogo: 'Ex.: Para jogar junto', livro: 'Ex.: Para ler nas férias' };
   function telaCategorias() {
     let h = topo('Categorias', 'Mais');
+    if (unicas()) {  // uma lista só, de todos os tipos
+      const k = ligados()[0], cs = S.e.categorias[k] || [];
+      const linhas = cs.map(c => {
+        const n = S.e.titulos.filter(t => t.categoria === c.id).length;
+        return `<button class="linha cat-linha" data-a="cat-abrir" data-k="${k}" data-id="${c.id}"><span class="rot-ic cat-tile" style="${estiloCor(c.cor)}">${ic('tag')}</span>
+          <span class="linha-t"><b>${esc(c.nome)}</b><small>${n ? plural(n, 'título', 'títulos') : 'Nenhum título'}</small></span>${ic('chev', 'ic-s chev')}</button>`;
+      }).join('');
+      return h + card('cat-todas', 'tag', `Todos os tipos <span class="cont">${cs.length}</span>`, `<div class="cats-lista">${linhas}
+        <button class="linha cat-linha nova" data-a="cat-abrir" data-k="${k}"><span class="rot-ic">${ic('plus')}</span><span class="linha-t"><b>Nova categoria</b></span></button></div>`, 'Categorias de todos os tipos');
+    }
     for (const [k, nome, icone] of [['serie', 'Séries', 'tv'], ['filme', 'Filmes', 'film'], ['jogo', 'Jogos', 'gamepad'], ['livro', 'Livros', 'book-open']].filter(([k]) => ligados().includes(k))) {
       const cs = S.e.categorias[k] || [];
       const linhas = cs.map(c => {
@@ -471,7 +483,7 @@
   function folhaCategoria(f) {
     const c = f.id ? (S.e.categorias[f.k] || []).find(x => x.id === f.id) : null, F = S.catf;
     const n = c ? S.e.titulos.filter(t => t.categoria === c.id).length : 0;
-    const corpo = `<div class="campo">${lbl('nota', 'Nome', 'cat-nome')}<textarea class="inp umalinha" rows="1" id="cat-nome" maxlength="40" placeholder="${EXEMPLO_CAT[f.k]}" enterkeyhint="done">${esc(F.nome)}</textarea></div>
+    const corpo = `<div class="campo">${lbl('nota', 'Nome', 'cat-nome')}<textarea class="inp umalinha" rows="1" id="cat-nome" maxlength="40" placeholder="${unicas() ? 'Ex.: Favoritos' : EXEMPLO_CAT[f.k]}" enterkeyhint="done">${esc(F.nome)}</textarea></div>
       <div class="campo">${lbl('palette', 'Cor')}<div class="cores" role="radiogroup" aria-label="Cor da categoria">${PALETA.map(x => `<button class="tsw${x.id === F.cor ? ' on' : ''}" role="radio" aria-checked="${x.id === F.cor}" style="--a:${x.fill}" data-a="cat-cor" data-v="${x.id}">
         <svg viewBox="-5 -5 40 30" aria-hidden="true"><path class="sw-ring" d="${TAG}"/><path class="sw-gap" d="${TAG}"/><path class="sw-fill" d="${TAG + FURO}"/><path class="sw-check" d="m14.6 10.3 3.2 3.2 6.5-6.9"/></svg><span>${x.nome}</span></button>`).join('')}</div></div>`;
     const pe = c && S.conf === 'cat:' + c.id ? `<p class="conf">Apagar «${esc(c.nome)}»?${n ? ` ${n === 1 ? 'O título dela fica' : `Os ${n} títulos dela ficam`} sem categoria.` : ''}</p><button class="btn out" data-a="conf-nao">${ic('x', 'ic-s')}Cancelar</button><button class="btn perigo" data-a="cat-apagar" data-id="${c.id}">${ic('trash', 'ic-s')}Apagar</button>`
@@ -582,7 +594,9 @@
     const tipo = (k, icone, nome, txt) => `<div class="linha-sw"><div><b>${ic(icone, 'ic-s')}${nome}</b><span>${so && a.tipos[k] ? 'Pelo menos um fica ligado.' : txt}</span></div>
       <button class="sw${a.tipos[k] ? ' on' : ''}" data-a="aj-tipo" data-k="${k}" role="switch" aria-checked="${a.tipos[k]}" aria-label="${nome}"${so && a.tipos[k] ? ' disabled' : ''}></button></div>`;
     return card('controlar', 'layers', 'O que controlar', `<p class="lead">Desligado some da tela e do CorrerIA; nada é apagado.</p>
-      ${tipo('serie', 'tv', 'Séries', 'O episódio em que cada um parou e os que vão sair.')}${tipo('filme', 'film', 'Filmes', 'Os filmes e as coleções (as sagas).')}${tipo('jogo', 'gamepad', 'Jogos', 'Os jogos e as coleções, pelo IGDB.')}${tipo('livro', 'book-open', 'Livros', 'Os livros, pelo nome ou pelo código de barras.')}`) + card('quem-ve', 'users', 'Quem vê', `<div class="linha-sw"><div><b>${ic('users', 'ic-s')}Marcar quem vê</b><span>Cada título diz quem da casa está vendo ou já viu.</span></div>
+      ${tipo('serie', 'tv', 'Séries', 'O episódio em que cada um parou e os que vão sair.')}${tipo('filme', 'film', 'Filmes', 'Os filmes e as coleções (as sagas).')}${tipo('jogo', 'gamepad', 'Jogos', 'Os jogos e as coleções, pelo IGDB.')}${tipo('livro', 'book-open', 'Livros', 'Os livros, pelo nome ou pelo código de barras.')}`)
+      + card('cat-unicas', 'tag', 'Categorias', `<div class="linha-sw"><div><b>${ic('tag', 'ic-s')}Categorias únicas</b><span>${a.cat_unicas ? 'Uma lista só, para todos os tipos.' : 'Cada tipo tem as suas.'}</span></div>
+      <button class="sw${a.cat_unicas ? ' on' : ''}" data-a="aj-cat" role="switch" aria-checked="${!!a.cat_unicas}" aria-label="Categorias únicas"></button></div>`) + card('quem-ve', 'users', 'Quem vê', `<div class="linha-sw"><div><b>${ic('users', 'ic-s')}Marcar quem vê</b><span>Cada título diz quem da casa está vendo ou já viu.</span></div>
       <button class="sw${a.quem ? ' on' : ''}" data-a="aj" data-k="quem" role="switch" aria-checked="${a.quem}" aria-label="Marcar quem vê"></button></div>`);
   }
   function telaConfig() {
@@ -1579,6 +1593,9 @@
     'aj-tipo': async el => {
       try { S.e.ajustes = (await api.post('ajustes', { tipos: { [el.dataset.k]: !S.e.ajustes.tipos[el.dataset.k] } })).ajustes; S.add.listas = {}; await carregar(); } catch (err) { toast(err.message); }
     },
+    'aj-cat': async () => {
+      try { S.e.ajustes = (await api.post('ajustes', { cat_unicas: !S.e.ajustes.cat_unicas })).ajustes; await carregar(); toast(S.e.ajustes.cat_unicas ? 'Uma lista só de categorias.' : 'Cada tipo com as suas categorias.'); } catch (err) { toast(err.message); }
+    },
     'cat-abrir': el => {
       const k = el.dataset.k, c = el.dataset.id && (S.e.categorias[k] || []).find(x => x.id === el.dataset.id);
       S.catf = { nome: c ? c.nome : '', cor: c ? c.cor : corLivre(S.e.categorias[k] || []) };
@@ -1695,7 +1712,7 @@
     if (id === 'f-cat' && ev.target.value === '__criar') { ev.target.value = S.busca.categoria; ir('categorias'); return; }
     if (filtro) {
       S.busca[filtro] = ev.target.value;
-      if (filtro === 'tipo') S.busca.categoria = ''; // as categorias são de cada tipo
+      if (filtro === 'tipo' && !unicas()) S.busca.categoria = ''; // as categorias são de cada tipo
       salvarBusca();
       render();
     }

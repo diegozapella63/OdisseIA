@@ -131,6 +131,57 @@ def limpar_titulo(t):
     return o
 
 
+def _juntar_categorias(categorias, titulos):
+    """Uma lista só: as de todos os tipos, na ordem, e as de mesmo nome viram uma (os títulos vão para a que ficou)."""
+    juntas, por_nome, troca = [], {}, {}
+    for k in TIPOS:
+        for c in categorias.get(k) or []:
+            if any(x["id"] == c["id"] for x in juntas):
+                continue
+            mesma = por_nome.get(sem_acento(c["nome"]))
+            if mesma:
+                troca[c["id"]] = mesma["id"]
+            else:
+                juntas.append(c)
+                por_nome[sem_acento(c["nome"])] = c
+    juntas = juntas[:MAX_CATEGORIAS]
+    for t in titulos:
+        if t.get("categoria") in troca:
+            t["categoria"] = troca[t["categoria"]]
+    for k in TIPOS:
+        categorias[k] = [dict(c) for c in juntas]
+
+
+def categorias_unicas(d, liga):
+    """0.17.0 (o dono: "Criar opção para marcar categorias únicas… uma categoria vai valer para todos"): liga (junta as de
+    todos os tipos numa lista só) ou desliga (cada tipo fica com a sua cópia, com ids novos, e os títulos seguem a deles)."""
+    liga = liga is True
+    if d["ajustes"].get("cat_unicas") is liga:
+        return
+    d["ajustes"]["cat_unicas"] = liga
+    if liga:
+        _juntar_categorias(d["categorias"], d["titulos"])
+        return
+    usados = {c["id"] for k in d["categorias"] for c in d["categorias"][k]}
+    for k in list(TIPOS)[1:]:  # o primeiro tipo fica com os ids; os outros ganham os deles
+        troca = {}
+        for c in d["categorias"][k]:
+            novo = next(i for i in ("c" + secrets.token_hex(3) for _ in range(99)) if i not in usados)
+            usados.add(novo)
+            troca[c["id"]], c["id"] = novo, novo
+        for t in d["titulos"]:
+            if t["tipo"] == k and t.get("categoria") in troca:
+                t["categoria"] = troca[t["categoria"]]
+
+
+def _espelhar_categorias(d, tipo):
+    """Com as Categorias únicas, o que mudou na lista de um tipo vale em todos."""
+    if d["ajustes"].get("cat_unicas") is True:
+        for k in TIPOS:
+            if k != tipo:
+                d["categorias"][k] = [dict(c) for c in d["categorias"][tipo]]
+
+
 def limpar_dados(d):
     """O arquivo inteiro como o app guarda: o que não vale sai (um título repetido pelo id também)."""
     d = d if isinstance(d, dict) else {}
@@ -150,6 +201,10 @@ def limpar_dados(d):
                 vistos.add(c["id"])
                 lista.append({"id": c["id"], "nome": _txt(c.get("nome"), 40), "cor": c.get("cor") if c.get("cor") in CORES else cor_livre(lista)})
         categorias[k] = lista[:MAX_CATEGORIAS]
+    # 0.17.0: com as Categorias únicas, uma lista só vale para todos os tipos (a mesma em cada um)
+    unicas = aj.get("cat_unicas") is True
+    if unicas:
+        _juntar_categorias(categorias, titulos)
     validas = {c["id"] for k in categorias for c in categorias[k]}
     for t in titulos:
         if t["categoria"] not in validas or t["categoria"] not in {c["id"] for c in categorias[t["tipo"]]}:
@@ -160,7 +215,7 @@ def limpar_dados(d):
         tipos = {k: k not in TIPOS_NOVOS for k in TIPOS}
     ajustes = {"cor": aj.get("cor") if isinstance(aj.get("cor"), str) and re.match(r"^[a-z]{2,12}$", aj["cor"]) else "lilas",
                "cor_dia": aj.get("cor_dia") is not False, "quem": aj.get("quem") is not False, "correria": aj.get("correria") is True,
-               "tipos": tipos,
+               "tipos": tipos, "cat_unicas": unicas,
                # 0.7.0: a IA (Configurações › Integrações › IA): ligada de início; a de cada uso, uma tarefa de IA do Home
                # Assistant ("": a padrão de lá; a de fotos e a de pesquisar vazias são a de conversar)
                "ia": aj.get("ia") is not False,
@@ -440,7 +495,8 @@ def achar_categoria(d, tipo, nome):
     c = next((c for c in d["categorias"][tipo] if sem_acento(c["nome"]) == alvo), None)
     if not c:
         valem = ", ".join(x["nome"] for x in d["categorias"][tipo])
-        raise ErroRegra(f"«{nome}» não é uma categoria de {PLURAIS[tipo]}." + (f" Valem: {valem}." if valem else " Crie em Mais › Categorias."))
+        de = "da casa" if d.get("ajustes", {}).get("cat_unicas") is True else f"de {PLURAIS[tipo]}"
+        raise ErroRegra(f"«{nome}» não é uma categoria {de}." + (f" Valem: {valem}." if valem else " Crie em Mais › Categorias."))
     return c["id"]
 
 
@@ -454,6 +510,8 @@ def mudar_categorias(d, corpo):
         raise ErroRegra("Cor desconhecida.")
     if acao == "nova":
         tipo = corpo.get("tipo")
+        if d["ajustes"].get("cat_unicas") is True and tipo not in TIPOS:
+            tipo = next(iter(TIPOS))  # uma lista só: o tipo não importa
         if tipo not in TIPOS:
             raise ErroRegra("O tipo vale filme, serie ou jogo.")
         if not nome:
@@ -466,6 +524,7 @@ def mudar_categorias(d, corpo):
         usados = {c["id"] for k in d["categorias"] for c in d["categorias"][k]}
         c = {"id": next(i for i in ("c" + secrets.token_hex(3) for _ in range(99)) if i not in usados), "nome": nome, "cor": cor or cor_livre(lista)}
         lista.append(c)
+        _espelhar_categorias(d, tipo)
         return c
     tipo, c = next(((k, c) for k in d["categorias"] for c in d["categorias"][k] if c["id"] == corpo.get("id")), (None, None))
     if not c:
@@ -479,11 +538,13 @@ def mudar_categorias(d, corpo):
             c["nome"] = nome
         if cor:
             c["cor"] = cor
+        _espelhar_categorias(d, tipo)
         return c
     if acao == "apagar":
         d["categorias"][tipo] = [x for x in d["categorias"][tipo] if x is not c]
         for t in d["titulos"]:
             if t.get("categoria") == c["id"]:
                 t["categoria"] = ""
+        _espelhar_categorias(d, tipo)
         return c
     raise ErroRegra("Ação desconhecida.")

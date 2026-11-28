@@ -79,11 +79,12 @@ FERRAMENTAS = [
     _f("proximo_episodio", "Próximo episódio", "Marca como visto o episódio seguinte ao último visto de uma série.",
        {"titulo": _TIT}, ["titulo"], grava=True),
     # 0.6.0 (o dono: "todas", das que faltavam): as categorias, como em Mais › Categorias
-    _f("categoria", "Criar, renomear ou apagar categoria", "As categorias da casa, de cada tipo (as de agora estão no resumo): "
+    _f("categoria", "Criar, renomear ou apagar categoria", "As categorias da casa (as de agora estão no resumo): de cada tipo "
+       "(diga o tipo) ou, com as Categorias únicas ligadas na casa, uma lista só para todos (sem o tipo): "
        "nova (com o nome), renomear (o nome e o novo_nome) ou apagar (os títulos dela ficam sem categoria). A cor da nova é a "
        "menos usada.",
        {"acao": {"type": "string", "enum": ["nova", "renomear", "apagar"]}, "tipo": {"type": "string", "enum": TIPOS},
-        "nome": {"type": "string"}, "novo_nome": {"type": "string"}}, ["acao", "tipo", "nome"], grava=True),
+        "nome": {"type": "string"}, "novo_nome": {"type": "string"}}, ["acao", "nome"], grava=True),
     # 0.14.0 (o dono, às ferramentas que faltavam: "pode seguir em todas"): o Apagar do Selecionar
     _f("apagar_varios", "Apagar vários", "Tira de uma vez vários títulos da lista da casa (os ids ou os nomes). Se um deles não "
        "é achado, nenhum sai.",
@@ -263,6 +264,8 @@ def resumo(d, pessoas, hoje=None):
         out.append("Jogos que saem nos próximos 30 dias:")
         out += [f"- {R.data_br(t['data'])}: {t['nome']}" + (f" ({', '.join(t['plataformas'][:3])})" if t.get("plataformas") else "") for t in jogos[:12]]
     cats = [f"{R.PLURAIS[k]}: {', '.join(c['nome'] for c in d['categorias'][k])}" for k in R.TIPOS if d.get("categorias", {}).get(k)]
+    if d.get("ajustes", {}).get("cat_unicas") is True and cats:  # uma lista só, de todos os tipos
+        cats = ["de todos os tipos: " + cats[0].split(": ", 1)[1]]
     if cats:
         out.append("Categorias da casa: " + "; ".join(cats) + ".")
     return "\n".join(out)
@@ -386,12 +389,15 @@ def chamar(nome, args, d, pessoas, pessoa=None, det=None, agora=None):
             R.proximo_ep(t, agora)
             return f"Feito: {t['nome']} {R.ep_txt(t['temp'], t['ep'])} visto." + (" A série acabou: ficou como Visto." if t["situacao"] == "visto" else ""), True
         if nome == "categoria":
-            tipo, acao = a["tipo"], a["acao"]
+            unicas = d["ajustes"].get("cat_unicas") is True
+            tipo, acao = a.get("tipo") or (R.tipos_ligados(d)[0] if unicas else None), a["acao"]
+            if not tipo:
+                raise ErroFerramenta("Falta: tipo (filme, serie, jogo ou livro).")
             if tipo not in R.tipos_ligados(d):
                 raise ErroFerramenta(f"Os {R.PLURAIS[tipo]} estão desligados (Mais › Configurações › Opções › O que controlar).")
             if acao == "nova":
                 c = R.mudar_categorias(d, {"acao": "nova", "tipo": tipo, "nome": a["nome"]})
-                return f"Categoria criada nos {R.PLURAIS[tipo]}: {c['nome']}.", True
+                return (f"Categoria criada: {c['nome']}." if unicas else f"Categoria criada nos {R.PLURAIS[tipo]}: {c['nome']}."), True
             cid = R.achar_categoria(d, tipo, a["nome"])
             velho = R.nome_categoria(d, {"tipo": tipo, "categoria": cid})
             if acao == "renomear":
