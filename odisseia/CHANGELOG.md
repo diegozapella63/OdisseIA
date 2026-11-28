@@ -1,5 +1,9 @@
 # Mudanças
 
+## 0.14.0
+
+- **Pelo CorrerIA**: dá para apagar vários títulos de uma vez ("tira da lista estes três"), como o Apagar do Selecionar. Só depois do Sim.
+
 ## 0.13.0
 
 - **Pelo CorrerIA**: agora dá para perguntar o que a lista tem em cada serviço ("o que temos para ver na Netflix?") e quantos títulos de cada assinatura a casa quer ver, para saber qual serviço sobra.

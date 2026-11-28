@@ -75,6 +75,11 @@ FERRAMENTAS = [
        "menos usada.",
        {"acao": {"type": "string", "enum": ["nova", "renomear", "apagar"]}, "tipo": {"type": "string", "enum": TIPOS},
         "nome": {"type": "string"}, "novo_nome": {"type": "string"}}, ["acao", "tipo", "nome"], grava=True),
+    # 0.14.0 (o dono, às ferramentas que faltavam: "pode seguir em todas"): o Apagar do Selecionar
+    _f("apagar_varios", "Apagar vários", "Tira de uma vez vários títulos da lista da casa (os ids ou os nomes). Se um deles não "
+       "é achado, nenhum sai.",
+       {"titulos": {"type": "array", "items": {"type": "string"}, "description": "Os ids (t…) ou os nomes."}}, ["titulos"],
+       grava=True, apaga=True),
     _f("apagar", "Apagar", "Tira um título da lista da casa.", {"titulo": _TIT}, ["titulo"], grava=True, apaga=True),
 ]
 POR_NOME = {f["nome"]: f for f in FERRAMENTAS}
@@ -332,6 +337,13 @@ def chamar(nome, args, d, pessoas, pessoa=None, det=None, agora=None):
             n = sum(1 for t in d["titulos"] if t.get("categoria") == cid)
             R.mudar_categorias(d, {"acao": "apagar", "id": cid})
             return f"Categoria apagada: {velho}." + (f" {n} {'título ficou' if n == 1 else 'títulos ficaram'} sem categoria." if n else ""), True
+        if nome == "apagar_varios":
+            ts = list({id(t): t for t in (R.achar(d, x) for x in a["titulos"])}.values())
+            if not ts:
+                raise ErroFerramenta("Diga quais títulos.")
+            fora = {t["id"] for t in ts}
+            d["titulos"] = [x for x in d["titulos"] if x["id"] not in fora]
+            return "\n".join([f"{'Apagado' if len(ts) == 1 else 'Apagados'} {len(ts)} {'título' if len(ts) == 1 else 'títulos'}:"] + ["- " + t["nome"] for t in ts]), True
         if nome == "apagar":  # a última: o nome já foi conferido
             d["titulos"] = [x for x in d["titulos"] if x["id"] != t["id"]]
             return f"Apagado: {t['nome']}.", True

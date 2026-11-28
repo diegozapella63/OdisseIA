@@ -1090,7 +1090,7 @@ def usar_ferramenta(corpo):
         if mudou:
             if nome == "adicionar" and capa:
                 gravar_capa(d["titulos"][0], capa)
-            if nome == "apagar":
+            if nome in ("apagar", "apagar_varios"):
                 vivos = {t["capa"] for t in d["titulos"] if t.get("capa")}
                 for t in ler()["titulos"]:
                     if t.get("capa") and t["capa"] not in vivos:

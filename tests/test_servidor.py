@@ -232,7 +232,7 @@ class TestCorrerIA(unittest.TestCase):
         self.assertEqual(oct(os.stat(arq).st_mode & 0o777), "0o600")
         self.assertEqual(self.ferr("GET", chave="errada")[0], 401)
         st, r = self.ferr("GET")
-        self.assertEqual([f["nome"] for f in r["ferramentas"]], ["resumo", "buscar", "ver", "lista_pronta", "adicionar", "adicionar_colecao", "marcar", "marcar_varios", "proximo_episodio", "categoria", "apagar"])
+        self.assertEqual([f["nome"] for f in r["ferramentas"]], ["resumo", "buscar", "ver", "lista_pronta", "adicionar", "adicionar_colecao", "marcar", "marcar_varios", "proximo_episodio", "categoria", "apagar_varios", "apagar"])
         self.assertEqual(self.usar("resumo")[1]["texto"], "A lista da casa está vazia.")
         self.assertIn("Falta a chave do TMDB", self.usar("adicionar", {"nome": "Mar de Estrelas"})[1]["erro"])
         pedir(self.base, "POST", "/api/tmdb", {"chave": apoio.CHAVE})
@@ -765,6 +765,18 @@ class TestNovidades040(unittest.TestCase):
             f({"nome": "marcar_varios", "argumentos": {"titulos": [], "situacao": "visto"}})
         r = f({"nome": "marcar_varios", "argumentos": {"titulos": ["Ilha dos Ventos"], "situacao": "visto"}})["texto"]
         self.assertIn("jogado", r)
+        # 0.14.0: o Apagar do Selecionar pelo CorrerIA (tudo ou nada)
+        antes = len(S.ler()["titulos"])
+        with self.assertRaises(S.ferramentas.ErroFerramenta):
+            f({"nome": "apagar_varios", "argumentos": {"titulos": ["Torre do Relógio", "Não existe esse"]}})
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "Diga quais"):
+            f({"nome": "apagar_varios", "argumentos": {"titulos": []}})
+        self.assertEqual(len(S.ler()["titulos"]), antes)
+        r = f({"nome": "apagar_varios", "argumentos": {"titulos": ["Torre do Relógio", "Torre do Relógio 2", "Torre do Relógio"]}})["texto"]
+        self.assertEqual(r, "Apagados 2 títulos:\n- Torre do Relógio\n- Torre do Relógio 2")
+        self.assertEqual(len(S.ler()["titulos"]), antes - 2)
+        apaga = {x["nome"]: x["apaga"] for x in S.ferramentas.FERRAMENTAS}
+        self.assertTrue(apaga["apagar_varios"])
         S.R.lote(S.ler(), [{"id": S.ler()["titulos"][0]["id"], "campos": "x"}], None)
 
 
