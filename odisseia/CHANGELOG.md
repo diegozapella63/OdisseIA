@@ -1,5 +1,9 @@
 # Mudanças
 
+## 0.18.0
+
+- **Mais coisas da tela pela IA do CorrerIA** (no WhatsApp, no Claude, no Gemini e na Conversa daqui): ver e mudar as **opções** (o que controlar, as Categorias únicas, o Marcar quem vê e os sensores), **atualizar** os dados de um título, **desfazer** um apagar feito pela conversa (volta como estava, com o episódio e quem viu) e **fazer um backup**. Ex.: "liga os livros", "atualiza a série X", "desfaz o que você apagou".
+
 ## 0.17.0
 
 - **Categorias únicas**: em **Configurações › Opções › Categorias**, ligue para ter uma lista só de categorias, que vale para séries, filmes, jogos e livros. Ao ligar, as de mesmo nome viram uma e os títulos continuam nelas. Com ela, o filtro de categoria do Buscar vale com todos os tipos.

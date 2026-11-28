@@ -232,7 +232,7 @@ class TestCorrerIA(unittest.TestCase):
         self.assertEqual(oct(os.stat(arq).st_mode & 0o777), "0o600")
         self.assertEqual(self.ferr("GET", chave="errada")[0], 401)
         st, r = self.ferr("GET")
-        self.assertEqual([f["nome"] for f in r["ferramentas"]], ["resumo", "buscar", "ver", "lista_pronta", "adicionar", "adicionar_colecao", "sugerir", "marcar", "marcar_varios", "proximo_episodio", "categoria", "apagar_varios", "apagar"])
+        self.assertEqual([f["nome"] for f in r["ferramentas"]], ["resumo", "buscar", "ver", "lista_pronta", "adicionar", "adicionar_colecao", "sugerir", "marcar", "marcar_varios", "proximo_episodio", "categoria", "apagar_varios", "apagar", "opcoes", "mudar_opcoes", "atualizar_titulo", "desfazer_apagar", "fazer_backup"])
         self.assertEqual(self.usar("resumo")[1]["texto"], "A lista da casa está vazia.")
         self.assertIn("Falta a chave do TMDB", self.usar("adicionar", {"nome": "Mar de Estrelas"})[1]["erro"])
         pedir(self.base, "POST", "/api/tmdb", {"chave": apoio.CHAVE})
@@ -978,6 +978,53 @@ class TestPorServico(unittest.TestCase):
                                           "- Cine Lumen: 6 títulos (T0, T1, T2, T3, …)", "- Tela Azul: 2 títulos (T0, T1)",
                                           "- Em nenhuma assinatura: 1"])
         self.assertEqual(F.texto_servicos([], {}), "Nenhum título com esses filtros.")
+
+
+class TestNovidades018(unittest.TestCase):
+    """0.18.0: a auditoria da tela contra as ferramentas: as opções, o Atualizar, o desfazer o apagar e o backup."""
+    setUp, post, chave, add = TestServidor.setUp, TestServidor.post, TestServidor.chave, TestServidor.add
+
+    def usa(self, nome, a=None):
+        return S.usar_ferramenta({"nome": nome, "argumentos": a or {}, "pessoa": {"nome": "Ana"}, "cliente": "Claude"})["texto"]
+
+    def test_opcoes_e_mudar_opcoes(self):
+        o = json.loads(self.usa("opcoes"))
+        self.assertEqual((o["filmes"], o["livros"], o["categorias_unicas"], o["marcar_quem_ve"], o["tmdb"]), (True, False, False, True, False))
+        t = self.usa("mudar_opcoes", {"livros": True, "jogos": False, "categorias_unicas": True, "marcar_quem_ve": False})
+        self.assertEqual(t, "Opções mudadas: jogos desligados; livros ligados; categorias únicas ligado; marcar quem vê desligado.")
+        o = json.loads(self.usa("opcoes"))
+        self.assertEqual((o["jogos"], o["livros"], o["categorias_unicas"], o["marcar_quem_ve"]), (False, True, True, False))
+        self.assertEqual(S.CORRERIA.ultimo["nome"], "opcoes")
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "Nada a mudar"):
+            self.usa("mudar_opcoes")
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "pelo menos um"):
+            self.usa("mudar_opcoes", {"filmes": False, "series": False, "livros": False})
+
+    def test_atualizar_desfazer_apagar_e_backup(self):
+        S.APAGADOS.update(em=0.0, titulos=[])  # o de outro teste não conta
+        self.chave()
+        t = self.add("serie", 202)
+        self.assertTrue(self.usa("atualizar_titulo", {"titulo": t["nome"]}).startswith(f"Atualizado: {t['nome']}."))
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "Nenhum título com «Nada assim»"):
+            self.usa("atualizar_titulo", {"titulo": "Nada assim"})
+        self.usa("marcar", {"titulo": t["id"], "temporada": 1, "episodio": 2})
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "Não há títulos apagados"):
+            self.usa("desfazer_apagar")
+        self.assertIn("Apagado", self.usa("apagar", {"titulo": t["id"]}))
+        self.assertEqual(S.ler()["titulos"], [])
+        self.assertEqual(self.usa("desfazer_apagar"), f"Voltou 1:\n- {t['nome']}")
+        volta = S.ler()["titulos"][0]
+        self.assertEqual((volta["id"], volta["temp"], volta["ep"]), (t["id"], 1, 2), "como estava")
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "Não há títulos apagados"):
+            self.usa("desfazer_apagar")
+        self.usa("apagar", {"titulo": t["id"]})
+        S.APAGADOS["em"] -= S.APAGADOS_SEG + 1
+        with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "Não há títulos apagados"):
+            self.usa("desfazer_apagar")
+        self.assertRegex(self.usa("fazer_backup"), r"^Backup salvo em share/odisseia/backups/odisseia-[\d-]+\.zip\.$")
+        with mock.patch.object(S, "fazer_backup", side_effect=OSError("disco cheio")):
+            with self.assertRaisesRegex(S.ferramentas.ErroFerramenta, "disco cheio"):
+                self.usa("fazer_backup")
 
 
 class TestSugerir(unittest.TestCase):

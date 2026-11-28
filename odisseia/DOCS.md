@@ -107,6 +107,8 @@ Em **Mais › Configurações › Integrações**:
 
 Com **Configurações › Integrações › CorrerIA** ligado, o CorrerIA (WhatsApp, Claude e Gemini) pode perguntar o que a casa está vendo e jogando, adicionar um filme, uma série ou um jogo pelo nome (também uma série inteira já vista), uma coleção inteira (de filmes ou de jogos), marcar o próximo episódio, a categoria, a situação e quem vê (também de vários de uma vez), dizer onde assistir e em que plataformas jogar, achar o que a lista tem num serviço (Netflix, Max…) e contar quantos títulos de cada assinatura, mostrar as listas prontas, dizer os episódios e os jogos que vão sair e criar, renomear e apagar as categorias.
 
+Também dá para ver e mudar as **opções** (o que controlar, as Categorias únicas, o Marcar quem vê e os sensores), **atualizar** os dados de um título (o próximo episódio, onde assistir, a capa), **desfazer** um apagar feito pela conversa (até 30 minutos depois, como estava) e **fazer um backup** na pasta share.
+
 ## Dados
 
 Em **Configurações › Dados**: **Exportar** (a lista e as capas num .zip), **Backup na pasta share** (`share/odisseia/backups`, os 10 últimos), **Importar**, **Versões anteriores** (as 5 últimas: uma por dia e antes de importar, restaurar ou apagar tudo) e **Começar do zero** (apaga a lista; as chaves e as configurações ficam).

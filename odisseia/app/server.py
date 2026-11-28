@@ -1049,10 +1049,75 @@ def publicar_correria():
     CORRERIA.publicar(correria_ligada())
 
 
+APAGADOS = {"em": 0.0, "titulos": []}  # 0.18.0: os títulos apagados pela conversa, para o desfazer_apagar
+APAGADOS_SEG = 30 * 60
+
+
+def ferramenta_do_servidor(nome, args):
+    """0.18.0: as ferramentas que rodam aqui (as opções, o Atualizar, o desfazer o apagar e o backup)."""
+    a = ferramentas.conferir(nome, args)
+    if nome == "opcoes":
+        d = ler()
+        aj = d["ajustes"]
+        tl = R.tipos_ligados(d)
+        return json.dumps({"filmes": "filme" in tl, "series": "serie" in tl, "jogos": "jogo" in tl, "livros": "livro" in tl,
+                           "categorias_unicas": aj.get("cat_unicas") is True, "marcar_quem_ve": aj.get("quem") is not False,
+                           "sensores": aj.get("sensores") is True, "usar_ia": aj.get("ia") is not False,
+                           "tmdb": estado_tmdb()["chave"], "igdb": estado_igdb()["chave"]}, ensure_ascii=False)
+    if nome == "mudar_opcoes":
+        corpo, mud = {}, []
+        tipos = {t: a[k] for k, t in (("filmes", "filme"), ("series", "serie"), ("jogos", "jogo"), ("livros", "livro")) if k in a}
+        if tipos:
+            corpo["tipos"] = tipos
+            mud += [f"{R.PLURAIS[t].lower()} {'ligados' if v else 'desligados'}" for t, v in tipos.items()]
+        for k, c, rot in (("categorias_unicas", "cat_unicas", "categorias únicas"), ("marcar_quem_ve", "quem", "marcar quem vê"), ("sensores", "sensores", "sensores")):
+            if k in a:
+                corpo[c] = a[k]
+                mud.append(f"{rot} {'ligado' if a[k] else 'desligado'}")
+        if not corpo:
+            raise ferramentas.ErroFerramenta("Nada a mudar: mande ao menos uma opção. As de agora estão em odisseia_opcoes.")
+        try:
+            mudar_ajustes(corpo)
+        except ValueError as e:
+            raise ferramentas.ErroFerramenta(str(e)) from e
+        return "Opções mudadas: " + "; ".join(mud) + "."
+    if nome == "atualizar_titulo":
+        try:
+            t = R.achar(ler(), a["titulo"])
+            t = atualizar(t["id"])
+        except (*ERROS, ValueError) as e:
+            raise ferramentas.ErroFerramenta(str(e)) from e
+        prox = t.get("proximo") or {}
+        return f"Atualizado: {t['nome']}." + (f" Próximo episódio: T{prox.get('temp')}E{prox.get('ep')} em {prox.get('data')}." if prox.get("data") else "")
+    if nome == "desfazer_apagar":
+        if not APAGADOS["titulos"] or time.time() - APAGADOS["em"] > APAGADOS_SEG:
+            raise ferramentas.ErroFerramenta("Não há títulos apagados pela conversa nos últimos 30 minutos para trazer de volta.")
+        try:
+            r = restaurar_titulos({"titulos": APAGADOS["titulos"]})
+        except ValueError as e:
+            raise ferramentas.ErroFerramenta(str(e)) from e
+        APAGADOS.update(em=0.0, titulos=[])
+        if not r["titulos"]:
+            return "Esses títulos já estavam de volta na lista."
+        return "\n".join([f"{'Voltou' if len(r['titulos']) == 1 else 'Voltaram'} {len(r['titulos'])}:"] + ["- " + t["nome"] for t in r["titulos"]])
+    try:
+        nome_zip_ = fazer_backup()
+    except OSError as e:
+        raise ferramentas.ErroFerramenta(f"Não deu para salvar o backup: {e}.") from e
+    return f"Backup salvo em share/odisseia/backups/{nome_zip_}."
+
+
 def usar_ferramenta(corpo):
     nome = str(corpo.get("nome") or "")
     if nome not in ferramentas.POR_NOME:
         raise KeyError(nome)
+    if nome in ferramentas.SO_DO_SERVIDOR:
+        texto = ferramenta_do_servidor(nome, corpo.get("argumentos") if isinstance(corpo.get("argumentos"), dict) else {})
+        if corpo.get("cliente") != "OdisseIA":
+            CORRERIA.ultimo = {"app": str(corpo.get("cliente") or "CorrerIA")[:40], "em": agora_iso(), "nome": nome}
+        if ferramentas.POR_NOME[nome]["grava"]:
+            log(f"{corpo.get('cliente') or 'CorrerIA'}:", nome, "→", texto.split("\n")[0][:160])
+        return {"texto": texto}
     args = corpo.get("argumentos") if isinstance(corpo.get("argumentos"), dict) else {}
     de_fora = corpo.get("cliente") != "OdisseIA"  # 0.7.0: a Conversa daqui não conta como uso do CorrerIA
     p = corpo.get("pessoa") if isinstance(corpo.get("pessoa"), dict) else {}
@@ -1123,9 +1188,17 @@ def usar_ferramenta(corpo):
                 gravar_capa(d["titulos"][0], capa)
             if nome in ("apagar", "apagar_varios"):
                 vivos = {t["capa"] for t in d["titulos"] if t.get("capa")}
-                for t in ler()["titulos"]:
-                    if t.get("capa") and t["capa"] not in vivos:
-                        apagar_capa(t["capa"])
+                ficam = {t["id"] for t in d["titulos"]}
+                saem = [t for t in ler()["titulos"] if t["id"] not in ficam]
+                APAGADOS.update(em=time.time(), titulos=[dict(t) for t in saem])  # 0.18.0: para o desfazer_apagar
+                os.makedirs(_lixo(), exist_ok=True)
+                for t in saem:
+                    if t.get("capa") and t["capa"] not in vivos and re.match(r"^t[0-9a-f]{8}\.(jpg|png)$", t["capa"]):
+                        try:  # a capa vai para o lixo (um dia), como no Apagar do Selecionar: o desfazer a traz de volta
+                            os.replace(caminho_capa(t["capa"]), os.path.join(_lixo(), t["capa"]))
+                            os.utime(os.path.join(_lixo(), t["capa"]))
+                        except OSError:
+                            pass
             salvar(d)
     if de_fora:
         CORRERIA.ultimo = {"app": str(corpo.get("cliente") or "CorrerIA")[:40], "em": agora_iso(), "nome": nome}

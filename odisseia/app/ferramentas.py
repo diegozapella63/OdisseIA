@@ -91,7 +91,20 @@ FERRAMENTAS = [
        {"titulos": {"type": "array", "items": {"type": "string"}, "description": "Os ids (t…) ou os nomes."}}, ["titulos"],
        grava=True, apaga=True),
     _f("apagar", "Apagar", "Tira um título da lista da casa.", {"titulo": _TIT}, ["titulo"], grava=True, apaga=True),
+    # 0.18.0 (a auditoria da tela contra as ferramentas; o dono: "Segue"): o que só a tela fazia
+    _f("opcoes", "Opções do app", "As opções de agora do OdisseIA: o que a casa controla (filmes, séries, jogos e livros), as "
+       "Categorias únicas, o Marcar quem vê, os sensores e se o TMDB e o IGDB estão ligados. Mude com odisseia_mudar_opcoes."),
+    _f("mudar_opcoes", "Mudar opções", "Muda opções (só o que for mandado): o que controlar (filmes, series, jogos, livros; pelo "
+       "menos um ligado), categorias_unicas (uma lista de categorias para todos os tipos), marcar_quem_ve e sensores.",
+       {**{k: {"type": "boolean"} for k in ("filmes", "series", "jogos", "livros", "categorias_unicas", "marcar_quem_ve", "sensores")}}, grava=True),
+    _f("atualizar_titulo", "Atualizar os dados de um título", "Busca de novo no TMDB, no IGDB ou na Open Library os dados de um "
+       "título (o próximo episódio, onde assistir, as plataformas, a capa), como o Atualizar da ficha.", {"titulo": _TIT}, ["titulo"], grava=True),
+    _f("desfazer_apagar", "Desfazer o apagar", "Traz de volta, como estavam (com o episódio, quem viu e a categoria), os títulos "
+       "apagados agora há pouco pela conversa (até 30 minutos depois).", grava=True),
+    _f("fazer_backup", "Fazer backup", "Salva um backup do OdisseIA (os títulos, as categorias e as capas) na pasta share do Home "
+       "Assistant (o Backup de Mais › Configurações › Dados). Restaurar, importar e começar do zero, só pela tela.", grava=True),
 ]
+SO_DO_SERVIDOR = ("opcoes", "mudar_opcoes", "atualizar_titulo", "desfazer_apagar", "fazer_backup")  # 0.18.0: rodam no server.py
 POR_NOME = {f["nome"]: f for f in FERRAMENTAS}
 
 
