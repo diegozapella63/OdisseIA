@@ -232,7 +232,7 @@ class TestCorrerIA(unittest.TestCase):
         self.assertEqual(oct(os.stat(arq).st_mode & 0o777), "0o600")
         self.assertEqual(self.ferr("GET", chave="errada")[0], 401)
         st, r = self.ferr("GET")
-        self.assertEqual([f["nome"] for f in r["ferramentas"]], ["resumo", "buscar", "ver", "lista_pronta", "adicionar", "adicionar_colecao", "marcar", "marcar_varios", "proximo_episodio", "categoria", "apagar_varios", "apagar"])
+        self.assertEqual([f["nome"] for f in r["ferramentas"]], ["resumo", "buscar", "ver", "lista_pronta", "adicionar", "adicionar_colecao", "sugerir", "marcar", "marcar_varios", "proximo_episodio", "categoria", "apagar_varios", "apagar"])
         self.assertEqual(self.usar("resumo")[1]["texto"], "A lista da casa está vazia.")
         self.assertIn("Falta a chave do TMDB", self.usar("adicionar", {"nome": "Mar de Estrelas"})[1]["erro"])
         pedir(self.base, "POST", "/api/tmdb", {"chave": apoio.CHAVE})
@@ -944,3 +944,32 @@ class TestPorServico(unittest.TestCase):
                                           "- Cine Lumen: 6 títulos (T0, T1, T2, T3, …)", "- Tela Azul: 2 títulos (T0, T1)",
                                           "- Em nenhuma assinatura: 1"])
         self.assertEqual(F.texto_servicos([], {}), "Nenhum título com esses filtros.")
+
+
+class TestSugerir(unittest.TestCase):
+    """0.15.0: o que ver hoje, da lista da casa (sem pesquisar nada)."""
+
+    def test_em_andamento_depois_o_que_esta_numa_assinatura_e_combina(self):
+        import ferramentas as F
+        def t(i, nome, tipo="filme", sit="quero", **k):
+            return dict({"id": f"t{i:08d}", "nome": nome, "original": nome, "ano": 2020, "tipo": tipo, "situacao": sit, "quem": [], "temp": 0, "ep": 0,
+                         "temporadas": [], "generos": [], "onde": {}}, **k)
+        d = {"titulos": [
+            t(1, "Visto Um", sit="visto", generos=["Drama"]), t(2, "Visto Dois", sit="visto", generos=["Drama", "Comédia"]),
+            t(3, "Sem Serviço", generos=["Drama"]),
+            t(4, "Na Assinatura", generos=["Terror"], onde={"assinatura": ["Cine Lumen"]}),
+            t(5, "Combina", generos=["Drama"], onde={"gratis": ["Tela Azul"]}, quem=["person.beto"]),
+            t(6, "Série Andando", tipo="serie", temp=1, ep=2, temporadas=[{"n": 1, "episodios": 8}], ultimo={"data": "2026-01-01", "temp": 1, "ep": 8, "nome": ""}),
+            t(7, "Jogo Que Vai Sair", tipo="jogo", data="2027-01-01"), t(8, "Jogo Lançado", tipo="jogo", data="2024-01-01")]}
+        ps = [{"id": "person.ana", "nome": "Ana"}, {"id": "person.beto", "nome": "Beto"}]
+        r = F.texto_sugestoes(d, {}, ps, "2026-11-27T20:00:00").splitlines()
+        self.assertEqual(r[0], "5 de 5 títulos para hoje:")
+        self.assertTrue(r[1].startswith("- t00000006 | Série Andando (2020) · série: em andamento, parou em "), r[1])
+        self.assertEqual(r[2], "- t00000005 | Combina (2020) · filme: em Tela Azul; a casa já viu bastante drama")
+        self.assertEqual([x.split(" | ")[1].split(" (")[0] for x in r[3:]], ["Jogo Lançado", "Na Assinatura", "Sem Serviço"])
+        self.assertIn("em nenhuma assinatura", r[5])
+        self.assertEqual(F.texto_sugestoes(d, {"servico": "lumen", "quantos": 3}, ps, "2026-11-27T20:00:00").splitlines(),
+                         ["1 de 1 título para hoje:", "- t00000004 | Na Assinatura (2020) · filme: em Cine Lumen"])
+        self.assertEqual(len(F.texto_sugestoes(d, {"tipo": "filme", "quem": ["ana"]}, ps, "2026-11-27T20:00:00").splitlines()), 3, "os de todos, sem o que é só do Beto")
+        self.assertEqual(F.texto_sugestoes(d, {"tipo": "jogo", "servico": "x"}, ps, "2026-11-27"), "Nada na lista para sugerir com esses filtros.")
+        self.assertEqual(F.chamar("sugerir", {"quantos": 1}, d, ps, None, None, "2026-11-27T20:00:00")[1], False)

@@ -168,6 +168,8 @@ A lista fica em `tools/iguais.py` e as regras, em **Arquivos iguais** e **Os app
 
 0.14.0 (o dono, às ferramentas que faltavam para o CorrerIA: "pode seguir em todas"): a ferramenta `apagar_varios` (`titulos`: os ids ou os nomes; `apaga`): o Apagar do Selecionar; um título não achado e nenhum sai (o `R.achar` de cada um antes de tirar); as capas saem como no `apagar` (`usar_ferramenta`). Teste: o de 0.14.0 no `test_ferramentas_com_os_jogos`, no `tests/test_servidor.py`.
 
+0.15.0 (o dono: "pode adicionar esses também"): a ferramenta `sugerir` (leitura; `tipo`, `quem`, `servico`, `quantos` até 10): o `texto_sugestoes` no ferramentas.py, sem a IA nem o TMDB: do Quero ver (fora o jogo que ainda não saiu), as séries em andamento com episódio para ver (`R.em_andamento` e `R.faltam`) primeiro, depois o que está numa assinatura ou de graça (`t.onde`) e, entre eles, o que soma mais nos gêneros dos Vistos; cada linha diz o porquê. Para a etapa O que ver hoje das rondas do CorrerIA 1.41.0. Teste: `TestSugerir` no `tests/test_servidor.py`.
+
 ## Conversa com o dono
 
 Respostas curtas, em português. Ao terminar uma mudança: o que mudou, a versão e se está publicado. Ele usa o app do Home

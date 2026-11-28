@@ -58,6 +58,13 @@ FERRAMENTAS = [
        "viram Visto (num jogo, Jogado).",
        {"nome": {"type": "string"}, "tipo": {"type": "string", "enum": ["filme", "jogo"], "description": "filme (de início) ou jogo."},
         "situacao": _SIT, "categoria": {"type": "string", "description": "O nome de uma categoria da casa (as do tipo): vale para todos; vazio tira."}}, ["nome"], grava=True),
+    # 0.15.0 (o dono: "pode adicionar esses também"): o que ver ou jogar hoje
+    _f("sugerir", "O que ver hoje", "Sugere o que ver ou jogar da lista da casa, sem pesquisar nada: primeiro as séries em andamento "
+       "com episódio para ver, depois o que está em Quero ver numa assinatura ou de graça e combina com os gêneros que a casa "
+       "mais viu. Dá para filtrar pelo tipo, por quem e por um serviço.",
+       {"tipo": {"type": "string", "enum": TIPOS}, "quem": _QUEM,
+        "servico": {"type": "string", "description": "Só o que está nesse serviço (o nome ou parte dele)."},
+        "quantos": {"type": "integer", "minimum": 1, "maximum": 10, "description": "Padrão: 5."}}),
     _f("marcar", "Marcar", "Muda a situação (quero ou visto), a categoria, o episódio (temporada e episodio, numa série), "
        "quem vê e as notas de um título.",
        {"titulo": _TIT, "situacao": _SIT, "categoria": _CAT,
@@ -159,6 +166,51 @@ def _onde(t):
     return ("Onde assistir no Brasil (JustWatch): " + "; ".join(partes) + ".") if partes else "Onde assistir: nada no Brasil, pelo que a JustWatch sabe."
 
 
+def texto_sugestoes(d, a, pessoas, agora):
+    """0.15.0: o que ver ou jogar hoje, da lista: as séries em andamento com episódio para ver, depois o Quero ver, o que está
+    numa assinatura ou de graça na frente e, entre eles, o que combina com os gêneros que a casa mais viu."""
+    quantos = max(1, min(10, int(a.get("quantos") or 5)))
+    hoje = agora[:10]
+    ts = [t for t in d["titulos"] if t["situacao"] == "quero" and (not a.get("tipo") or t["tipo"] == a["tipo"])]
+    ts = [t for t in ts if not (t["tipo"] == "jogo" and t.get("data") and t["data"] > hoje)]  # o jogo que ainda não saiu
+    if a.get("quem"):
+        quem = set(ids_de(a["quem"], pessoas))
+        ts = [t for t in ts if not t["quem"] or quem & set(t["quem"])]
+    serv = R.sem_acento(a.get("servico") or "")
+
+    def onde(t):
+        o = t.get("onde") or {}
+        return [n for n in list(o.get("assinatura") or []) + list(o.get("gratis") or []) if not serv or serv in R.sem_acento(n)]
+    if serv:
+        ts = [t for t in ts if onde(t)]
+    gosto = {}
+    for t in d["titulos"]:
+        if t["situacao"] == "visto":
+            for g in t.get("generos") or []:
+                gosto[g] = gosto.get(g, 0) + 1
+
+    def nota(t):
+        vendo = R.em_andamento(t) and bool(R.faltam(t))
+        return (0 if vendo else 1, 0 if (onde(t) or t["tipo"] == "jogo") else 1, -sum(gosto.get(g, 0) for g in t.get("generos") or []), R.sem_acento(t["nome"]))
+    ts.sort(key=nota)
+    if not ts:
+        return "Nada na lista para sugerir com esses filtros."
+    linhas = [f"{min(quantos, len(ts))} de {len(ts)} {'título' if len(ts) == 1 else 'títulos'} para hoje:"]
+    for t in ts[:quantos]:
+        porque = []
+        if R.em_andamento(t) and R.faltam(t):
+            porque.append(f"em andamento, parou em {R.ep_txt(t['temp'], t['ep'])}")
+        if onde(t):
+            porque.append("em " + ", ".join(dict.fromkeys(onde(t))))
+        elif t["tipo"] != "jogo":
+            porque.append("em nenhuma assinatura")
+        comuns = [g for g in t.get("generos") or [] if gosto.get(g)]
+        if comuns:
+            porque.append("a casa já viu bastante " + ", ".join(comuns[:2]).lower())
+        linhas.append(f"- {t['id']} | {t['nome']}" + (f" ({t['ano']})" if t["ano"] else "") + f" · {R.TIPOS[t['tipo']].lower()}" + (": " + "; ".join(porque) if porque else ""))
+    return "\n".join(linhas)
+
+
 def texto_servicos(ts, a):
     """0.13.0: quantos títulos de cada assinatura (por_servico do buscar), o que mais tem primeiro, e os que não estão em nenhuma."""
     conta, exemplos = {}, {}
@@ -221,6 +273,8 @@ def chamar(nome, args, d, pessoas, pessoa=None, det=None, agora=None):
     try:
         if nome == "resumo":
             return resumo(d, pessoas, date.fromisoformat(agora[:10])), False
+        if nome == "sugerir":
+            return texto_sugestoes(d, a, pessoas, agora), False
         if nome == "buscar":
             ts = d["titulos"]
             if a.get("texto"):

@@ -1,5 +1,9 @@
 # Mudanças
 
+## 0.15.0
+
+- **Pelo CorrerIA e na Conversa**: "o que vemos hoje?" sugere da lista da casa: primeiro as séries em andamento com episódio para ver, depois o que está numa assinatura ou de graça e combina com o que a casa mais viu. Dá para pedir só de um serviço, de um tipo ou de uma pessoa.
+
 ## 0.14.0
 
 - **Pelo CorrerIA**: dá para apagar vários títulos de uma vez ("tira da lista estes três"), como o Apagar do Selecionar. Só depois do Sim.
