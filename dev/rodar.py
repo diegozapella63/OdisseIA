@@ -23,8 +23,11 @@ if "--vazio" not in sys.argv:
     S.adicionar({"tipo": "filme", "tmdb": 103, "situacao": "visto"}, "")
     S.adicionar({"tipo": "jogo", "igdb": 701, "situacao": "visto"}, "person.beto")
     S.adicionar({"tipo": "jogo", "igdb": 703, "situacao": "quero"}, "person.ana")
+    S.mudar_ajustes({"tipos": {"livro": True}})
+    S.adicionar({"tipo": "livro", "ol": 901, "situacao": "quero"}, "person.ana")
+    S.adicionar({"tipo": "livro", "ol": 902, "situacao": "visto"}, "person.beto")
     d = S.ler()
-    for tipo, nome in (("filme", "Para ver em família"), ("filme", "Clássicos"), ("serie", "Para ver a dois"), ("jogo", "Para jogar junto")):
+    for tipo, nome in (("filme", "Para ver em família"), ("filme", "Clássicos"), ("serie", "Para ver a dois"), ("jogo", "Para jogar junto"), ("livro", "Para ler nas férias")):
         S.R.mudar_categorias(d, {"acao": "nova", "tipo": tipo, "nome": nome})
     S.salvar(d)
     serie = next(t for t in d["titulos"] if t["tmdb"] == 202)

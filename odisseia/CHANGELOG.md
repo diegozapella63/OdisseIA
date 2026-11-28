@@ -1,5 +1,12 @@
 # Mudanças
 
+## 0.16.0
+
+- **Livros**: um tipo novo, com **Quero ler** e **Lido**. Ligue em **Configurações › Opções › O que controlar › Livros** (começa desligado).
+- No **+**, em **Livros**, procure pelo nome, pelo autor ou pelo ISBN, ou toque em **Ler código de barras** e aponte a câmera para o código do livro. Vêm a capa, o autor, o ano e as páginas, da Open Library (de graça, sem conta).
+- Os livros têm as categorias deles, entram no Agora (**Quero ler**), no Buscar, no Concluídos (**Livros**) e no Selecionar.
+- **Pelo CorrerIA e na Conversa**: "põe o livro tal na lista", "marca como lido", "o que eu quero ler?".
+
 ## 0.15.0
 
 - **Pelo CorrerIA e na Conversa**: "o que vemos hoje?" sugere da lista da casa: primeiro as séries em andamento com episódio para ver, depois o que está numa assinatura ou de graça e combina com o que a casa mais viu. Dá para pedir só de um serviço, de um tipo ou de uma pessoa.

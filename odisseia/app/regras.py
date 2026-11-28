@@ -11,10 +11,15 @@ from datetime import date, datetime
 SITUACOES = {"quero": "Quero ver", "visto": "Visto"}
 # 0.4.0 (o dono: "cadê os jogos?"): num jogo, as mesmas duas situações com os nomes de jogo
 SIT_JOGO = {"quero": "Quero jogar", "visto": "Jogado"}
+# 0.16.0 (o dono: "Livros… Ótima ideia controlar os livros também, pode adicionar"): num livro, Quero ler e Lido
+SIT_LIVRO = {"quero": "Quero ler", "visto": "Lido"}
 MAX_CATEGORIAS = 40
 CAT_RE = re.compile(r"^c[0-9a-f]{6}$")
-TIPOS = {"filme": "Filme", "serie": "Série", "jogo": "Jogo"}
-PLURAIS = {"filme": "filmes", "serie": "séries", "jogo": "jogos"}
+TIPOS = {"filme": "Filme", "serie": "Série", "jogo": "Jogo", "livro": "Livro"}
+PLURAIS = {"filme": "filmes", "serie": "séries", "jogo": "jogos", "livro": "livros"}
+TIPOS_NOVOS = ("livro",)  # um tipo que chegou depois começa desligado (Opções › O que controlar)
+FONTES = {"filme": "tmdb", "serie": "tmdb", "jogo": "igdb", "livro": "ol"}
+NOME_FONTE = {"tmdb": "TMDB", "igdb": "IGDB", "ol": "Open Library"}
 # 0.4.0 (o dono: "colocar cor, fazer no mesmo padrão dos outros apps"): cada categoria tem uma cor da paleta da família
 CORES = ["vermelho", "coral", "laranja", "ouro", "verde", "menta", "turquesa", "azul", "indigo", "lilas", "rosa", "grafite"]
 
@@ -77,7 +82,7 @@ def limpar_titulo(t):
     nome = _txt(t.get("nome"), 160)
     if not nome:
         return None
-    o = {"id": t["id"], "tipo": t["tipo"], "tmdb": _int(t.get("tmdb"), 0, 10 ** 9) or None if t["tipo"] != "jogo" else None, "nome": nome, "original": _txt(t.get("original"), 160),
+    o = {"id": t["id"], "tipo": t["tipo"], "tmdb": _int(t.get("tmdb"), 0, 10 ** 9) or None if t["tipo"] in ("filme", "serie") else None, "nome": nome, "original": _txt(t.get("original"), 160),
          "ano": _int(t.get("ano"), 0, 3000) or None, "capa": str(t.get("capa") or "") if re.match(r"^t[0-9a-f]{8}\.(jpg|png)$", str(t.get("capa") or "")) else "",
          "capa_tmdb": str(t.get("capa_tmdb") or "")[:90], "sinopse": _txt(t.get("sinopse"), 1200), "generos": _nomes(t.get("generos"), 6),
          "situacao": "visto" if t.get("situacao") == "visto" else "quero",
@@ -89,7 +94,16 @@ def limpar_titulo(t):
     w = t.get("onde") if isinstance(t.get("onde"), dict) else {}
     o["onde"] = {k: _nomes(w.get(k)) for k in ("assinatura", "gratis", "alugar", "comprar")}
     o["onde"]["link"] = str(w.get("link") or "")[:300] if str(w.get("link") or "").startswith("https://") else ""
-    if o["tipo"] == "jogo":
+    if o["tipo"] == "livro":  # 0.16.0: da Open Library: a obra (ol), a capa, os autores, as páginas e o ISBN
+        o["ol"] = _int(t.get("ol"), 0, 10 ** 12) or None
+        o["capa_ol"] = str(t.get("capa_ol") or "") if re.match(r"^\d{1,12}$", str(t.get("capa_ol") or "")) else ""
+        o["ol_em"] = str(t.get("ol_em") or "")[:25]
+        o["autores"] = _nomes(t.get("autores"), 4)
+        o["paginas"] = _int(t.get("paginas"), 0, 20000) or None
+        o["isbn"] = str(t.get("isbn") or "") if re.match(r"^[0-9Xx]{10,13}$", str(t.get("isbn") or "")) else ""
+        o["link"] = str(t.get("link") or "")[:300] if str(t.get("link") or "").startswith("https://") else ""
+        del o["onde"], o["capa_tmdb"], o["tmdb_em"]
+    elif o["tipo"] == "jogo":
         o["igdb"] = _int(t.get("igdb"), 0, 10 ** 9) or None
         o["capa_igdb"] = str(t.get("capa_igdb") or "") if CAPA_IGDB_RE.match(str(t.get("capa_igdb") or "")) else ""
         o["igdb_em"] = str(t.get("igdb_em") or "")[:25]
@@ -141,9 +155,9 @@ def limpar_dados(d):
         if t["categoria"] not in validas or t["categoria"] not in {c["id"] for c in categorias[t["tipo"]]}:
             t["categoria"] = ""
     tipos = aj.get("tipos") if isinstance(aj.get("tipos"), dict) else {}
-    tipos = {k: tipos.get(k) is not False for k in TIPOS}
+    tipos = {k: tipos.get(k) is True if k in TIPOS_NOVOS else tipos.get(k) is not False for k in TIPOS}
     if not any(tipos.values()):
-        tipos = {k: True for k in TIPOS}
+        tipos = {k: k not in TIPOS_NOVOS for k in TIPOS}
     ajustes = {"cor": aj.get("cor") if isinstance(aj.get("cor"), str) and re.match(r"^[a-z]{2,12}$", aj["cor"]) else "lilas",
                "cor_dia": aj.get("cor_dia") is not False, "quem": aj.get("quem") is not False, "correria": aj.get("correria") is True,
                "tipos": tipos,
@@ -183,7 +197,7 @@ def achar(d, ref):
 
 def fonte(tipo):
     """De onde vem o título: o número do IGDB num jogo, o do TMDB num filme ou numa série."""
-    return "igdb" if tipo == "jogo" else "tmdb"
+    return FONTES.get(tipo, "tmdb")
 
 
 def de_fonte(d, tipo, n):
@@ -196,15 +210,20 @@ de_tmdb = de_fonte
 
 
 def nome_sit(tipo, s):
-    return (SIT_JOGO if tipo == "jogo" else SITUACOES)[s]
+    return (SIT_JOGO if tipo == "jogo" else SIT_LIVRO if tipo == "livro" else SITUACOES)[s]
 
 
 def aplicar_detalhes(t, det, agora):
     """O que vem do TMDB ou do IGDB por cima do título (o que é da casa, como a situação, quem, a categoria e o
     episódio, fica)."""
-    for k in ("nome", "original", "ano", "sinopse", "generos") + (("plataformas", "data", "link") if t["tipo"] == "jogo" else ("onde",)):
-        if det.get(k) not in (None, "") or k in ("generos", "onde", "plataformas"):
+    proprios = {"jogo": ("plataformas", "data", "link"), "livro": ("autores", "paginas", "isbn", "link")}.get(t["tipo"], ("onde",))
+    for k in ("nome", "original", "ano", "sinopse", "generos") + proprios:
+        if det.get(k) not in (None, "") or k in ("generos", "onde", "plataformas", "autores"):
             t[k] = det.get(k) if det.get(k) is not None else t.get(k)
+    if t["tipo"] == "livro":
+        t["capa_ol"] = det.get("capa") or t.get("capa_ol", "")
+        t["ol_em"] = agora
+        return t
     if t["tipo"] == "jogo":
         t["capa_igdb"] = det.get("capa") or t.get("capa_igdb", "")
         t["colecao"] = det.get("colecao") if "colecao" in det else t.get("colecao")
@@ -226,7 +245,7 @@ def criar(d, det, situacao="quero", quem=(), agora=None):
     existe e False."""
     agora = agora or datetime.now().isoformat(timespec="seconds")
     if det.get("tipo") not in TIPOS:
-        raise ErroRegra("O tipo precisa ser filme, serie ou jogo.")
+        raise ErroRegra("O tipo precisa ser filme, serie, jogo ou livro.")
     ja = de_fonte(d, det["tipo"], det.get(fonte(det["tipo"])))
     if ja:
         return ja, False
@@ -234,11 +253,14 @@ def criar(d, det, situacao="quero", quem=(), agora=None):
         raise ErroRegra(f"A lista chegou a {MAX_TITULOS} títulos.")
     if situacao not in SITUACOES:
         raise ErroRegra("A situação vale quero ou visto.")
-    t = {"id": novo_id({x["id"] for x in d["titulos"]}), "tipo": det["tipo"], "tmdb": det.get("tmdb") if det["tipo"] != "jogo" else None, "nome": det.get("nome") or "Sem nome",
+    t = {"id": novo_id({x["id"] for x in d["titulos"]}), "tipo": det["tipo"], "tmdb": det.get("tmdb") if det["tipo"] in ("filme", "serie") else None, "nome": det.get("nome") or "Sem nome",
          "original": det.get("original") or "", "ano": det.get("ano"), "capa": "", "capa_tmdb": "", "sinopse": "", "generos": [],
          "situacao": "quero", "quem": [], "categoria": "", "notas": "", "criado": agora, "atualizado": agora, "visto_em": None, "tmdb_em": "",
          "onde": {"assinatura": [], "gratis": [], "alugar": [], "comprar": [], "link": ""}}
-    if t["tipo"] == "jogo":
+    if t["tipo"] == "livro":
+        t.update(ol=det.get("ol"), capa_ol="", ol_em="", autores=[], paginas=None, isbn="", link="")
+        del t["onde"], t["capa_tmdb"], t["tmdb_em"]
+    elif t["tipo"] == "jogo":
         t.update(igdb=det.get("igdb"), capa_igdb="", igdb_em="", data="", plataformas=[], link="", colecao=None)
         del t["onde"], t["capa_tmdb"], t["tmdb_em"]
     elif t["tipo"] == "filme":

@@ -98,6 +98,19 @@ COLECOES_JOGOS = {501: {"id": 501, "name": "Saga da Torre"}}
 POPULARES = {1: [705, 707, 701, 702, 999], 3: [701]}
 
 
+# a Open Library de mentira: livros, autores e ISBN inventados
+LIVROS = {
+    901: {"key": "/works/OL901W", "title": "O Farol das Marés", "author_name": ["Ana Autora"], "first_publish_year": 2001, "cover_i": 5001,
+          "number_of_pages_median": 320, "isbn": ["9786500000017", "6500000013"], "subject": ["Aventura", "Mar"]},
+    902: {"key": "/works/OL902W", "title": "A Torre de Vidro", "author_name": ["Beto Escritor", "Ana Autora"], "first_publish_year": 1998,
+          "isbn": ["9786500000024"], "subject": ["Mistério"]},
+    903: {"key": "/works/OL903W", "title": "The Glass Lighthouse", "author_name": ["Carla Writer"], "first_publish_year": 2015, "cover_i": 5003,
+          "number_of_pages_median": 210, "isbn": ["9786500000031"], "editions": {"docs": [{"title": "O Farol de Vidro", "language": ["por"]}]}},
+}
+SINOPSES_LIVROS = {901: {"description": {"type": "/type/text", "value": "Uma faroleira e o mar que não devolve nada."}}, 902: {"description": "Um mistério numa torre."}, 903: {}}
+CAPAS_LIVROS = {"5001": "/viagem.jpg", "5003": "/estrelas.jpg"}
+
+
 class TMDBFalso:
     """O TMDB de mentira: a mesma forma das respostas de verdade, só com os títulos daqui. pedidos: o que chegou."""
 
@@ -106,6 +119,7 @@ class TMDBFalso:
         self.tokens = set()
         self.n_token = 0
         self.falha_igdb = 0
+        self.falha_ol = 0  # o código que a Open Library de mentira responde (0: funciona)
         dono = self
 
         class H(BaseHTTPRequestHandler):
@@ -119,6 +133,27 @@ class TMDBFalso:
                 if u.path.startswith("/igdb/image/upload/"):
                     dado = CAPAS.get({"co1torre": "/viagem.jpg", "co2torre": "/estrelas.jpg", "co5ilha": "/farol.jpg", "co4torre": "/texto.jpg"}.get(u.path.rsplit("/", 1)[-1][:-4], ""))
                     return self.resp(200, dado, "image/jpeg") if dado else self.resp(404, b"{}")
+                if u.path.startswith("/olimg/b/id/"):
+                    dado = CAPAS.get(CAPAS_LIVROS.get(u.path.rsplit("/", 1)[-1].split("-")[0], ""))
+                    return self.resp(200, dado, "image/jpeg") if dado else self.resp(404, b"{}")
+                if u.path.startswith("/ol/"):
+                    dono.ua_ol = self.headers.get("User-Agent")
+                    if dono.falha_ol:
+                        return self.resp(dono.falha_ol, {})
+                    if u.path == "/ol/search.json":
+                        alvo = q.get("q", "").lower()
+                        if alvo.startswith("isbn:"):
+                            docs = [v for v in LIVROS.values() if alvo[5:] in [i.lower() for i in v["isbn"]]]
+                        elif alvo.startswith("key:"):
+                            docs = [v for v in LIVROS.values() if v["key"].lower() == alvo[4:]]
+                        else:
+                            docs = [v for v in LIVROS.values() if alvo in v["title"].lower() or any(alvo in a.lower() for a in v["author_name"])
+                                    or any(alvo in e["title"].lower() for e in (v.get("editions") or {}).get("docs", []))]
+                        return self.resp(200, {"numFound": len(docs), "docs": docs + (["x", {"key": "/authors/OL1A", "title": "Não é obra"}] if alvo == "estranho" else [])})
+                    m = re.match(r"^/ol/works/OL(\d+)W\.json$", u.path)
+                    if m and int(m.group(1)) in SINOPSES_LIVROS:
+                        return self.resp(200, SINOPSES_LIVROS[int(m.group(1))])
+                    return self.resp(404, {})
                 if u.path.startswith("/t/p/"):
                     dado = CAPAS.get("/" + u.path.rsplit("/", 1)[-1])
                     return self.resp(200, dado, "image/jpeg") if dado else self.resp(404, b"{}")
@@ -247,7 +282,8 @@ PASTA = tempfile.mkdtemp(prefix="odisseia-teste-")
 os.environ.update(ODISSEIA_DEV="1", ODISSEIA_DATA=os.path.join(PASTA, "data"), ODISSEIA_SHARE=os.path.join(PASTA, "share", "odisseia"),
                   ODISSEIA_TMDB=f"http://127.0.0.1:{TMDB.porta}/3", ODISSEIA_TMDB_IMG=f"http://127.0.0.1:{TMDB.porta}/t/p",
                   ODISSEIA_URL_INTERNA="http://odisseia-teste:8099", ODISSEIA_IGDB=f"http://127.0.0.1:{TMDB.porta}/v4",
-                  ODISSEIA_TWITCH=f"http://127.0.0.1:{TMDB.porta}/oauth2/token", ODISSEIA_IGDB_IMG=f"http://127.0.0.1:{TMDB.porta}/igdb/image/upload")
+                  ODISSEIA_TWITCH=f"http://127.0.0.1:{TMDB.porta}/oauth2/token", ODISSEIA_IGDB_IMG=f"http://127.0.0.1:{TMDB.porta}/igdb/image/upload",
+                  ODISSEIA_OL=f"http://127.0.0.1:{TMDB.porta}/ol", ODISSEIA_OL_IMG=f"http://127.0.0.1:{TMDB.porta}/olimg", ODISSEIA_OL_INTERVALO="0")
 os.environ.pop("SUPERVISOR_TOKEN", None)
 import server as S  # noqa: E402
 
@@ -284,6 +320,7 @@ def limpar():
     S.ESTADO_IGDB.update(erro="", em="")
     S.G._TOKENS.clear()
     TMDB.falha_igdb = 0
+    TMDB.falha_ol = 0
     S.IMGS.clear()
     S.DETALHES.clear()
     S.CORRERIA._chave = None

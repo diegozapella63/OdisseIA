@@ -31,6 +31,7 @@ import fala as FALA_M  # noqa: E402
 import ferramentas  # noqa: E402
 import ia as IA  # noqa: E402
 import igdb as G  # noqa: E402
+import livros as L  # noqa: E402
 import memoria_ia  # noqa: E402
 import uso as USO_M  # noqa: E402
 import regras as R  # noqa: E402
@@ -64,6 +65,10 @@ TMDB_IMG = os.environ.get("ODISSEIA_TMDB_IMG", T.IMG)
 IGDB_API = os.environ.get("ODISSEIA_IGDB", G.API)
 IGDB_TOKEN = os.environ.get("ODISSEIA_TWITCH", G.TOKEN)
 IGDB_IMG = os.environ.get("ODISSEIA_IGDB_IMG", G.IMG)
+# 0.16.0: os livros, pela Open Library (sem conta); nos testes, uma de mentira e sem o intervalo entre os pedidos
+OL_API = os.environ.get("ODISSEIA_OL", L.API)
+OL_IMG = os.environ.get("ODISSEIA_OL_IMG", L.IMG)
+OL_INTERVALO = float(os.environ.get("ODISSEIA_OL_INTERVALO", L.INTERVALO))
 DADOS_ARQ = os.path.join(DATA_DIR, "odisseia.json")
 SEGREDOS_ARQ = os.path.join(DATA_DIR, "segredos.json")
 CAPAS = os.path.join(DATA_DIR, "capas")
@@ -233,7 +238,13 @@ def estado_igdb():
     return {"chave": bool(c), "fim": ("••••" + c[-4:]) if c else "", "erro": ESTADO_IGDB["erro"] if c else ""}
 
 
-ERROS = (T.ErroTMDB, G.ErroIGDB)
+def cliente_livros():
+    return L.Livros(OL_API, OL_IMG, intervalo=OL_INTERVALO)
+
+
+ERROS = (T.ErroTMDB, G.ErroIGDB, L.ErroLivros)
+CAPA_DE = {"jogo": "capa_igdb", "livro": "capa_ol"}  # onde cada tipo guarda a capa da fonte (os outros, capa_tmdb)
+EM_DE = {"jogo": "igdb_em", "livro": "ol_em"}  # e quando os detalhes foram lidos (os outros, tmdb_em)
 
 
 # ---------------------------------------------------------------- as pessoas da casa
@@ -299,13 +310,18 @@ def baixar_capa(tipo, capa):
     """Os bytes da capa de um título (a do TMDB num filme ou numa série, a do IGDB num jogo), ou None."""
     if not capa:
         return None
+    if tipo == "livro":
+        return cliente_livros().imagem(capa, "ol_L") or cliente_livros().imagem(capa, "ol_M")
     return cliente_igdb().imagem(capa, "t_cover_big") if tipo == "jogo" else cliente().imagem(capa, "w342")
 
 
 def capa_da_busca(tamanho, caminho):
     k = tamanho + caminho
     if k not in IMGS:
-        dado = cliente_igdb().imagem(caminho, tamanho) if tamanho.startswith("t_") else cliente().imagem(caminho, tamanho)
+        if tamanho.startswith("ol_"):
+            dado = cliente_livros().imagem(caminho, tamanho)
+        else:
+            dado = cliente_igdb().imagem(caminho, tamanho) if tamanho.startswith("t_") else cliente().imagem(caminho, tamanho)
         if not dado:
             return None
         if len(IMGS) >= 300:
@@ -320,7 +336,7 @@ def adicionar(corpo, quem_usa=""):
     tipo = corpo.get("tipo")
     n = corpo.get(R.fonte(tipo))
     if tipo not in R.TIPOS or not isinstance(n, int) or isinstance(n, bool):
-        raise ValueError("Escolha um filme, uma série ou um jogo da busca.")
+        raise ValueError("Escolha um filme, uma série, um jogo ou um livro da busca.")
     situacao = corpo.get("situacao") or "quero"
     if situacao not in R.SITUACOES:
         raise ValueError("A situação vale quero ou visto.")
@@ -361,17 +377,20 @@ def so_ligados(rs):
     return [r for r in rs if r["tipo"] in ligados or (r["tipo"] == "colecao" and "filme" in ligados) or (r["tipo"] == "colecao_jogos" and "jogo" in ligados)]
 
 
-def fontes(tipo):
-    """De onde vêm uma busca e uma lista: (TMDB, IGDB). Com um tipo, a dele; sem tipo, as dos tipos ligados que têm a
-    conta posta (sem nenhuma, a dos filmes e das séries, que diz o que falta)."""
+def fontes(tipo, livros=True):
+    """De onde vêm uma busca e uma lista: (TMDB, IGDB, Open Library). Com um tipo, a dele; sem tipo, as dos tipos ligados
+    que têm a conta posta (os livros não pedem conta; sem nenhuma, a dos filmes e das séries, que diz o que falta). As
+    listas prontas não têm livros (livros=False)."""
+    if tipo == "livro":
+        return False, False, livros
     if tipo == "jogo":
-        return False, True
+        return False, True, False
     if tipo in ("filme", "serie"):
-        return True, False
+        return True, False, False
     lig = set(R.tipos_ligados(ler()))
     tv = bool(lig & {"filme", "serie"})
-    tm, ig = tv and bool(chave_tmdb()), "jogo" in lig and bool(conta_igdb()[0])
-    return (tm, ig) if tm or ig else (tv, not tv)
+    tm, ig, ol = tv and bool(chave_tmdb()), "jogo" in lig and bool(conta_igdb()[0]), livros and "livro" in lig
+    return (tm, ig, ol) if tm or ig or ol else (tv, "jogo" in lig and not tv, False)
 
 
 def juntar(chamadas):
@@ -393,13 +412,23 @@ def juntar(chamadas):
 
 def buscar(q, tipo):
     tipo = tipo_de_busca(tipo)
-    tm, ig = fontes(tipo)
+    tm, ig, ol = fontes(tipo)
+    if ol and L.isbn_de(q):  # o número do código de barras de um livro: só a Open Library sabe
+        tm = ig = False
     chamadas = []
     if tm:
         chamadas.append(lambda: (com_colecao(so_ligados(tmdb_fez(cliente().buscar, q, tipo))), False))
     if ig:
         chamadas.append(lambda: (so_ligados(igdb_fez(cliente_igdb().buscar, q)), False))
+    if ol:
+        chamadas.append(lambda: (cliente_livros().buscar(q), False))
     return marcar_ja(juntar(chamadas)[0])
+
+
+def detalhes_da_fonte(tipo, n):
+    if tipo == "livro":
+        return cliente_livros().detalhes(n)
+    return igdb_fez(cliente_igdb().detalhes, n) if tipo == "jogo" else tmdb_fez(cliente().detalhes, tipo, n)
 
 
 DETALHES = {}  # (tipo, número) → (quando, detalhes): os detalhes lidos valem 12 horas (a coleção de cada filme da lista)
@@ -409,7 +438,7 @@ def detalhes(tipo, n):
     v = DETALHES.get((tipo, n))
     if v and time.time() - v[0] < 12 * 3600:
         return v[1]
-    det = igdb_fez(cliente_igdb().detalhes, n) if tipo == "jogo" else tmdb_fez(cliente().detalhes, tipo, n)
+    det = detalhes_da_fonte(tipo, n)
     if len(DETALHES) > 3000:
         DETALHES.clear()
     DETALHES[(tipo, n)] = (time.time(), det)
@@ -474,7 +503,9 @@ def lista_pronta(nome, tipo="", pagina=1):
         raise ValueError("Lista desconhecida.")
     tipo = tipo_de_busca(tipo)
     lig = R.tipos_ligados(ler())
-    tm, ig = fontes(tipo)
+    tm, ig, _ = fontes(tipo, livros=False)
+    if not tm and not ig:  # os livros não têm listas prontas
+        return {"resultados": [], "mais": False}
     chamadas = []
     if nome == "colecoes":
         if tm and "filme" in lig and tipo != "serie":
@@ -580,9 +611,9 @@ def atualizar(tid):
         t = R.achar(ler(), tid)
     tipo, n = t["tipo"], t.get(R.fonte(t["tipo"]))
     if not n:
-        raise ValueError("Esse título não veio do " + ("IGDB." if tipo == "jogo" else "TMDB."))
-    det = igdb_fez(cliente_igdb().detalhes, n) if tipo == "jogo" else tmdb_fez(cliente().detalhes, tipo, n)
-    antes = t.get("capa_igdb" if tipo == "jogo" else "capa_tmdb")
+        raise ValueError("Esse título não veio " + {"igdb": "do IGDB.", "ol": "da Open Library."}.get(R.fonte(tipo), "do TMDB."))
+    det = detalhes_da_fonte(tipo, n)
+    antes = t.get(CAPA_DE.get(tipo, "capa_tmdb"))
     capa = None
     if det.get("capa") and (det["capa"] != antes or not t.get("capa") or not os.path.exists(caminho_capa(t["capa"]))):
         capa = baixar_capa(tipo, det["capa"])
@@ -701,18 +732,18 @@ def precisa_atualizar(t, agora):
     if not t.get(R.fonte(t["tipo"])):
         return False
     try:
-        idade = agora - datetime.fromisoformat(t.get("igdb_em" if t["tipo"] == "jogo" else "tmdb_em") or "2000-01-01T00:00:00")
+        idade = agora - datetime.fromisoformat(t.get(EM_DE.get(t["tipo"], "tmdb_em")) or "2000-01-01T00:00:00")
     except ValueError:
         return True
     if t["tipo"] == "serie" and t["situacao"] == "quero" or t["tipo"] == "jogo" and t["situacao"] == "quero" and (t.get("data") or "9") > agora.date().isoformat():
         return idade > timedelta(hours=20)
-    return idade > timedelta(days=7)
+    return idade > timedelta(days=30 if t["tipo"] == "livro" else 7)  # um livro quase não muda: de mês em mês
 
 
 def uma_volta(agora=None):
     """Uma passada do laço: até 30 títulos com os detalhes velhos. Uma fonte sem a conta (ou sem internet) para ali."""
     agora = agora or datetime.now()
-    tem = {"tmdb": bool(chave_tmdb()), "igdb": bool(conta_igdb()[0])}
+    tem = {"tmdb": bool(chave_tmdb()), "igdb": bool(conta_igdb()[0]), "ol": True}
     parou = set()
     fila = [(t["id"], R.fonte(t["tipo"])) for t in ler()["titulos"] if tem[R.fonte(t["tipo"])] and precisa_atualizar(t, agora)][:30]
     for tid, f in fila:
@@ -722,7 +753,7 @@ def uma_volta(agora=None):
             atualizar(tid)
         except (ValueError, *ERROS) as e:
             log("Atualizar", tid, e)
-            if any(p in str(e) for p in ("chave", "internet", "Client", "acesso")):
+            if any(p in str(e) for p in ("chave", "internet", "Client", "acesso", "esperar")):
                 parou.add(f)
         time.sleep(0.5)
 
@@ -995,7 +1026,7 @@ class Conexao:
                 return
             url, ip = self.endereco()
             corpo = {"app": "odisseia", "nome": "OdisseIA",
-                     "assunto": "filmes, séries e jogos da casa: o que cada um quer ver (ou jogar) ou já viu (ou jogou), episódios, categorias e onde assistir",
+                     "assunto": "filmes, séries, jogos e livros da casa: o que cada um quer ver (jogar, ler) ou já viu (jogou, leu), episódios, categorias e onde assistir",
                      "versao": VERSAO, "url": url, "ip_url": f"http://{ip}:{PORTA}" if ip else None, "chave": self.chave(),
                      "ferramentas": "/api/integracao/ferramentas", "gravado_em": datetime.now().isoformat(timespec="seconds")}
             _gravar(self.arq_share, json.dumps(corpo, ensure_ascii=False, indent=1), 0o600)
@@ -1407,7 +1438,7 @@ def mudar_ajustes(corpo):
         if "tipos" in corpo:
             t = corpo["tipos"]
             if not isinstance(t, dict) or any(k not in R.TIPOS or not isinstance(v, bool) for k, v in t.items()):
-                raise ValueError("tipos: filme, serie e jogo, ligado ou desligado.")
+                raise ValueError("tipos: filme, serie, jogo e livro, ligado ou desligado.")
             novos = dict(a["tipos"], **t)
             if not any(novos.values()):
                 raise ValueError("Deixe pelo menos um ligado.")
@@ -1540,7 +1571,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.enviar(404, {"erro": "Sem capa."})
                 return self.enviar(200, dado, MIME[os.path.splitext(m.group(1))[1]] if m.group(1).endswith(".png") else "image/jpeg",
                                    {"Cache-Control": "private, max-age=604800"})
-            m = re.match(r"^/api/img/(w92|w185|w342)(/[A-Za-z0-9_-]{1,80}\.(?:jpg|png))$", c) or re.match(r"^/api/img/(t_cover_big)/([a-z0-9]{2,40})\.jpg$", c)
+            m = re.match(r"^/api/img/(w92|w185|w342)(/[A-Za-z0-9_-]{1,80}\.(?:jpg|png))$", c) or re.match(r"^/api/img/(t_cover_big)/([a-z0-9]{2,40})\.jpg$", c) or re.match(r"^/api/img/(ol_M)/(\d{1,12})\.jpg$", c)
             if m:
                 dado = capa_da_busca(m.group(1), m.group(2))
                 if not dado:

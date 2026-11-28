@@ -440,7 +440,7 @@ class TestNovidades020(unittest.TestCase):
         self.post("/api/titulo", {"acao": "adicionar", "tipo": "filme", "tmdb": 101})
         self.post("/api/titulo", {"acao": "adicionar", "tipo": "serie", "tmdb": 202})
         st, r = self.post("/api/ajustes", {"tipos": {"filme": False, "jogo": False}})
-        self.assertEqual(r["ajustes"]["tipos"], {"filme": False, "serie": True, "jogo": False})
+        self.assertEqual(r["ajustes"]["tipos"], {"filme": False, "serie": True, "jogo": False, "livro": False})
         self.assertEqual([t["tipo"] for t in self.get("/api/estado")[1]["titulos"]], ["serie"])
         self.assertEqual(len(S.ler()["titulos"]), 2, "desligar não apaga")
         self.assertEqual(self.post("/api/ajustes", {"tipos": {"serie": False}})[1]["erro"], "Deixe pelo menos um ligado.")

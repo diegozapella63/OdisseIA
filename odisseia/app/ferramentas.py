@@ -8,13 +8,14 @@ import igdb as G
 import regras as R
 import tmdb as T
 
-INSTRUCOES = ("OdisseIA: os filmes, as séries e os jogos da casa: o que cada pessoa quer ver ou já viu (as duas situações, "
-              "quero e visto; num jogo, quero é Quero jogar e visto é Jogado), o episódio em que parou numa série (em "
+INSTRUCOES = ("OdisseIA: os filmes, as séries, os jogos e os livros da casa: o que cada pessoa quer ver ou já viu (as duas situações, "
+              "quero e visto; num jogo, quero é Quero jogar e visto é Jogado; num livro, Quero ler e Lido), o episódio em que parou numa série (em "
               "andamento: em Quero ver, com algum episódio visto), a categoria (as da casa, uma lista para cada tipo), "
               "onde assistir no Brasil (dados da JustWatch) e as plataformas de um jogo. Os ids dos títulos "
               "começam com t. Para marcar o episódio seguinte ao último visto, use proximo_episodio; para um episódio "
               "certo, marcar com temporada e episodio. Para pôr um título novo, adicionar procura pelo nome (filmes e "
-              "séries no TMDB, jogos no IGDB; diga o tipo); uma série inteira já vista é adicionar com situacao visto "
+              "séries no TMDB, jogos no IGDB, livros na Open Library, também pelo autor ou pelo ISBN; diga o tipo; os livros "
+              "não têm listas prontas nem coleções); uma série inteira já vista é adicionar com situacao visto "
               "(marca até o último episódio que saiu). Uma coleção inteira de uma vez (uma saga de filmes ou uma série "
               "de jogos): adicionar_colecao.")
 SIT = list(R.SITUACOES)
@@ -29,7 +30,7 @@ def _f(nome, titulo, descricao, props=None, obrig=(), grava=False, apaga=False):
 _TIT = {"type": "string", "description": "O id do título (t…) ou o nome."}
 _QUEM = {"type": "array", "items": {"type": "string"}, "description": "Os nomes das pessoas da casa (troca a lista); «todos» põe a casa toda."}
 _CAT = {"type": "string", "description": "O nome de uma categoria da casa (as do tipo do título); vazio tira."}
-_SIT = {"type": "string", "enum": SIT, "description": "quero (Quero ver; num jogo, Quero jogar) ou visto (num jogo, Jogado)."}
+_SIT = {"type": "string", "enum": SIT, "description": "quero (Quero ver; num jogo, Quero jogar; num livro, Quero ler) ou visto (num jogo, Jogado; num livro, Lido)."}
 FERRAMENTAS = [
     _f("resumo", "Resumo", "Quantos títulos há em cada situação, as séries em andamento (com o episódio e quantos faltam), "
        "os episódios que vão sair nos próximos 14 dias, os jogos em Quero jogar que saem nos próximos 30 dias e as categorias da casa."),
@@ -48,8 +49,9 @@ FERRAMENTAS = [
        "(num jogo, os mais jogados), mais bem avaliados, coleções ou estreias (os filmes nos cinemas do Brasil, as séries "
        "no ar, os jogos lançados nos últimos 90 dias), com o que já está na lista da casa. Para sugerir o que ver ou jogar.",
        {"lista": {"type": "string", "enum": list(T.LISTAS)}, "tipo": {"type": "string", "enum": TIPOS}}, ["lista"]),
-    _f("adicionar", "Adicionar", "Procura o filme, a série (no TMDB) ou o jogo (no IGDB) pelo nome e põe na lista da casa "
-       "(o que combina com o tipo e o ano). Se já está na lista, diz.",
+    _f("adicionar", "Adicionar", "Procura o filme, a série (no TMDB), o jogo (no IGDB) ou o livro (na Open Library; com tipo livro, o nome pode ser o "
+       "título, o autor ou o ISBN, o número do código de barras) e põe na lista da casa (o que combina com o tipo e o ano). "
+       "Se já está na lista, diz.",
        {"nome": {"type": "string"}, "tipo": {"type": "string", "enum": TIPOS},
         "ano": {"type": "integer", "minimum": 1880, "maximum": 2100}, "situacao": _SIT, "quem": _QUEM, "categoria": _CAT},
        ["nome"], grava=True),
@@ -147,6 +149,8 @@ def nomes_de(ids, pessoas):
 
 def linha(t, pessoas, d=None):
     s = f"{t['id']} | {t['nome']}" + (f" ({t['ano']})" if t["ano"] else "") + f" · {R.TIPOS[t['tipo']].lower()} · {R.nome_sit(t['tipo'], t['situacao']).lower()}"
+    if t["tipo"] == "livro" and t.get("autores"):
+        s += " · " + t["autores"][0]
     if t["tipo"] == "serie" and t["temp"]:
         s += f" · parou em {R.ep_txt(t['temp'], t['ep'])}"
         f = R.faltam(t)
@@ -191,7 +195,7 @@ def texto_sugestoes(d, a, pessoas, agora):
 
     def nota(t):
         vendo = R.em_andamento(t) and bool(R.faltam(t))
-        return (0 if vendo else 1, 0 if (onde(t) or t["tipo"] == "jogo") else 1, -sum(gosto.get(g, 0) for g in t.get("generos") or []), R.sem_acento(t["nome"]))
+        return (0 if vendo else 1, 0 if (onde(t) or t["tipo"] in ("jogo", "livro")) else 1, -sum(gosto.get(g, 0) for g in t.get("generos") or []), R.sem_acento(t["nome"]))
     ts.sort(key=nota)
     if not ts:
         return "Nada na lista para sugerir com esses filtros."
@@ -202,7 +206,7 @@ def texto_sugestoes(d, a, pessoas, agora):
             porque.append(f"em andamento, parou em {R.ep_txt(t['temp'], t['ep'])}")
         if onde(t):
             porque.append("em " + ", ".join(dict.fromkeys(onde(t))))
-        elif t["tipo"] != "jogo":
+        elif t["tipo"] in ("filme", "serie"):
             porque.append("em nenhuma assinatura")
         comuns = [g for g in t.get("generos") or [] if gosto.get(g)]
         if comuns:
@@ -309,6 +313,13 @@ def chamar(nome, args, d, pessoas, pessoa=None, det=None, agora=None):
                 out.append("Gêneros: " + ", ".join(t["generos"]) + ".")
             if t["tipo"] == "filme" and t.get("duracao"):
                 out.append(f"Duração: {t['duracao']} min.")
+            if t["tipo"] == "livro":
+                if t.get("autores"):
+                    out.append(("Autores: " if len(t["autores"]) > 1 else "Autor: ") + ", ".join(t["autores"]) + ".")
+                if t.get("paginas"):
+                    out.append(f"Páginas: {t['paginas']}.")
+                if t.get("isbn"):
+                    out.append(f"ISBN: {t['isbn']}.")
             if t["tipo"] == "jogo":
                 if t.get("plataformas"):
                     out.append("Plataformas: " + ", ".join(t["plataformas"]) + ".")
@@ -323,7 +334,7 @@ def chamar(nome, args, d, pessoas, pessoa=None, det=None, agora=None):
                     out.append(f"Último que saiu: {R.ep_txt(t['ultimo']['temp'], t['ultimo']['ep'])}" + (f" em {R.data_br(t['ultimo']['data'])}" if t["ultimo"]["data"] else "") + ".")
                 if t.get("proximo"):
                     out.append(f"Próximo: {R.ep_txt(t['proximo']['temp'], t['proximo']['ep'])} em {R.data_br(t['proximo']['data'])}.")
-            if t["tipo"] != "jogo":
+            if t["tipo"] in ("filme", "serie"):
                 out.append(_onde(t))
             if t["sinopse"]:
                 out.append("Sinopse: " + t["sinopse"])

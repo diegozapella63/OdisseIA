@@ -28,7 +28,7 @@ class TestRegras(unittest.TestCase):
                                                      "situacao": "vendo", "capa": "../x.jpg", "visto_em": "ontem", "onde": {"link": "http://x", "assinatura": ["A", "", 3]},
                                                      "categoria": "c000001"},
                                                     {"id": "t00000001", "tipo": "filme", "nome": "Repetido"}, {"id": "zz", "tipo": "filme", "nome": "x"},
-                                                    {"id": "t00000002", "tipo": "livro", "nome": "x"}, {"id": "t00000003", "tipo": "serie", "nome": ""},
+                                                    {"id": "t00000002", "tipo": "disco", "nome": "x"}, {"id": "t00000003", "tipo": "serie", "nome": ""},
                                                     {"id": "t00000004", "tipo": "serie", "nome": "S", "temp": 3, "ep": 0, "situacao": "abandonado", "categoria": "c000001",
                                                      "temporadas": [{"n": 2, "episodios": 5}, {"n": 1, "episodios": 4}, {"n": 0, "episodios": 9}, "x"]}, 5],
                               "categorias": {"filme": [{"id": "c000001", "nome": " Família "}, {"id": "c000001", "nome": "Repetida"}, {"id": "x", "nome": "y"}, {"id": "c000002", "nome": ""}],
@@ -42,15 +42,15 @@ class TestRegras(unittest.TestCase):
         s = d["titulos"][1]
         self.assertEqual(([x["n"] for x in s["temporadas"]], s["temp"], s["ep"], s["situacao"], s["categoria"]), ([1, 2], 0, 0, "quero", ""),
                          "o Vendo e o Abandonado viram Quero ver; a categoria de filme numa série sai")
-        self.assertEqual(d["categorias"], {"filme": [{"id": "c000001", "nome": "Família", "cor": "vermelho"}], "serie": [], "jogo": []}, "sem cor, a primeira livre")
-        self.assertEqual(d["ajustes"], {"cor": "lilas", "cor_dia": False, "quem": True, "correria": False, "tipos": {"filme": True, "serie": True, "jogo": True},
+        self.assertEqual(d["categorias"], {"filme": [{"id": "c000001", "nome": "Família", "cor": "vermelho"}], "serie": [], "jogo": [], "livro": []}, "sem cor, a primeira livre")
+        self.assertEqual(d["ajustes"], {"cor": "lilas", "cor_dia": False, "quem": True, "correria": False, "tipos": {"filme": True, "serie": True, "jogo": True, "livro": False},
                                         "ia": True, "ia_conversa": "", "ia_fotos": "", "ia_pesquisa": "", "fala": "", "sensores": False})
         # 0.7.0: a IA de cada uso só aceita uma tarefa de IA; Usar IA começa ligado
         aj = R.limpar_dados({"ajustes": {"ia": False, "ia_conversa": "ai_task.gemini", "ia_fotos": "camera.x", "ia_pesquisa": 3}})["ajustes"]
         self.assertEqual((aj["ia"], aj["ia_conversa"], aj["ia_fotos"], aj["ia_pesquisa"]), (False, "ai_task.gemini", "", ""))
-        self.assertEqual(R.limpar_dados({"ajustes": {"tipos": {"filme": False, "serie": False, "jogo": False}}})["ajustes"]["tipos"], {"filme": True, "serie": True, "jogo": True}, "nunca todos desligados")
-        self.assertEqual(R.limpar_dados({"ajustes": {"tipos": {"filme": False, "serie": False}}})["ajustes"]["tipos"], {"filme": False, "serie": False, "jogo": True}, "os jogos de uma casa de antes começam ligados")
-        self.assertEqual(R.limpar_dados({"ajustes": {"tipos": {"filme": False}}})["ajustes"]["tipos"], {"filme": False, "serie": True, "jogo": True})
+        self.assertEqual(R.limpar_dados({"ajustes": {"tipos": {"filme": False, "serie": False, "jogo": False}}})["ajustes"]["tipos"], {"filme": True, "serie": True, "jogo": True, "livro": False}, "nunca todos desligados")
+        self.assertEqual(R.limpar_dados({"ajustes": {"tipos": {"filme": False, "serie": False}}})["ajustes"]["tipos"], {"filme": False, "serie": False, "jogo": True, "livro": False}, "os jogos de uma casa de antes começam ligados")
+        self.assertEqual(R.limpar_dados({"ajustes": {"tipos": {"filme": False}}})["ajustes"]["tipos"], {"filme": False, "serie": True, "jogo": True, "livro": False})
         f = R.limpar_titulo({"id": "t00000009", "tipo": "filme", "nome": "F", "colecao": {"id": 7, "nome": " Saga ", "capa": "/s.jpg"}})
         self.assertEqual(f["colecao"], {"id": 7, "nome": "Saga", "capa": "/s.jpg"})
         self.assertIsNone(R.limpar_titulo({"id": "t00000009", "tipo": "filme", "nome": "F", "colecao": {"id": "x"}})["colecao"])
@@ -83,7 +83,7 @@ class TestRegras(unittest.TestCase):
         with self.assertRaisesRegex(R.ErroRegra, "Mais de um título"):
             R.achar(d, "mar")
         with self.assertRaisesRegex(R.ErroRegra, "tipo"):
-            R.criar(d, {"tipo": "livro"}, "quero", [], AGORA)
+            R.criar(d, {"tipo": "disco"}, "quero", [], AGORA)
         with self.assertRaisesRegex(R.ErroRegra, "situação"):
             R.criar(d, dict(serie(), tmdb=999), "vendo", [], AGORA)
 
@@ -155,7 +155,7 @@ class TestRegras(unittest.TestCase):
         b = R.mudar_categorias(d, {"acao": "nova", "tipo": "filme", "nome": "Clássicos"})
         f, _ = R.criar(d, filme(), "quero", [], AGORA)
         f["categoria"] = a["id"]
-        for corpo, erro in (({"acao": "nova", "tipo": "livro", "nome": "x"}, "tipo"), ({"acao": "nova", "tipo": "filme", "nome": " "}, "Escreva"),
+        for corpo, erro in (({"acao": "nova", "tipo": "disco", "nome": "x"}, "tipo"), ({"acao": "nova", "tipo": "filme", "nome": " "}, "Escreva"),
                             ({"acao": "nova", "tipo": "filme", "nome": "FAMÍLIA"}, "já existe"), ({"acao": "renomear", "id": b["id"], "nome": "familia"}, "já existe"),
                             ({"acao": "renomear", "id": b["id"], "nome": ""}, "Escreva"), ({"acao": "apagar", "id": "c000000"}, "não existe"),
                             ({"acao": "voar", "id": a["id"]}, "desconhecida")):

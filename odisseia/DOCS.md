@@ -71,9 +71,17 @@ Nos dois, em cima da lista:
 - **A categoria em cada linha**, na cor dela, ou **+ Categoria**: o toque abre só a escolha da categoria daquele título.
 - **Selecionar**: toque nos títulos (ou segure o dedo num) e **Alterar** muda de uma vez a **Categoria** e **Quem**; cada campo começa em **Manter**. **Apagar** tira os títulos marcados da lista. Depois, o aviso tem o **Desfazer**. Uma seleção é de um tipo só (as categorias são de cada tipo). O Voltar do celular sai do Selecionar.
 
+## Os livros
+
+Ligue em **Configurações › Opções › O que controlar › Livros**. Os livros vêm da [Open Library](https://openlibrary.org), de graça e sem conta.
+
+No **+**, em **Livros**, escreva o nome, o autor ou o ISBN (o número embaixo do código de barras), ou toque em **Ler código de barras** e aponte a câmera para o código. Vêm a capa, o autor, o ano e as páginas; quando a Open Library tem a edição em português, o nome vem dela. As situações são **Quero ler** e **Lido**.
+
+A câmera só abre em https. Sem ela (ou num aparelho que não lê códigos), escreva o número. Um livro que a Open Library não tem não aparece na busca. Os livros não têm listas prontas nem coleções.
+
 ## O que controlar
 
-Em **Configurações › Opções › O que controlar**, ligue as séries, os filmes e os jogos (pelo menos um). O que fica desligado some da tela e do CorrerIA; nada é apagado, e volta ao ligar de novo.
+Em **Configurações › Opções › O que controlar**, ligue as séries, os filmes, os jogos e os livros (pelo menos um; os livros começam desligados). O que fica desligado some da tela e do CorrerIA; nada é apagado, e volta ao ligar de novo.
 
 ## A IA: Conversa e Falar
 
@@ -101,4 +109,4 @@ Em **Configurações › Dados**: **Exportar** (a lista e as capas num .zip), **
 
 ## Créditos
 
-Este app usa a API do TMDB, mas não é endossado nem certificado pelo TMDB. Onde assistir: dados da [JustWatch](https://www.justwatch.com/br). Os jogos: dados do [IGDB](https://www.igdb.com/).
+Este app usa a API do TMDB, mas não é endossado nem certificado pelo TMDB. Onde assistir: dados da [JustWatch](https://www.justwatch.com/br). Os jogos: dados do [IGDB](https://www.igdb.com/). Os livros: dados da [Open Library](https://openlibrary.org).

@@ -22,6 +22,7 @@
     calendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/>',
     star: '<path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/>',
     user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/>',
     users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
     x: '<path d="M18 6 6 18M6 6l12 12"/>',
@@ -74,12 +75,14 @@
 
   // 0.3.0 (o dono: "pode tirar a opção de vendo, só vou controlar visto e quero ver")
   const SIT = { quero: ['Quero ver', 'bookmark'], visto: ['Visto', 'visto'] };
-  const TIPO = { filme: ['Filme', 'film'], serie: ['Série', 'tv'], jogo: ['Jogo', 'gamepad'], colecao: ['Coleção de filmes', 'layers'], colecao_jogos: ['Coleção de jogos', 'layers'] };
-  const NOMES = { filme: 'Filmes', serie: 'Séries', jogo: 'Jogos' };
+  const TIPO = { filme: ['Filme', 'film'], serie: ['Série', 'tv'], jogo: ['Jogo', 'gamepad'], livro: ['Livro', 'book-open'], colecao: ['Coleção de filmes', 'layers'], colecao_jogos: ['Coleção de jogos', 'layers'] };
+  const NOMES = { filme: 'Filmes', serie: 'Séries', jogo: 'Jogos', livro: 'Livros' };
+  const ehTV = k => k === 'filme' || k === 'serie';
   // 0.4.0 (o dono: "cadê os jogos?"): num jogo, as mesmas duas situações com os nomes de jogo
   const ehJogo = r => r.tipo === 'jogo' || r.tipo === 'colecao_jogos';
-  const ref = r => ehJogo(r) ? r.igdb : r.tmdb;
-  const sitN = (tipo, k) => tipo === 'jogo' || tipo === 'colecao_jogos' ? { quero: 'Quero jogar', visto: 'Jogado' }[k] : SIT[k][0];
+  const ref = r => ehJogo(r) ? r.igdb : r.tipo === 'livro' ? r.ol : r.tmdb;
+  // 0.16.0 (o dono: "Ótima ideia controlar os livros também"): num livro, Quero ler e Lido
+  const sitN = (tipo, k) => tipo === 'jogo' || tipo === 'colecao_jogos' ? { quero: 'Quero jogar', visto: 'Jogado' }[k] : tipo === 'livro' ? { quero: 'Quero ler', visto: 'Lido' }[k] : SIT[k][0];
   const ABAS = [['integracoes', 'Integrações', 'layers'], ['dados', 'Dados', 'database'], ['aparencia', 'Aparência', 'palette'], ['opcoes', 'Opções', 'toggle']];
   const S = {
     e: null, tela: 'agora', aba: guardada('odisseia-aba') || 'integracoes', tema: guardada('odisseia-tema') || 'auto',
@@ -206,13 +209,15 @@
   // a fonte do tipo tem a conta posta (o TMDB nos filmes e nas séries, o IGDB nos jogos)? sem tipo: alguma dos ligados
   function temFonte(tipo) {
     const tv = S.e.tmdb.chave, jg = S.e.igdb.chave, l = ligados();
+    if (tipo === 'livro') return true;  // os livros vêm da Open Library, sem conta
     if (tipo === 'jogo') return jg;
     if (tipo) return tv;
-    return (tv && l.some(k => k !== 'jogo')) || (jg && l.includes('jogo'));
+    return (tv && l.some(ehTV)) || (jg && l.includes('jogo')) || l.includes('livro');
   }
   // «Nome do filme, da série ou do jogo», com os tipos ligados (ou o escolhido)
   function oQue(tipo) {
-    const n = { filme: 'do filme', serie: 'da série', jogo: 'do jogo' }, l = (tipo ? [tipo] : ligados()).map(k => n[k]);
+    const n = { filme: 'do filme', serie: 'da série', jogo: 'do jogo', livro: 'do livro' }, l = (tipo ? [tipo] : ligados()).map(k => n[k]);
+    if (l.length === 1 && l[0] === n.livro) return 'Nome do livro, autor ou ISBN';
     return 'Nome ' + (l.length > 1 ? l.slice(0, -1).join(', ') + ' ou ' + l[l.length - 1] : l[0]);
   }
   const podeProximo = t => { const s = t.tipo === 'serie' && seguinte(t); return s && jaSaiu(t, s) ? s : null; };
@@ -245,6 +250,10 @@
       if (f) p.push(`faltam ${f}`);
     } else if (t.tipo === 'serie') {
       p.push('Série' + (t.temporadas && t.temporadas.length ? ' · ' + plural(t.temporadas.length, 'temporada', 'temporadas') : ''));
+      if (t.ano) p.push(t.ano);
+    } else if (t.tipo === 'livro') {
+      p.push('Livro');
+      if ((t.autores || []).length) p.push(t.autores[0]);
       if (t.ano) p.push(t.ano);
     } else if (t.tipo === 'jogo') {
       p.push('Jogo');
@@ -325,7 +334,7 @@
   function telaAgora() {
     const e = S.e, ts = e.titulos, eu = pessoa(e.eu);
     let h = topo('Agora');
-    const l = ligados(), faltaTV = !e.tmdb.chave && l.some(k => k !== 'jogo'), faltaJG = !e.igdb.chave && l.includes('jogo');
+    const l = ligados(), faltaTV = !e.tmdb.chave && l.some(ehTV), faltaJG = !e.igdb.chave && l.includes('jogo');
     if (faltaTV || faltaJG) {
       const txt = faltaTV && faltaJG ? `Para procurar, o app usa o ${site('https://www.themoviedb.org/settings/api', 'TMDB')} (filmes e séries) e o ${site('https://dev.twitch.tv/console', 'IGDB')} (jogos), os dois de graça. Ponha as contas em Configurações.`
         : faltaTV ? `Para procurar os filmes e as séries, o app usa o TMDB, de graça. Crie a sua chave no ${site('https://www.themoviedb.org/settings/api', 'TMDB')} e cole em Configurações.`
@@ -350,11 +359,11 @@
     if (saem.length) {
       h += card('saem', 'calendar', 'Jogos que vão sair', `<ul class="titulos">${saem.slice(0, 6).map(t => linhaTit(t, { dest: true, sub: 'sai ' + esc(saiEm(t.data)) })).join('')}</ul>`);
     }
-    for (const [k, nome, icone, so] of [['quero', 'Quero ver', 'bookmark', t => t.tipo !== 'jogo'], ['quero-jogar', 'Quero jogar', 'gamepad', t => t.tipo === 'jogo']]) {
+    for (const [k, nome, icone, so, vt] of [['quero', 'Quero ver', 'bookmark', t => ehTV(t.tipo), ''], ['quero-jogar', 'Quero jogar', 'gamepad', t => t.tipo === 'jogo', 'jogo'], ['quero-ler', 'Quero ler', 'book-open', t => t.tipo === 'livro', 'livro']]) {
       const quero = ordem(ts.filter(t => t.situacao === 'quero' && !emAndamento(t) && so(t)));
       if (quero.length) {
         h += card(k, icone, `${nome} <span class="cont">${quero.length}</span>`, lista(quero.slice(0, 6)) +
-          (quero.length > 6 ? `<div class="acoes ver-todos"><button class="btn out" data-a="ver-quero" data-v="${k === 'quero' ? '' : 'jogo'}">${ic('list', 'ic-s')}Ver todos</button></div>` : ''), nome);
+          (quero.length > 6 ? `<div class="acoes ver-todos"><button class="btn out" data-a="ver-quero" data-v="${vt}">${ic('list', 'ic-s')}Ver todos</button></div>` : ''), nome);
       }
     }
     return h;
@@ -394,9 +403,10 @@
     const sel = [];
     const todos = tipos.map((k, i) => i ? NOMES[k].toLowerCase() : NOMES[k]), tipo = tipos.includes(b.tipo) ? b.tipo : '';
     if (tipos.length > 1) sel.push(caixa('f-tipo', 'film', 'Tipo', opt('', todos.slice(0, -1).join(', ') + ' e ' + todos[todos.length - 1], b.tipo) + tipos.map(k => opt(k, NOMES[k], b.tipo)).join('')));
-    const soJogo = tipo === 'jogo' || (tipos.length === 1 && tipos[0] === 'jogo'), comJogo = !tipo && tipos.includes('jogo') && tipos.length > 1;
-    sel.push(caixa('f-sit', 'layers', 'Situação', opt('', 'Todas as situações', b.situacao) + opt('quero', soJogo ? 'Quero jogar' : comJogo ? 'Quero ver ou jogar' : 'Quero ver', b.situacao)
-      + opt('visto', soJogo ? 'Jogados' : comJogo ? 'Vistos e jogados' : 'Vistos', b.situacao)));
+    const um = tipo || (tipos.length === 1 ? tipos[0] : ''), comJogo = !um && tipos.includes('jogo'), comLivro = !um && tipos.includes('livro');
+    const soJogo = um === 'jogo', soLivro = um === 'livro';
+    sel.push(caixa('f-sit', 'layers', 'Situação', opt('', 'Todas as situações', b.situacao) + opt('quero', soLivro ? 'Quero ler' : soJogo ? 'Quero jogar' : comLivro ? 'Quero' : comJogo ? 'Quero ver ou jogar' : 'Quero ver', b.situacao)
+      + opt('visto', soLivro ? 'Lidos' : soJogo ? 'Jogados' : comLivro ? 'Concluídos' : comJogo ? 'Vistos e jogados' : 'Vistos', b.situacao)));
     // 0.4.0 (o dono: "filtro por categoria aqui"): a caixa está sempre; sem nenhuma categoria, leva a criar
     sel.push(tipoUm ? caixa('f-cat', 'tag', 'Categoria', opt('', 'Todas as categorias', b.categoria) + cats.map(c => opt(c.id, c.nome, b.categoria)).join('')
       + opt('sem', 'Sem categoria', b.categoria) + (cats.length ? '' : opt('__criar', 'Criar categorias…', '')))
@@ -412,7 +422,7 @@
 
   /* ---------- Vistos: o que está salvo como visto (jogado), numa aba para cada tipo (0.4.0, o dono: "não precisa ser
      histórico essa aba, pode ser aqui o que está salvo como visto"), com o filtro da categoria; o mais recente primeiro */
-  const VISTOS = [['serie', 'Séries', 'tv', 'Séries vistas', 'Nenhuma série vista'], ['filme', 'Filmes', 'film', 'Filmes vistos', 'Nenhum filme visto'], ['jogo', 'Jogos', 'gamepad', 'Jogos jogados', 'Nenhum jogo jogado']];
+  const VISTOS = [['serie', 'Séries', 'tv', 'Séries vistas', 'Nenhuma série vista'], ['filme', 'Filmes', 'film', 'Filmes vistos', 'Nenhum filme visto'], ['jogo', 'Jogos', 'gamepad', 'Jogos jogados', 'Nenhum jogo jogado'], ['livro', 'Livros', 'book-open', 'Livros lidos', 'Nenhum livro lido']];
   function telaVistos() {
     const abas = VISTOS.filter(([k]) => ligados().includes(k));
     const [aba, , icone, titulo, vazio] = abas.find(([k]) => k === S.hist) || abas[0];
@@ -422,7 +432,7 @@
     const ts = todos.filter(t => !f || (f === 'sem' ? !catDe(t) : t.categoria === f))
       .sort((a, b) => String(b.visto_em || '').localeCompare(String(a.visto_em || '')) || a.nome.localeCompare(b.nome, 'pt-BR'));
     let h = topo('Concluídos') + (abas.length < 2 ? '' : `<div class="abas" role="tablist">${abas.map(([k, n, i]) => `<button role="tab" aria-selected="${aba === k}" class="${aba === k ? 'on' : ''}" data-a="hist" data-v="${k}">${ic(i, 'ic-s')}${n}</button>`).join('')}</div>`);
-    if (!todos.length) return h + card('nada-visto', icone, vazio, `<p class="lead">O que a casa ${aba === 'jogo' ? 'jogou' : 'viu'} aparece aqui.</p>`, 'nada-visto');
+    if (!todos.length) return h + card('nada-visto', icone, vazio, `<p class="lead">O que a casa ${aba === 'jogo' ? 'jogou' : aba === 'livro' ? 'leu' : 'viu'} aparece aqui.</p>`, 'nada-visto');
     const chip = (v, nome, icone_) => `<button class="chip${f === v ? ' on' : ''}" data-a="v-cat" data-v="${v}" aria-pressed="${f === v}">${icone_}${esc(nome)}</button>`;
     const chipCat = c => `<button class="chip cor${f === c.id ? ' on' : ''}" style="${estiloCor(c.cor)}" data-a="v-cat" data-v="${c.id}" aria-pressed="${f === c.id}"><span class="dot"></span>${esc(c.nome)}</button>`;
     // 0.12.0 (PADROES.md, "O alto das listas"): a categoria dentro do Filtros, que fecha (o aparelho lembra; fechado, a escolhida
@@ -443,10 +453,10 @@
   // 0.3.0 (o dono: "tirar a opção de nota e colocar um campo de categoria... vou poder definir categorias para filme, outra
   // para séries e outra para jogos"); 0.4.0 (o dono: "colocar cor, fazer no mesmo padrão dos outros apps"): uma lista por
   // tipo ligado, como no MemorIA: cada categoria com o ícone na cor dela; o toque abre o nome e a cor
-  const EXEMPLO_CAT = { filme: 'Ex.: Para ver em família', serie: 'Ex.: Para ver a dois', jogo: 'Ex.: Para jogar junto' };
+  const EXEMPLO_CAT = { filme: 'Ex.: Para ver em família', serie: 'Ex.: Para ver a dois', jogo: 'Ex.: Para jogar junto', livro: 'Ex.: Para ler nas férias' };
   function telaCategorias() {
     let h = topo('Categorias', 'Mais');
-    for (const [k, nome, icone] of [['serie', 'Séries', 'tv'], ['filme', 'Filmes', 'film'], ['jogo', 'Jogos', 'gamepad']].filter(([k]) => ligados().includes(k))) {
+    for (const [k, nome, icone] of [['serie', 'Séries', 'tv'], ['filme', 'Filmes', 'film'], ['jogo', 'Jogos', 'gamepad'], ['livro', 'Livros', 'book-open']].filter(([k]) => ligados().includes(k))) {
       const cs = S.e.categorias[k] || [];
       const linhas = cs.map(c => {
         const n = S.e.titulos.filter(t => t.tipo === k && t.categoria === c.id).length;
@@ -572,14 +582,14 @@
     const tipo = (k, icone, nome, txt) => `<div class="linha-sw"><div><b>${ic(icone, 'ic-s')}${nome}</b><span>${so && a.tipos[k] ? 'Pelo menos um fica ligado.' : txt}</span></div>
       <button class="sw${a.tipos[k] ? ' on' : ''}" data-a="aj-tipo" data-k="${k}" role="switch" aria-checked="${a.tipos[k]}" aria-label="${nome}"${so && a.tipos[k] ? ' disabled' : ''}></button></div>`;
     return card('controlar', 'layers', 'O que controlar', `<p class="lead">Desligado some da tela e do CorrerIA; nada é apagado.</p>
-      ${tipo('serie', 'tv', 'Séries', 'O episódio em que cada um parou e os que vão sair.')}${tipo('filme', 'film', 'Filmes', 'Os filmes e as coleções (as sagas).')}${tipo('jogo', 'gamepad', 'Jogos', 'Os jogos e as coleções, pelo IGDB.')}`) + card('quem-ve', 'users', 'Quem vê', `<div class="linha-sw"><div><b>${ic('users', 'ic-s')}Marcar quem vê</b><span>Cada título diz quem da casa está vendo ou já viu.</span></div>
+      ${tipo('serie', 'tv', 'Séries', 'O episódio em que cada um parou e os que vão sair.')}${tipo('filme', 'film', 'Filmes', 'Os filmes e as coleções (as sagas).')}${tipo('jogo', 'gamepad', 'Jogos', 'Os jogos e as coleções, pelo IGDB.')}${tipo('livro', 'book-open', 'Livros', 'Os livros, pelo nome ou pelo código de barras.')}`) + card('quem-ve', 'users', 'Quem vê', `<div class="linha-sw"><div><b>${ic('users', 'ic-s')}Marcar quem vê</b><span>Cada título diz quem da casa está vendo ou já viu.</span></div>
       <button class="sw${a.quem ? ' on' : ''}" data-a="aj" data-k="quem" role="switch" aria-checked="${a.quem}" aria-label="Marcar quem vê"></button></div>`);
   }
   function telaConfig() {
     const abas = `<div class="abas" role="tablist">${ABAS.map(([k, n, i]) => `<button role="tab" aria-selected="${S.aba === k}" class="${S.aba === k ? 'on' : ''}" data-a="aba" data-v="${k}">${ic(i, 'ic-s')}${n}</button>`).join('')}</div>`;
     const l = ligados();
     const corpo = S.aba === 'dados' ? abaDados() : S.aba === 'aparencia' ? abaAparencia() : S.aba === 'opcoes' ? abaOpcoes()
-      : (l.some(k => k !== 'jogo') ? cardTMDB() : '') + (l.includes('jogo') ? cardIGDB() : '') + cardCorrerIA() + cardIA()
+      : (l.some(ehTV) ? cardTMDB() : '') + (l.includes('jogo') ? cardIGDB() : '') + cardCorrerIA() + cardIA()
         + (S.e.ajustes.ia ? cardMemoria() + cardFalar() + cardUso() : '') + cardSensores();
     return topo('Configurações', 'Mais') + abas + corpo;
   }
@@ -620,9 +630,9 @@
   function cartaz(r, i, o) {
     // o que ainda não saiu (um filme da coleção, uma estreia futura) não tem o Já vi
     const col = r.tipo === 'colecao' || r.tipo === 'colecao_jogos', sit = r.situacao && [sitN(r.tipo, r.situacao), SIT[r.situacao][1]], saiu = r.saiu !== false && !(r.data && r.data > hojeISO());
-    const jg = ehJogo(r), quer = jg ? 'Quero jogar' : 'Quero ver', vi = jg ? 'Já joguei' : 'Já vi';
-    const img = r.capa ? `<img src="api/img/${jg ? `t_cover_big/${esc(r.capa)}.jpg` : 'w185' + esc(r.capa)}" alt="" loading="lazy">` : `<span class="cz-sem">${ic(TIPO[r.tipo][1])}</span>`;
-    const meta = [r.ano, col ? 'Coleção' : TIPO[r.tipo][0], saiu ? '' : (r.data ? 'sai em ' + new Date(r.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'sem data')].filter(Boolean).join(' · ');
+    const jg = ehJogo(r), lv = r.tipo === 'livro', quer = lv ? 'Quero ler' : jg ? 'Quero jogar' : 'Quero ver', vi = lv ? 'Já li' : jg ? 'Já joguei' : 'Já vi';
+    const img = r.capa ? `<img src="api/img/${lv ? `ol_M/${esc(r.capa)}.jpg` : jg ? `t_cover_big/${esc(r.capa)}.jpg` : 'w185' + esc(r.capa)}" alt="" loading="lazy">` : `<span class="cz-sem">${ic(TIPO[r.tipo][1])}</span>`;
+    const meta = [r.ano, col ? 'Coleção' : lv && (r.autores || []).length ? r.autores[0] : TIPO[r.tipo][0], saiu ? '' : (r.data ? 'sai em ' + new Date(r.data + 'T12:00:00').toLocaleDateString('pt-BR') : 'sem data')].filter(Boolean).join(' · ');
     return `<li class="cz${r.situacao === 'visto' ? ' feito' : ''}"><div class="cz-quadro"><button class="cz-capa" data-a="cz-abrir" data-o="${o}" data-i="${i}" aria-label="${esc(r.nome)}">${img}
         ${sit ? `<span class="cz-sit">${ic(sit[1], 'ic-s')}${sit[0]}</span>` : col ? `<span class="cz-sit">${ic('layers', 'ic-s')}Coleção</span>` : ''}</button>
       ${col ? `<span class="cz-acoes">${r.situacao ? '' : `<button class="cz-bt" data-a="cz-col-todos" data-v="quero" data-o="${o}" data-i="${i}" aria-label="${quer} todos de ${esc(r.nome)}">${ic('bookmark', 'ic-s')}</button>`}
@@ -640,13 +650,18 @@
     const semChave = !temFonte(a.tipo), busca = a.q.trim().length >= 2;
     const seg = l.length > 1 ? `<div class="seg n${l.length + 1}">${[['', 'Tudo'], ...l.map(k => [k, NOMES[k]])].map(([v, n]) => `<button class="${a.tipo === v ? 'on' : ''}" data-a="add-tipo" data-v="${v}">${n}</button>`).join('')}</div>` : '';
     let res = '';
-    const faltaJogo = a.tipo === 'jogo' || (!a.tipo && !l.some(k => k !== 'jogo'));
+    const faltaJogo = a.tipo === 'jogo' || (!a.tipo && !l.some(ehTV));
+    const soLivro = a.tipo === 'livro' || (l.length === 1 && l[0] === 'livro');
     if (semChave) res = `<p class="lead" style="margin-top:14px">${faltaJogo ? 'Falta a conta do IGDB.' : 'Falta a chave do TMDB.'}</p><div class="acoes"><button class="btn pri" data-a="ir-config" data-v="integracoes">${ic('key', 'ic-s')}${faltaJogo ? 'Pôr a conta' : 'Pôr a chave'}</button></div>`;
     else if (busca) {
       if (a.erro) res = `<p class="status erro" style="margin-top:14px">${esc(a.erro)}</p>`;
       else if (!a.res) res = '<p class="vazio" style="margin-top:14px">Procurando…</p>';
-      else if (!a.res.length) res = `<p class="vazio" style="margin-top:14px">Nada com esse nome${a.tipo === 'jogo' ? ' no IGDB' : a.tipo ? ' no TMDB' : ''}.</p>`;
+      else if (!a.res.length) res = `<p class="vazio" style="margin-top:14px">Nada com esse nome${soLivro ? ' na Open Library' : a.tipo === 'jogo' ? ' no IGDB' : a.tipo ? ' no TMDB' : ''}.</p>`;
       else res = grade(a.res, 'busca');
+    } else if (soLivro) {
+      // os livros não têm listas prontas: o nome, o autor ou o código de barras (o ISBN)
+      res = `<div class="acoes" style="margin-top:14px"><button class="btn pri" data-a="add-codigo">${ic('camera', 'ic-s')}Ler código de barras</button></div>
+        <p class="credito">Dados da ${site('https://openlibrary.org', 'Open Library')}.</p>`;
     } else {
       const L = a.listas[a.lista + ':' + a.tipo];
       if (!listas().some(([k]) => k === a.lista)) a.lista = 'alta';
@@ -674,8 +689,8 @@
   }
   function folhaTitulo(t) {
     const e = S.e, pode = podeProximo(t);
-    const jg = t.tipo === 'jogo';
-    const info = [t.ano, TIPO[t.tipo][0], t.tipo === 'filme' ? duracao(t.duracao) : t.tipo === 'serie' ? (t.temporadas.length ? plural(t.temporadas.length, 'temporada', 'temporadas') : '') : '',
+    const jg = t.tipo === 'jogo', lv = t.tipo === 'livro';
+    const info = [t.ano, TIPO[t.tipo][0], lv && t.paginas ? plural(t.paginas, 'página', 'páginas') : t.tipo === 'filme' ? duracao(t.duracao) : t.tipo === 'serie' ? (t.temporadas.length ? plural(t.temporadas.length, 'temporada', 'temporadas') : '') : '',
       t.tipo === 'serie' && t.fim ? 'terminou' : '', jg && t.data && t.data > hojeISO() ? 'sai ' + saiEm(t.data) : ''].filter(Boolean).join(' · ');
     let h = `<div class="topo-tit">${capa(t, true)}<div class="info">${t.original && t.original !== t.nome ? `<span class="orig">${esc(t.original)}</span>` : ''}<span class="meta">${esc(info)}</span>
       ${t.generos.length ? `<span class="gens">${t.generos.map(g => `<span class="tag">${esc(g)}</span>`).join('')}</span>` : ''}</div></div>`;
@@ -701,7 +716,10 @@
       const todos = e.pessoas.every(p => t.quem.includes(p.id));
       h += `<div class="campo">${lbl('users', 'Quem')}<div class="escolhas">${e.pessoas.length > 1 ? `<button class="escolha${todos ? ' on' : ''}" data-a="quem-todos">${ic(todos ? 'check' : 'users', 'ic-s')}Todos</button>` : ''}${e.pessoas.map(p => `<button class="escolha${t.quem.includes(p.id) ? ' on' : ''}" data-a="quem" data-v="${esc(p.id)}">${ic(t.quem.includes(p.id) ? 'check' : 'user', 'ic-s')}${esc(p.nome.split(' ')[0])}</button>`).join('')}</div></div>`;
     }
-    if (jg) {
+    if (lv) {
+      h += `<div class="campo">${lbl('user', (t.autores || []).length > 1 ? 'Autores' : 'Autor')}${(t.autores || []).length ? `<p class="sinopse">${esc(t.autores.join(', '))}</p>` : '<p class="vazio">A Open Library não diz o autor.</p>'}
+        <p class="credito">${t.isbn ? `ISBN ${esc(t.isbn)} · ` : ''}Dados da ${t.link ? site(esc(t.link), 'Open Library') : 'Open Library'}${t.ol_em ? `, de ${esc(dia(t.ol_em.slice(0, 10)))}` : ''}.</p></div>`;
+    } else if (jg) {
       h += `<div class="campo">${lbl('gamepad', 'Onde jogar')}${(t.plataformas || []).length ? `<dl class="onde"><div><dt>Plataformas</dt><dd>${esc(t.plataformas.join(', '))}</dd></div></dl>` : '<p class="vazio">O IGDB não diz as plataformas.</p>'}
         <p class="credito">Dados do ${t.link ? site(esc(t.link), 'IGDB') : 'IGDB'}${t.igdb_em ? `, de ${esc(dia(t.igdb_em.slice(0, 10)))}` : ''}.</p></div>`;
     } else {
@@ -710,7 +728,7 @@
         <p class="credito">Dados da ${o.link ? site(esc(o.link), 'JustWatch') : 'JustWatch'}${t.tmdb_em ? `, de ${esc(dia(t.tmdb_em.slice(0, 10)))}` : ''}.</p></div>`;
     }
     if (t.sinopse) h += `<div class="campo">${lbl('texto', 'Sinopse')}<p class="sinopse">${esc(t.sinopse)}</p></div>`;
-    h += `<div class="campo">${lbl('nota', 'Notas', 'f-notas')}<textarea class="inp" id="f-notas" rows="3" placeholder="${jg ? 'Onde parou, o que achou…' : 'O que a casa achou, quem indicou…'}">${esc(t.notas)}</textarea></div>`;
+    h += `<div class="campo">${lbl('nota', 'Notas', 'f-notas')}<textarea class="inp" id="f-notas" rows="3" placeholder="${jg || lv ? 'Onde parou, o que achou…' : 'O que a casa achou, quem indicou…'}">${esc(t.notas)}</textarea></div>`;
     const pe = S.conf === 'apagar:' + t.id ? `<p class="conf">Apagar «${esc(t.nome)}» da lista?</p><button class="btn out" data-a="conf-nao">${ic('x', 'ic-s')}Cancelar</button><button class="btn perigo" data-a="apagar" data-id="${t.id}">${ic('trash', 'ic-s')}Apagar</button>`
       : `<button class="btn out" data-a="conf" data-v="apagar:${t.id}">${ic('trash', 'ic-s')}Apagar</button><button class="btn out" data-a="atualizar" data-id="${t.id}"${ref(t) ? '' : ' disabled'}>${ic('refresh', 'ic-s')}Atualizar</button>`;
     return { titulo: t.nome, icone: TIPO[t.tipo][1], corpo: h, pe };
@@ -871,11 +889,59 @@
     if (S.ch.fala && !(S.folha && S.folha.tipo === 'conversa')) pararFala();  // o Voltar fechou a Conversa: o microfone para
     S.conf = '';
     S.novaCat = null;
+    if (COD.aberto && !st.cod) fecharCodigo();  // e fecha a câmera do código de barras
     if (S.sel && !st.sel) S.sel = null; // o Voltar do celular sai do Selecionar
     if (!st.painel) { S.ch.rapidas = false; S.ch.editando = null; }  // e fecha as perguntas prontas
     if (st.t && st.t !== S.tela) { S.tela = st.t; window.scrollTo(0, 0); }
     render();
   });
+
+  /* ---------- 0.16.0: o código de barras de um livro (o ISBN), pela câmera do app: o número vai para a busca */
+  const COD = { aberto: false, fluxo: null, el: null, t: 0 };
+  function fecharCodigo() {
+    clearTimeout(COD.t);
+    if (COD.fluxo) COD.fluxo.getTracks().forEach(x => x.stop());
+    if (COD.el) COD.el.remove();
+    Object.assign(COD, { aberto: false, fluxo: null, el: null });
+  }
+  function achouCodigo(n) {
+    S.add.q = n;
+    S.add.res = null;
+    history.back();  // fecha a câmera (o popstate) e a busca começa
+    setTimeout(buscarTMDB, 60);
+  }
+  async function lerCodigo() {
+    const md = navigator.mediaDevices;
+    if (!md || !md.getUserMedia || !('BarcodeDetector' in window)) {
+      toast(window.isSecureContext === false ? 'Sem https não há câmera: escreva o número que fica embaixo do código de barras.' : 'Aqui não dá para ler o código: escreva o número que fica embaixo dele.');
+      return;
+    }
+    try { COD.fluxo = await md.getUserMedia({ video: { facingMode: 'environment' }, audio: false }); } catch (err) {
+      toast('Sem a câmera: escreva o número que fica embaixo do código de barras.');
+      return;
+    }
+    const el = document.createElement('div');
+    el.className = 'cod-cam';
+    el.innerHTML = `<video playsinline muted></video><div class="cod-guia"></div><p>Aponte para o código de barras do livro</p><button class="btn out" data-a="cod-fechar">${ic('x', 'ic-s')}Fechar</button>`;
+    document.body.appendChild(el);
+    Object.assign(COD, { aberto: true, el });
+    history.pushState(Object.assign({}, history.state, { cod: 1 }), '');
+    const v = el.querySelector('video');
+    v.srcObject = COD.fluxo;
+    const toca = v.play();  // sem esperar: o vídeo começa quando der
+    if (toca && toca.catch) toca.catch(() => {});
+    const det = new window.BarcodeDetector({ formats: ['ean_13'] });
+    const olhar = async () => {
+      if (!COD.aberto) return;
+      try {
+        const cs = await det.detect(v);
+        const c = cs.map(x => String(x.rawValue || '')).find(x => /^97[89]\d{10}$/.test(x));
+        if (c) { achouCodigo(c); return; }
+      } catch (err) { /* um quadro que não deu: o próximo */ }
+      COD.t = setTimeout(olhar, 250);
+    };
+    olhar();
+  }
 
   /* ---------- as ações */
   function trocar(t) {
@@ -939,7 +1005,7 @@
   }
   async function adicionarUm(r, situacao) {
     const tipo = r.tipo || (S.col && S.col.jogo ? 'jogo' : 'filme');
-    const x = await api.post('titulo', { acao: 'adicionar', tipo, [tipo === 'jogo' ? 'igdb' : 'tmdb']: ref(Object.assign({ tipo }, r)), situacao });
+    const x = await api.post('titulo', { acao: 'adicionar', tipo, [tipo === 'jogo' ? 'igdb' : tipo === 'livro' ? 'ol' : 'tmdb']: ref(Object.assign({ tipo }, r)), situacao });
     trocar(x.titulo);
     r.ja = x.titulo.id;
     r.situacao = x.titulo.situacao;
@@ -1338,6 +1404,8 @@
     'add-lista': el => { S.add.lista = el.dataset.v; guardar('odisseia-lista', S.add.lista); render(); },
     'add-mais': () => carregarLista(true),
     'add-limpar': () => { S.add.q = ''; S.add.res = null; render(); },
+    'add-codigo': () => lerCodigo(),
+    'cod-fechar': () => history.back(),
     'cz-abrir': async el => {
       const r = itemDe(el);
       if (r.tipo === 'colecao' || r.tipo === 'colecao_jogos') { S.col = null; S.colCat = null; abrirFolha({ tipo: 'colecao', id: ref(r), jogo: r.tipo === 'colecao_jogos' }, true); return; }
@@ -1423,7 +1491,7 @@
     },
     atualizar: async el => {
       el.disabled = true;
-      try { const r = await api.post('titulo', { acao: 'atualizar', id: el.dataset.id }); trocar(r.titulo); toast(`Atualizado pelo ${r.titulo.tipo === 'jogo' ? 'IGDB' : 'TMDB'}.`); render(); } catch (err) { el.disabled = false; toast(err.message); }
+      try { const r = await api.post('titulo', { acao: 'atualizar', id: el.dataset.id }); trocar(r.titulo); toast(r.titulo.tipo === 'livro' ? 'Atualizado pela Open Library.' : `Atualizado pelo ${r.titulo.tipo === 'jogo' ? 'IGDB' : 'TMDB'}.`); render(); } catch (err) { el.disabled = false; toast(err.message); }
     },
     conf: el => { S.conf = el.dataset.v; render(); },
     'conf-nao': () => { S.conf = ''; S.importar = null; render(); },

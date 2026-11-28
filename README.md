@@ -2,7 +2,7 @@
 
 ![OdisseIA](odisseia/logo.png)
 
-Um app (add-on) do Home Assistant para os filmes, as séries e os jogos da casa, da família de apps da CorrerIA Code.
+Um app (add-on) do Home Assistant para os filmes, as séries, os jogos e os livros da casa, da família de apps da CorrerIA Code.
 
 <p align="center">
   <img src="docs/agora.png" width="24%" alt="Agora: continuar vendo, os episódios novos e os jogos que vão sair">
@@ -13,6 +13,7 @@ Um app (add-on) do Home Assistant para os filmes, as séries e os jogos da casa,
 
 - **Agora**: o que a casa está vendo, o episódio em que cada um parou, os episódios e os jogos que vão sair e o que quer ver ou jogar.
 - **Adicionar** pelo nome ou pelas listas prontas (em alta, mais populares, mais bem avaliados, estreias e coleções), com a capa: filmes e séries em português (TMDB), jogos (IGDB); uma série ou uma coleção inteira de uma vez.
+- **Livros** (opcional): pelo nome, pelo autor ou pelo código de barras (ISBN), com a capa e o autor, da Open Library; Quero ler e Lido.
 - **Situação, episódio, categoria (com cor), quem vê, onde assistir no Brasil** (dados da JustWatch) e **onde jogar**.
 - **Buscar** e **Concluídos**, em capas ou em lista, agrupados por categoria ou gênero, com o Selecionar para mudar vários de uma vez.
 - **IA**: a **Conversa** e o **Falar** no alto de toda tela, com a IA do Home Assistant; a Memória da IA da casa.
@@ -42,4 +43,4 @@ python3 tools/prints_readme.py  # refaz as capturas deste README (docs/*.png)
 
 As instruções para quem mexe no código (pessoas ou IAs) estão em [AGENTS.md](AGENTS.md).
 
-Este app usa a API do TMDB, mas não é endossado nem certificado pelo TMDB. Os jogos: dados do IGDB.
+Este app usa a API do TMDB, mas não é endossado nem certificado pelo TMDB. Os jogos: dados do IGDB. Os livros: dados da Open Library.
